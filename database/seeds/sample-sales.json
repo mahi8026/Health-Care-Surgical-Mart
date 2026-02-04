@@ -1,0 +1,114 @@
+[
+  {
+    "invoiceNo": "INV-2024-001",
+    "customerId": null,
+    "customerName": "Walk-in Customer",
+    "items": [
+      {
+        "productId": null,
+        "name": "Paracetamol 500mg",
+        "rate": 5.0,
+        "qty": 2,
+        "total": 10.0
+      },
+      {
+        "productId": null,
+        "name": "Digital Thermometer",
+        "rate": 20.0,
+        "qty": 1,
+        "total": 20.0
+      }
+    ],
+    "subtotal": 30.0,
+    "discountAmount": 0,
+    "discountPercent": 0,
+    "vatAmount": 3.0,
+    "vatPercent": 10,
+    "grandTotal": 33.0,
+    "cashPaid": 35.0,
+    "bankPaid": 0,
+    "returnAmount": 2.0,
+    "paymentStatus": "Paid",
+    "saleDate": "2024-01-25T10:30:00.000Z",
+    "createdBy": null,
+    "createdByName": "Shop Admin",
+    "notes": "Walk-in customer purchase"
+  },
+  {
+    "invoiceNo": "INV-2024-002",
+    "customerId": null,
+    "customerName": "Robert Wilson",
+    "items": [
+      {
+        "productId": null,
+        "name": "Amoxicillin 250mg",
+        "rate": 15.0,
+        "qty": 1,
+        "total": 15.0
+      },
+      {
+        "productId": null,
+        "name": "Surgical Mask (50pcs)",
+        "rate": 15.0,
+        "qty": 2,
+        "total": 30.0
+      }
+    ],
+    "subtotal": 45.0,
+    "discountAmount": 2.25,
+    "discountPercent": 5,
+    "vatAmount": 4.28,
+    "vatPercent": 10,
+    "grandTotal": 47.03,
+    "cashPaid": 50.0,
+    "bankPaid": 0,
+    "returnAmount": 2.97,
+    "paymentStatus": "Paid",
+    "saleDate": "2024-01-25T14:15:00.000Z",
+    "createdBy": null,
+    "createdByName": "Staff Member",
+    "notes": "Regular customer"
+  },
+  {
+    "invoiceNo": "INV-2024-003",
+    "customerId": null,
+    "customerName": "ABC Hospital",
+    "items": [
+      {
+        "productId": null,
+        "name": "Surgical Gloves (Medium)",
+        "rate": 10.0,
+        "qty": 10,
+        "total": 100.0
+      },
+      {
+        "productId": null,
+        "name": "Disposable Syringes 5ml",
+        "rate": 0.5,
+        "qty": 100,
+        "total": 50.0
+      },
+      {
+        "productId": null,
+        "name": "Alcohol Swabs (100pcs)",
+        "rate": 10.0,
+        "qty": 5,
+        "total": 50.0
+      }
+    ],
+    "subtotal": 200.0,
+    "discountAmount": 20.0,
+    "discountPercent": 10,
+    "vatAmount": 18.0,
+    "vatPercent": 10,
+    "grandTotal": 198.0,
+    "cashPaid": 0,
+    "bankPaid": 198.0,
+    "returnAmount": 0,
+    "paymentStatus": "Paid",
+    "saleDate": "2024-01-25T16:45:00.000Z",
+    "createdBy": null,
+    "createdByName": "Shop Admin",
+    "notes": "Bulk order for hospital"
+  }
+]

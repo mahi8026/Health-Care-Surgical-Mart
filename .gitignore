@@ -1,0 +1,271 @@
+# ============================================
+# Health Care Surgical Mart - .gitignore
+# ============================================
+
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+jspm_packages/
+
+# ============================================
+# Environment Variables (CRITICAL - Never commit!)
+# ============================================
+.env
+.env.*
+!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+client/.env
+server/.env
+
+# ============================================
+# Logs (IMPORTANT - Can be large)
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pids
+*.pid
+*.seed
+*.pid.lock
+server/logs/
+client/logs/
+
+# ============================================
+# Build Outputs
+# ============================================
+dist/
+dist-ssr/
+build/
+.next/
+.nuxt/
+out/
+client/dist/
+server/dist/
+
+# ============================================
+# Testing & Coverage
+# ============================================
+coverage/
+*.lcov
+.nyc_output
+test-results/
+junit.xml
+server/coverage/
+client/coverage/
+
+# ============================================
+# Cache & Temporary Files
+# ============================================
+.cache/
+.parcel-cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.npm
+.eslintcache
+*.tsbuildinfo
+.node_repl_history
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ============================================
+# Editor & IDE
+# ============================================
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+.vscode-test
+
+# ============================================
+# Operating System Files
+# ============================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================
+# Database Files (CRITICAL - Never commit!)
+# ============================================
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql
+database/backups/
+*.backup
+*.bak
+
+# ============================================
+# Uploads & User Files (IMPORTANT)
+# ============================================
+uploads/
+server/uploads/
+client/uploads/
+*.pdf
+*.xlsx
+*.xls
+*.csv
+!**/template*.csv
+!**/sample*.csv
+
+# ============================================
+# SSL Certificates & Keys (CRITICAL - Security!)
+# ============================================
+ssl/
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# ============================================
+# Package Manager Files
+# ============================================
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.yarn-integrity
+*.tgz
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# ============================================
+# Docker
+# ============================================
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# ============================================
+# PM2 & Process Managers
+# ============================================
+ecosystem.config.js
+.pm2/
+
+# ============================================
+# Webpack & Bundlers
+# ============================================
+webpack-stats.json
+bundle-analyzer-report.html
+stats.json
+
+# ============================================
+# Documentation (Generated)
+# ============================================
+# Keep manually created docs, ignore generated ones
+docs/api/
+docs/coverage/
+
+# ============================================
+# Miscellaneous
+# ============================================
+.vercel
+.netlify
+.firebase/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+.vscode-test
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ============================================
+# Project Specific
+# ============================================
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Temporary markdown files (keep main docs)
+*_TEMP.md
+*_OLD.md
+*_BACKUP.md
+
+# Test data
+test-data/
+mock-data/
+
+# Local configuration
+local.config.js
+local.config.json
+
+# ============================================
+# Keep These Files (Exceptions)
+# ============================================
+!.gitkeep
+!.htaccess
+!.editorconfig
+!.prettierrc
+!.eslintrc.js
+!README.md
+!LICENSE
+!CHANGELOG.md

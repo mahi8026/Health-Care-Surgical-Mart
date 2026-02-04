@@ -1,0 +1,113 @@
+[
+  {
+    "purchaseNo": "PO-2024-001",
+    "supplierName": "PharmaCorp Distributors",
+    "supplierPhone": "9876543210",
+    "supplierAddress": "123 Pharma Street, Industrial Zone",
+    "items": [
+      {
+        "productId": null,
+        "name": "Paracetamol 500mg",
+        "rate": 2.5,
+        "qty": 100,
+        "total": 250.0,
+        "batchNo": "PC2024001",
+        "expiryDate": "2025-12-31T00:00:00.000Z"
+      },
+      {
+        "productId": null,
+        "name": "Amoxicillin 250mg",
+        "rate": 8.0,
+        "qty": 50,
+        "total": 400.0,
+        "batchNo": "PC2024002",
+        "expiryDate": "2025-11-30T00:00:00.000Z"
+      }
+    ],
+    "totalAmount": 650.0,
+    "paidAmount": 650.0,
+    "dueAmount": 0,
+    "paymentStatus": "Paid",
+    "purchaseDate": "2024-01-20T09:00:00.000Z",
+    "createdBy": null,
+    "createdByName": "Shop Admin",
+    "notes": "Monthly medicine stock replenishment"
+  },
+  {
+    "purchaseNo": "PO-2024-002",
+    "supplierName": "Surgical Solutions Inc",
+    "supplierPhone": "9876543214",
+    "supplierAddress": "654 Surgical Avenue, Medical Zone",
+    "items": [
+      {
+        "productId": null,
+        "name": "Surgical Gloves (Medium)",
+        "rate": 5.0,
+        "qty": 50,
+        "total": 250.0,
+        "batchNo": "SS2024001",
+        "expiryDate": "2026-12-31T00:00:00.000Z"
+      },
+      {
+        "productId": null,
+        "name": "Disposable Syringes 5ml",
+        "rate": 0.25,
+        "qty": 500,
+        "total": 125.0,
+        "batchNo": "SS2024002",
+        "expiryDate": "2026-08-31T00:00:00.000Z"
+      },
+      {
+        "productId": null,
+        "name": "Surgical Mask (50pcs)",
+        "rate": 8.0,
+        "qty": 20,
+        "total": 160.0,
+        "batchNo": "SS2024003",
+        "expiryDate": "2026-06-30T00:00:00.000Z"
+      }
+    ],
+    "totalAmount": 535.0,
+    "paidAmount": 300.0,
+    "dueAmount": 235.0,
+    "paymentStatus": "Partial",
+    "purchaseDate": "2024-01-22T11:30:00.000Z",
+    "createdBy": null,
+    "createdByName": "Shop Admin",
+    "notes": "Surgical supplies order - partial payment made"
+  },
+  {
+    "purchaseNo": "PO-2024-003",
+    "supplierName": "Lab Equipment Pro",
+    "supplierPhone": "9876543215",
+    "supplierAddress": "987 Laboratory Road, Science District",
+    "items": [
+      {
+        "productId": null,
+        "name": "Blood Glucose Test Strips",
+        "rate": 15.0,
+        "qty": 20,
+        "total": 300.0,
+        "batchNo": "LEP2024001",
+        "expiryDate": "2025-12-31T00:00:00.000Z"
+      },
+      {
+        "productId": null,
+        "name": "Digital Thermometer",
+        "rate": 12.0,
+        "qty": 15,
+        "total": 180.0,
+        "batchNo": "LEP2024002",
+        "expiryDate": "2027-06-30T00:00:00.000Z"
+      }
+    ],
+    "totalAmount": 480.0,
+    "paidAmount": 0,
+    "dueAmount": 480.0,
+    "paymentStatus": "Pending",
+    "purchaseDate": "2024-01-24T15:00:00.000Z",
+    "createdBy": null,
+    "createdByName": "Shop Admin",
+    "notes": "Lab equipment order - payment pending"
+  }
+]

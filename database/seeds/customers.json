@@ -1,0 +1,152 @@
+[
+  {
+    "name": "Robert Wilson",
+    "phone": "1234567801",
+    "email": "robert.wilson@email.com",
+    "address": "123 Customer Street, Downtown",
+    "type": "Retail",
+    "creditLimit": 0,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Emily Davis",
+    "phone": "1234567802",
+    "email": "emily.davis@email.com",
+    "address": "456 Buyer Avenue, Midtown",
+    "type": "Retail",
+    "creditLimit": 0,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Michael Johnson",
+    "phone": "1234567803",
+    "email": "michael.johnson@email.com",
+    "address": "789 Client Road, Uptown",
+    "type": "Retail",
+    "creditLimit": 0,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Sarah Thompson",
+    "phone": "1234567804",
+    "email": "sarah.thompson@email.com",
+    "address": "321 Patient Lane, Eastside",
+    "type": "Retail",
+    "creditLimit": 0,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "David Martinez",
+    "phone": "1234567805",
+    "email": "david.martinez@email.com",
+    "address": "654 Health Street, Westside",
+    "type": "Retail",
+    "creditLimit": 0,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "ABC Hospital",
+    "phone": "1234567810",
+    "email": "purchase@abchospital.com",
+    "address": "789 Hospital Road, Medical District",
+    "type": "Wholesale",
+    "creditLimit": 50000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "City Medical Center",
+    "phone": "1234567811",
+    "email": "procurement@citymedical.com",
+    "address": "456 Medical Plaza, Healthcare Zone",
+    "type": "Wholesale",
+    "creditLimit": 75000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "General Hospital",
+    "phone": "1234567812",
+    "email": "supplies@generalhospital.com",
+    "address": "123 General Avenue, Hospital District",
+    "type": "Wholesale",
+    "creditLimit": 100000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Community Health Clinic",
+    "phone": "1234567813",
+    "email": "orders@communityclinic.com",
+    "address": "987 Community Street, Health Center",
+    "type": "Wholesale",
+    "creditLimit": 25000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "MediCare Pharmacy Chain",
+    "phone": "1234567814",
+    "email": "bulk@medicarechain.com",
+    "address": "555 Pharmacy Boulevard, Retail District",
+    "type": "Wholesale",
+    "creditLimit": 200000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Dr. James Anderson",
+    "phone": "1234567820",
+    "email": "dr.anderson@clinic.com",
+    "address": "111 Doctor Street, Medical Plaza",
+    "type": "Retail",
+    "creditLimit": 5000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Dr. Lisa Chen",
+    "phone": "1234567821",
+    "email": "dr.chen@healthcenter.com",
+    "address": "222 Physician Avenue, Health District",
+    "type": "Retail",
+    "creditLimit": 5000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Wellness Pharmacy",
+    "phone": "1234567830",
+    "email": "orders@wellnesspharmacy.com",
+    "address": "333 Wellness Road, Pharmacy District",
+    "type": "Wholesale",
+    "creditLimit": 30000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "HealthFirst Clinic",
+    "phone": "1234567831",
+    "email": "supplies@healthfirst.com",
+    "address": "444 HealthFirst Street, Clinic Zone",
+    "type": "Wholesale",
+    "creditLimit": 40000,
+    "outstandingBalance": 0,
+    "isActive": true
+  },
+  {
+    "name": "Senior Care Home",
+    "phone": "1234567832",
+    "email": "medical@seniorcare.com",
+    "address": "555 Senior Avenue, Care District",
+    "type": "Wholesale",
+    "creditLimit": 35000,
+    "outstandingBalance": 0,
+    "isActive": true
+  }
+]

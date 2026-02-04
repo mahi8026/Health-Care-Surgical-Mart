@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  medical-pos:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - LOG_LEVEL=info
+    volumes:
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - medical-pos-network
+
+  # Optional: Add nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - medical-pos
+    restart: unless-stopped
+    networks:
+      - medical-pos-network
+
+networks:
+  medical-pos-network:
+    driver: bridge
+
+volumes:
+  logs:
+  backups:

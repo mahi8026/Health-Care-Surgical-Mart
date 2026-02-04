@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Medical",
+    "description": "Pharmaceutical medicines and drugs",
+    "isActive": true
+  },
+  {
+    "name": "Lab",
+    "description": "Laboratory equipment and diagnostic tools",
+    "isActive": true
+  },
+  {
+    "name": "Surgical",
+    "description": "Surgical instruments and supplies",
+    "isActive": true
+  }
+]
