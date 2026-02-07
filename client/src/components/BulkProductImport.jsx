@@ -10,17 +10,35 @@ const BulkProductImport = ({ onClose, onSuccess }) => {
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
+    console.log("File selected:", {
+      name: selectedFile?.name,
+      type: selectedFile?.type,
+      size: selectedFile?.size,
+    });
+
     if (selectedFile) {
       const validTypes = [
         "text/csv",
         "application/vnd.ms-excel",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       ];
-      if (validTypes.includes(selectedFile.type)) {
+
+      // Also check file extension as backup
+      const fileName = selectedFile.name.toLowerCase();
+      const hasValidExtension =
+        fileName.endsWith(".csv") ||
+        fileName.endsWith(".xlsx") ||
+        fileName.endsWith(".xls");
+
+      if (validTypes.includes(selectedFile.type) || hasValidExtension) {
         setFile(selectedFile);
         setErrors([]);
+        console.log("File accepted:", selectedFile.name);
       } else {
-        setErrors(["Please upload a valid CSV or Excel file"]);
+        console.log("Invalid file type:", selectedFile.type);
+        setErrors([
+          `Please upload a valid CSV or Excel file. Current type: ${selectedFile.type}`,
+        ]);
         setFile(null);
       }
     }
@@ -52,24 +70,39 @@ Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
     setImporting(true);
     setProgress(0);
     setErrors([]);
+    setResults(null);
 
     const formData = new FormData();
     formData.append("file", file);
 
+    // Debug FormData
+    console.log("FormData created:", {
+      hasFile: formData.has("file"),
+      fileFromFormData: formData.get("file"),
+    });
+
     try {
+      console.log("Starting bulk import:", {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+      });
+
       const response = await apiService.post(
-        "/products/bulk-import",
+        "/bulk-products/bulk-import",
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total,
             );
             setProgress(percentCompleted);
+            console.log("Upload progress:", percentCompleted + "%");
           },
         },
       );
+
+      console.log("Import response:", response);
 
       if (response.success) {
         setResults(response.data);
@@ -85,7 +118,26 @@ Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
         setErrors([response.message || "Import failed"]);
       }
     } catch (error) {
-      setErrors([error.response?.data?.message || "Failed to import products"]);
+      console.error("Import error:", error);
+
+      // Extract detailed error message
+      let errorMessage = "Failed to import products";
+
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Add stack trace in development
+      if (
+        error.response?.data?.error &&
+        process.env.NODE_ENV === "development"
+      ) {
+        console.error("Detailed error:", error.response.data.error);
+      }
+
+      setErrors([errorMessage]);
     } finally {
       setImporting(false);
     }
@@ -170,10 +222,19 @@ Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
               </label>
               {file && (
                 <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-600">
-                  <i className="fas fa-file-csv"></i>
+                  <i className="fas fa-file-excel"></i>
                   <span>{file.name}</span>
+                  <span className="text-gray-500">
+                    ({(file.size / 1024).toFixed(1)} KB)
+                  </span>
                   <button
-                    onClick={() => setFile(null)}
+                    onClick={() => {
+                      setFile(null);
+                      setErrors([]);
+                      setResults(null);
+                      // Reset the input
+                      document.getElementById("file-upload").value = "";
+                    }}
                     className="text-red-600 hover:text-red-700 ml-2"
                   >
                     <i className="fas fa-times"></i>

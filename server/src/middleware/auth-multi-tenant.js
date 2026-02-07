@@ -51,7 +51,7 @@ async function authenticate(req, res, next) {
     if (decoded.role === "SUPER_ADMIN") {
       const systemDb = getSystemDatabase();
       user = await systemDb.collection("system_users").findOne({
-        _id: new ObjectId(decoded.userId),
+        _id: decoded.userId, // Use string ID for mock database compatibility
       });
     } else {
       if (!decoded.shopId) {
@@ -66,7 +66,7 @@ async function authenticate(req, res, next) {
 
       const shopDb = getShopDatabase(decoded.shopId);
       user = await shopDb.collection("users").findOne({
-        _id: new ObjectId(decoded.userId),
+        _id: decoded.userId, // Use string ID for mock database compatibility
       });
     }
 

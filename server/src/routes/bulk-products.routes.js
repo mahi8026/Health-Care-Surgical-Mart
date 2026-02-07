@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const Product = require("../models/product.schema");
 const Stock = require("../models/stock.schema");
-const { authenticateToken } = require("../middleware/auth-multi-tenant");
+const { authenticate } = require("../middleware/auth-multi-tenant");
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
@@ -66,6 +66,159 @@ const parseExcel = (filePath) => {
   }
 };
 
+// Column mapping function to handle different Excel formats
+const mapProductColumns = (rawProduct) => {
+  console.log("=== COLUMN MAPPING DEBUG ===");
+  console.log("Raw product data:", rawProduct);
+  console.log("Available columns:", Object.keys(rawProduct));
+
+  const columnMappings = {
+    // Standard mappings
+    name: [
+      "name",
+      "product_name",
+      "productname",
+      "item_name",
+      "itemname",
+      "product",
+      "item",
+      "description",
+      "product_description",
+      "product description",
+    ],
+    sku: [
+      "sku",
+      "code",
+      "product_code",
+      "productcode",
+      "item_code",
+      "itemcode",
+      "barcode",
+      "id",
+      "product_id",
+      "s/n",
+      "sn",
+      "serial",
+      "serial_number",
+    ],
+    category: [
+      "category",
+      "cat",
+      "type",
+      "group",
+      "product_category",
+      "item_category",
+    ],
+    purchasePrice: [
+      "purchase_price",
+      "purchaseprice",
+      "cost_price",
+      "costprice",
+      "cost",
+      "buy_price",
+      "buyprice",
+      "wholesale_price",
+      "distributor price (tk)",
+      "distributor_price",
+    ],
+    sellingPrice: [
+      "selling_price",
+      "sellingprice",
+      "sale_price",
+      "saleprice",
+      "price",
+      "retail_price",
+      "retailprice",
+      "mrp",
+      "price (tk)",
+      "price_tk",
+    ],
+    unit: [
+      "unit",
+      "uom",
+      "unit_of_measure",
+      "measure",
+      "qty_unit",
+      "quantity_unit",
+      "pack size",
+      "pack_size",
+      "packsize",
+    ],
+    minStockLevel: [
+      "min_stock_level",
+      "minstocklevel",
+      "min_stock",
+      "minstock",
+      "reorder_level",
+      "reorderlevel",
+      "minimum_quantity",
+      "test/pack",
+      "test_pack",
+    ],
+    description: [
+      "description",
+      "desc",
+      "details",
+      "notes",
+      "remarks",
+      "product_details",
+    ],
+  };
+
+  const mapped = {};
+
+  // Get all available keys from the raw product (case-insensitive)
+  const availableKeys = Object.keys(rawProduct).map((key) =>
+    key.toLowerCase().trim(),
+  );
+
+  console.log("Available keys (lowercase):", availableKeys);
+
+  // Map each field
+  for (const [standardField, possibleNames] of Object.entries(columnMappings)) {
+    let value = null;
+
+    // Try to find a matching column name
+    for (const possibleName of possibleNames) {
+      const matchingKey = availableKeys.find(
+        (key) => key === possibleName.toLowerCase(),
+      );
+      if (matchingKey) {
+        // Find the original key with correct case
+        const originalKey = Object.keys(rawProduct).find(
+          (k) => k.toLowerCase().trim() === matchingKey,
+        );
+        value = rawProduct[originalKey];
+        console.log(
+          `✅ Mapped ${standardField}: "${possibleName}" -> "${value}"`,
+        );
+        break;
+      }
+    }
+
+    if (!value) {
+      console.log(`❌ No mapping found for ${standardField}`);
+    }
+
+    mapped[standardField] = value;
+  }
+
+  // Special handling for your Excel format
+  // If no category found, set a default
+  if (!mapped.category || mapped.category === null || mapped.category === "") {
+    mapped.category = "Medical Supplies"; // Default category
+  }
+
+  // If SKU is just a number, create a proper SKU
+  if (mapped.sku && !isNaN(mapped.sku)) {
+    mapped.sku = `BIO-${String(mapped.sku).padStart(3, "0")}`;
+  }
+
+  console.log("Final mapped product:", mapped);
+  console.log("=== END COLUMN MAPPING DEBUG ===");
+  return mapped;
+};
+
 // Validate product data
 const validateProductData = (product, rowIndex) => {
   const errors = [];
@@ -106,13 +259,50 @@ const validateProductData = (product, rowIndex) => {
 // Bulk import products
 router.post(
   "/bulk-import",
-  authenticateToken,
+  (req, res, next) => {
+    console.log("Bulk import request received:", {
+      method: req.method,
+      url: req.url,
+      contentType: req.headers["content-type"],
+      hasBody: !!req.body,
+      bodyKeys: Object.keys(req.body || {}),
+    });
+    next();
+  },
+  authenticate,
   upload.single("file"),
   async (req, res) => {
     let filePath = null;
 
     try {
+      console.log("Bulk import middleware passed:", {
+        hasFile: !!req.file,
+        hasUser: !!req.user,
+        shopId: req.user?.shopId,
+        fileName: req.file?.originalname,
+        fileSize: req.file?.size,
+        filePath: req.file?.path,
+        multerError: req.multerError || "none",
+      });
+
+      // Validate authentication
+      if (!req.user || !req.user.shopId) {
+        console.error("Bulk import - Missing user or shopId:", {
+          hasUser: !!req.user,
+          shopId: req.user?.shopId,
+        });
+        return res.status(401).json({
+          success: false,
+          message: "Authentication failed: Missing shop context",
+        });
+      }
+
       if (!req.file) {
+        console.error("Bulk import - No file in request:", {
+          hasFile: !!req.file,
+          files: req.files,
+          body: req.body,
+        });
         return res.status(400).json({
           success: false,
           message: "No file uploaded",
@@ -122,15 +312,36 @@ router.post(
       filePath = req.file.path;
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
 
+      console.log("Parsing file:", {
+        extension: fileExtension,
+        path: filePath,
+      });
+
       // Parse file based on type
       let products = [];
-      if (fileExtension === ".csv") {
-        products = await parseCSV(filePath);
-      } else if (fileExtension === ".xlsx" || fileExtension === ".xls") {
-        products = parseExcel(filePath);
-      } else {
-        throw new Error("Unsupported file format");
+      try {
+        if (fileExtension === ".csv") {
+          products = await parseCSV(filePath);
+        } else if (fileExtension === ".xlsx" || fileExtension === ".xls") {
+          products = parseExcel(filePath);
+        } else {
+          throw new Error("Unsupported file format");
+        }
+      } catch (parseError) {
+        console.error("File parsing error:", parseError);
+        throw new Error(`Failed to parse file: ${parseError.message}`);
       }
+
+      console.log("File parsed successfully:", {
+        productCount: products.length,
+        firstProduct: products[0],
+        availableColumns: products[0] ? Object.keys(products[0]) : [],
+        sampleData: products.slice(0, 2),
+        allColumnNames:
+          products.length > 0
+            ? Object.keys(products[0]).map((k) => `"${k}"`)
+            : [],
+      });
 
       if (products.length === 0) {
         return res.status(400).json({
@@ -149,8 +360,16 @@ router.post(
       };
 
       for (let i = 0; i < products.length; i++) {
-        const productData = products[i];
+        const rawProductData = products[i];
         const rowIndex = i + 2; // +2 for header row and 0-based index
+
+        // Map columns to standard format
+        const productData = mapProductColumns(rawProductData);
+
+        console.log(`Row ${rowIndex} mapping:`, {
+          raw: rawProductData,
+          mapped: productData,
+        });
 
         // Validate product data
         const validationErrors = validateProductData(productData, rowIndex);
@@ -190,6 +409,9 @@ router.post(
           });
 
           await newProduct.save();
+          console.log(
+            `Product created: ${newProduct.name} (${newProduct.sku})`,
+          );
 
           // Create initial stock entry
           const stock = new Stock({
@@ -200,6 +422,7 @@ router.post(
           });
 
           await stock.save();
+          console.log(`Stock entry created for product: ${newProduct.sku}`);
 
           results.imported.push({
             name: newProduct.name,
@@ -207,12 +430,19 @@ router.post(
           });
           results.successCount++;
         } catch (error) {
+          console.error(`Row ${rowIndex} import error:`, error);
           results.errors.push(
             `Row ${rowIndex}: ${error.message || "Failed to import product"}`,
           );
           results.errorCount++;
         }
       }
+
+      console.log("Bulk import completed:", {
+        total: results.totalRows,
+        success: results.successCount,
+        errors: results.errorCount,
+      });
 
       // Clean up uploaded file
       if (fs.existsSync(filePath)) {
@@ -225,23 +455,33 @@ router.post(
         data: results,
       });
     } catch (error) {
-      console.error("Bulk import error:", error);
+      console.error("Bulk import error:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
 
       // Clean up uploaded file on error
       if (filePath && fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+        try {
+          fs.unlinkSync(filePath);
+        } catch (cleanupError) {
+          console.error("Failed to cleanup file:", cleanupError);
+        }
       }
 
-      res.status(500).json({
+      // Ensure we always return a valid JSON response
+      return res.status(500).json({
         success: false,
         message: error.message || "Failed to import products",
+        error: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
     }
   },
 );
 
 // Bulk export products
-router.get("/bulk-export", authenticateToken, async (req, res) => {
+router.get("/bulk-export", authenticate, async (req, res) => {
   try {
     const products = await Product.find({
       shopId: req.user.shopId,
@@ -278,7 +518,7 @@ router.get("/bulk-export", authenticateToken, async (req, res) => {
 });
 
 // Bulk update products
-router.put("/bulk-update", authenticateToken, async (req, res) => {
+router.put("/bulk-update", authenticate, async (req, res) => {
   try {
     const { updates } = req.body;
 
@@ -355,7 +595,7 @@ router.put("/bulk-update", authenticateToken, async (req, res) => {
 });
 
 // Bulk delete products
-router.post("/bulk-delete", authenticateToken, async (req, res) => {
+router.post("/bulk-delete", authenticate, async (req, res) => {
   try {
     const { skus } = req.body;
 

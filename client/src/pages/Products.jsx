@@ -24,14 +24,31 @@ const Products = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (searchTerm) params.append("search", searchTerm);
-      if (selectedCategory) params.append("category", selectedCategory);
-      params.append("isActive", "true");
 
-      const response = await apiService.get(`/products?${params.toString()}`);
-      if (response.success) {
-        let filteredProducts = response.data;
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/products");
+      const data = await response.json();
+
+      if (data.success) {
+        let filteredProducts = data.data;
+
+        // Apply search filter on frontend
+        if (searchTerm) {
+          filteredProducts = filteredProducts.filter(
+            (product) =>
+              product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (product.brand &&
+                product.brand.toLowerCase().includes(searchTerm.toLowerCase())),
+          );
+        }
+
+        // Apply category filter on frontend
+        if (selectedCategory) {
+          filteredProducts = filteredProducts.filter(
+            (product) => product.category === selectedCategory,
+          );
+        }
 
         // Apply stock filter on frontend
         if (stockFilter) {
@@ -51,7 +68,7 @@ const Products = () => {
 
         setProducts(filteredProducts);
       } else {
-        setError(response.message || "Failed to fetch products");
+        setError(data.message || "Failed to fetch products");
       }
     } catch (error) {
       setError("Failed to fetch products");

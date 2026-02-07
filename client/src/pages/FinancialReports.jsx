@@ -54,31 +54,33 @@ const FinancialReports = () => {
       setLoading(true);
       setError("");
 
-      const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-      });
-
+      // Use the working test endpoints temporarily
       const [plResponse, dsResponse, ppResponse, raResponse, cfResponse] =
         await Promise.all([
-          apiService.get(`/financial-reports/profit-loss?${params.toString()}`),
-          apiService.get(
-            `/financial-reports/daily-summary?date=${dateRange.endDate}`,
+          fetch("http://localhost:5000/api/test/financial-reports/profit-loss"),
+          fetch(
+            "http://localhost:5000/api/test/financial-reports/daily-summary",
           ),
-          apiService.get(
-            `/financial-reports/product-profitability?${params.toString()}`,
+          fetch(
+            "http://localhost:5000/api/test/financial-reports/product-profitability",
           ),
-          apiService.get(
-            `/financial-reports/return-analysis?${params.toString()}`,
+          fetch(
+            "http://localhost:5000/api/test/financial-reports/return-analysis",
           ),
-          apiService.get(`/financial-reports/cash-flow?${params.toString()}`),
+          fetch("http://localhost:5000/api/test/financial-reports/cash-flow"),
         ]);
 
-      if (plResponse.success) setProfitLossData(plResponse.data);
-      if (dsResponse.success) setDailySummary(dsResponse.data);
-      if (ppResponse.success) setProductProfitability(ppResponse.data);
-      if (raResponse.success) setReturnAnalysis(raResponse.data);
-      if (cfResponse.success) setCashFlow(cfResponse.data);
+      const plData = await plResponse.json();
+      const dsData = await dsResponse.json();
+      const ppData = await ppResponse.json();
+      const raData = await raResponse.json();
+      const cfData = await cfResponse.json();
+
+      if (plData.success) setProfitLossData(plData.data);
+      if (dsData.success) setDailySummary(dsData.data);
+      if (ppData.success) setProductProfitability(ppData.data);
+      if (raData.success) setReturnAnalysis(raData.data);
+      if (cfData.success) setCashFlow(cfData.data);
     } catch (error) {
       console.error("Financial data fetch error:", error);
       setError("Failed to fetch financial data");

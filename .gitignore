@@ -65,6 +65,11 @@ junit.xml
 server/coverage/
 client/coverage/
 
+# Test files in root
+test-*.js
+test-*.html
+test-*.json
+
 # ============================================
 # Cache & Temporary Files
 # ============================================

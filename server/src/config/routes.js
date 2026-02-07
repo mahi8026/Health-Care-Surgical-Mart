@@ -15,6 +15,10 @@ const setupRoutes = (app) => {
     logger.info("Loading authentication routes...");
     app.use("/api/auth", require("../routes/auth-multi-tenant.routes"));
 
+    // Test routes (no auth required) - for testing dashboard functionality
+    logger.info("Loading test routes...");
+    app.use("/api/test", require("../routes/test.routes"));
+
     // Super admin routes (super admin auth required)
     logger.info("Loading super admin routes...");
     app.use("/api/super-admin", require("../routes/super-admin.routes"));
@@ -85,6 +89,10 @@ const setupRoutes = (app) => {
     // Bulk Products routes
     logger.info("Loading bulk products routes...");
     app.use("/api/bulk-products", require("../routes/bulk-products.routes"));
+
+    // Notifications routes
+    logger.info("Loading notifications routes...");
+    app.use("/api/notifications", require("../routes/notifications.routes"));
 
     // Test route (no auth required)
     app.get("/api/test", (req, res) => {

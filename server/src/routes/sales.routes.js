@@ -182,6 +182,27 @@ router.post(
         }
       }
 
+      // Send notification to customer (async, don't wait)
+      try {
+        const notificationService = require("../services/notification.service");
+        const settings = await req.shopDb.collection("settings").findOne({});
+
+        if (customer && customer._id) {
+          const customerData = await req.shopDb
+            .collection("customers")
+            .findOne({ _id: new ObjectId(customer._id) });
+
+          if (customerData) {
+            notificationService
+              .sendSaleConfirmation(sale, customerData, settings || {})
+              .catch((err) => console.error("Notification error:", err));
+          }
+        }
+      } catch (notifError) {
+        // Don't fail the sale if notification fails
+        console.error("Failed to send notification:", notifError);
+      }
+
       res.status(201).json({
         success: true,
         message: "Sale created successfully",

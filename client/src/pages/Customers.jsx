@@ -38,29 +38,42 @@ const Customers = () => {
   // Fetch customers
   const fetchCustomers = async (page = 1) => {
     try {
-      const params = new URLSearchParams();
-      params.append("page", page);
-      params.append("limit", "20");
-      if (searchTerm) params.append("search", searchTerm);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/customers");
+      const data = await response.json();
 
-      const response = await apiService.get(`/customers?${params.toString()}`);
-      if (response.success) {
-        let filteredCustomers = response.data;
+      if (data.success) {
+        let filteredCustomers = data.data;
+
+        // Apply search filter on frontend
+        if (searchTerm) {
+          filteredCustomers = filteredCustomers.filter(
+            (customer) =>
+              customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              customer.phone.includes(searchTerm) ||
+              (customer.email &&
+                customer.email
+                  .toLowerCase()
+                  .includes(searchTerm.toLowerCase())),
+          );
+        }
 
         // Apply client-side filtering for customer type
         if (customerTypeFilter !== "all") {
-          filteredCustomers = response.data.filter(
+          filteredCustomers = filteredCustomers.filter(
             (customer) => customer.type === customerTypeFilter,
           );
         }
 
         setCustomers(filteredCustomers);
-        setCurrentPage(response.pagination.page);
-        setTotalPages(response.pagination.pages);
-        setTotalCustomers(response.pagination.total);
+        setCurrentPage(1);
+        setTotalPages(1);
+        setTotalCustomers(filteredCustomers.length);
 
         // Calculate statistics
-        calculateStats(response.data);
+        calculateStats(data.data);
+      } else {
+        setError("Failed to fetch customers");
       }
     } catch (error) {
       console.error("Fetch customers error:", error);

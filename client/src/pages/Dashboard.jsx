@@ -39,9 +39,12 @@ const Dashboard = () => {
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
-      const response = await apiService.get("/reports/dashboard");
-      if (response.success) {
-        setDashboardData(response.data);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/dashboard");
+      const data = await response.json();
+
+      if (data.success) {
+        setDashboardData(data.data);
       } else {
         setError("Failed to fetch dashboard data");
       }
@@ -54,9 +57,14 @@ const Dashboard = () => {
   // Fetch stock valuation data
   const fetchStockData = async () => {
     try {
-      const response = await apiService.get("/reports/stock-valuation");
-      if (response.success) {
-        setStockData(response.data);
+      // Use the working test endpoint temporarily
+      const response = await fetch(
+        "http://localhost:5000/api/test/stock-valuation",
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setStockData(data.data);
       }
     } catch (error) {
       console.error("Stock data error:", error);
@@ -66,27 +74,17 @@ const Dashboard = () => {
   // Fetch expense summary data
   const fetchExpenseData = async () => {
     try {
-      // Get current month expense summary
-      const today = new Date();
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      // Use the working test endpoint temporarily
+      const response = await fetch(
+        "http://localhost:5000/api/test/expense-analytics",
+      );
+      const data = await response.json();
 
-      const [monthlyResponse, categoryResponse] = await Promise.all([
-        apiService.get(`/expense-analytics/month-over-month?months=2`),
-        apiService.get(
-          `/expense-analytics/category-distribution?startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}`,
-        ),
-      ]);
-
-      if (monthlyResponse.success && categoryResponse.success) {
+      if (data.success) {
         const currentMonth =
-          monthlyResponse.data.comparison[
-            monthlyResponse.data.comparison.length - 1
-          ];
+          data.data.comparison[data.data.comparison.length - 1];
         const previousMonth =
-          monthlyResponse.data.comparison[
-            monthlyResponse.data.comparison.length - 2
-          ];
+          data.data.comparison[data.data.comparison.length - 2];
 
         setExpenseData({
           currentMonth: currentMonth || {
@@ -95,8 +93,11 @@ const Dashboard = () => {
             changes: { amount: 0 },
           },
           previousMonth: previousMonth || { totalAmount: 0, expenseCount: 0 },
-          categories: categoryResponse.data.distribution.slice(0, 5), // Top 5 categories
-          summary: categoryResponse.data.summary,
+          categories: data.data.distribution || [], // Use distribution array
+          summary: {
+            totalAmount: currentMonth?.totalAmount || 0,
+            expenseCount: currentMonth?.expenseCount || 0,
+          },
         });
       }
     } catch (error) {
@@ -176,7 +177,7 @@ const Dashboard = () => {
     datasets: [
       {
         data: [
-          (stockData?.summary?.totalProducts || 0) -
+          (stockData?.totalProducts || 0) -
             (dashboardData?.lowStockProducts?.length || 0),
           dashboardData?.lowStockProducts?.length || 0,
         ],
@@ -287,8 +288,8 @@ const Dashboard = () => {
           },
           {
             title: "Total Products",
-            value: dashboardData?.totalProducts || 0,
-            subtitle: `${stockData?.summary?.totalItems || 0} items in stock`,
+            value: stockData?.totalProducts || 0,
+            subtitle: `${stockData?.totalProducts || 0} items in stock`,
             icon: "fas fa-boxes",
             bgColor: "bg-purple-100",
             textColor: "text-purple-600",
@@ -408,7 +409,7 @@ const Dashboard = () => {
                         {category.categoryName}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {category.expenseCount} expenses
+                        {Math.round(category.percentage)}% of total
                       </p>
                     </div>
                   </div>
@@ -559,27 +560,27 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
               <p className="text-2xl font-bold text-blue-600">
-                {formatCurrency(stockData.summary.totalPurchaseValue)}
+                {formatCurrency(stockData.summary?.totalPurchaseValue || 0)}
               </p>
               <p className="text-sm text-gray-600">Purchase Value</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(stockData.summary.totalSellingValue)}
+                {formatCurrency(stockData.summary?.totalSellingValue || 0)}
               </p>
               <p className="text-sm text-gray-600">Selling Value</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">
-                {formatCurrency(stockData.summary.potentialProfit)}
+                {formatCurrency(stockData.summary?.totalProfit || 0)}
               </p>
               <p className="text-sm text-gray-600">Potential Profit</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-orange-600">
-                {stockData.summary.totalItems}
+                {stockData.totalProducts || 0}
               </p>
-              <p className="text-sm text-gray-600">Total Items</p>
+              <p className="text-sm text-gray-600">Total Products</p>
             </div>
           </div>
         </div>

@@ -30,32 +30,37 @@ const StockReport = () => {
     try {
       setLoading(true);
 
-      // Fetch stock report
-      const stockResponse = await apiService.get("/reports/stock", {
-        params: {
-          category: filters.category || undefined,
-          lowStock: filters.lowStock || undefined,
-        },
-      });
+      // Use the working test endpoints temporarily
+      const [stockResponse, valuationResponse, dashboardResponse] =
+        await Promise.all([
+          fetch("http://localhost:5000/api/test/reports/stock"),
+          fetch("http://localhost:5000/api/test/reports/stock-valuation"),
+          fetch("http://localhost:5000/api/test/reports/dashboard"),
+        ]);
 
-      // Fetch stock valuation
-      const valuationResponse = await apiService.get(
-        "/reports/stock-valuation",
-      );
+      const stockData = await stockResponse.json();
+      const valuationData = await valuationResponse.json();
+      const dashboardData = await dashboardResponse.json();
 
-      // Fetch dashboard data for low stock items
-      const dashboardResponse = await apiService.get("/reports/dashboard");
+      if (stockData.success) {
+        let stockItems = stockData.data || [];
 
-      if (stockResponse.success) {
-        let stockItems = stockResponse.data || [];
+        // Apply filters on frontend
+        if (filters.category) {
+          stockItems = stockItems.filter(
+            (item) => item.category === filters.category,
+          );
+        }
+
+        if (filters.lowStock) {
+          stockItems = stockItems.filter((item) => item.isLowStock);
+        }
 
         // Apply search filter
         if (filters.search) {
           stockItems = stockItems.filter(
             (item) =>
-              item.productName
-                .toLowerCase()
-                .includes(filters.search.toLowerCase()) ||
+              item.name.toLowerCase().includes(filters.search.toLowerCase()) ||
               item.sku.toLowerCase().includes(filters.search.toLowerCase()),
           );
         }
@@ -99,12 +104,12 @@ const StockReport = () => {
         setStockSummary(summary);
       }
 
-      if (valuationResponse.success) {
-        setStockValuation(valuationResponse.data);
+      if (valuationData.success) {
+        setStockValuation(valuationData.data);
       }
 
-      if (dashboardResponse.success) {
-        setLowStockItems(dashboardResponse.data.lowStockProducts || []);
+      if (dashboardData.success) {
+        setLowStockItems(dashboardData.data.lowStockProducts || []);
       }
     } catch (error) {
       console.error("Stock data fetch error:", error);

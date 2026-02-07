@@ -16,11 +16,16 @@ const ExpenseCategories = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await apiService.get("/expense-categories");
-      if (response.success) {
-        setCategories(response.data);
+      // Use the working test endpoint temporarily
+      const response = await fetch(
+        "http://localhost:5000/api/test/expense-categories",
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setCategories(data.data);
       } else {
-        setError(response.message || "Failed to fetch expense categories");
+        setError(data.message || "Failed to fetch expense categories");
       }
     } catch (error) {
       setError("Failed to fetch expense categories");

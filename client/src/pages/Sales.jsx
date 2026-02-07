@@ -43,35 +43,55 @@ const Sales = () => {
   // Fetch products for POS
   const fetchProducts = async () => {
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append("search", searchTerm);
-      params.append("isActive", "true");
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/products");
+      const data = await response.json();
 
-      const response = await apiService.get(`/products?${params.toString()}`);
-      if (response.success) {
-        const availableProducts = response.data.filter(
-          (p) => p.stockQuantity > 0,
-        );
+      if (data.success) {
+        // Filter to only show products with stock > 0 for POS
+        const availableProducts = data.data.filter((p) => p.stockQuantity > 0);
         setProducts(availableProducts);
+      } else {
+        console.error("Failed to fetch products:", data.message);
+        setProducts([]);
       }
     } catch (error) {
       console.error("Fetch products error:", error);
+      setProducts([]);
     }
   };
 
   // Fetch customers
   const fetchCustomers = async () => {
     try {
-      const params = new URLSearchParams();
-      if (customerSearchTerm) params.append("search", customerSearchTerm);
-      params.append("limit", "20");
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/customers");
+      const data = await response.json();
 
-      const response = await apiService.get(`/customers?${params.toString()}`);
-      if (response.success) {
-        setCustomers(response.data);
+      if (data.success) {
+        // Apply search filter on frontend if needed
+        let filteredCustomers = data.data;
+        if (customerSearchTerm) {
+          filteredCustomers = filteredCustomers.filter(
+            (customer) =>
+              customer.name
+                .toLowerCase()
+                .includes(customerSearchTerm.toLowerCase()) ||
+              customer.phone.includes(customerSearchTerm) ||
+              (customer.email &&
+                customer.email
+                  .toLowerCase()
+                  .includes(customerSearchTerm.toLowerCase())),
+          );
+        }
+        setCustomers(filteredCustomers.slice(0, 20)); // Limit to 20 results
+      } else {
+        console.error("Failed to fetch customers:", data.message);
+        setCustomers([]);
       }
     } catch (error) {
       console.error("Fetch customers error:", error);
+      setCustomers([]);
     }
   };
 
@@ -237,6 +257,7 @@ const Sales = () => {
             },
         items: cart.map((item) => ({
           productId: item.productId,
+          name: item.name,
           quantity: item.quantity,
           sellingPrice: item.rate,
         })),
@@ -250,13 +271,22 @@ const Sales = () => {
         notes: posData.reference,
       };
 
-      const response = await apiService.post("/sales", saleData);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/sales", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(saleData),
+      });
 
-      if (response.success) {
+      const data = await response.json();
+
+      if (data.success) {
         // Create sale object for invoice
         const saleForInvoice = {
-          ...response.data,
-          invoiceNo: response.data.invoiceNo || invoiceNumber,
+          ...data.data,
+          invoiceNo: data.data.invoiceNo || posData.invoiceNo,
           items: cart.map((item) => ({
             ...item,
             name: item.name,
@@ -296,7 +326,7 @@ const Sales = () => {
         // Refresh products to update stock
         fetchProducts();
       } else {
-        setError(response.message || "Failed to process sale");
+        setError(data.message || "Failed to process sale");
       }
     } catch (error) {
       setError("Failed to process sale");
@@ -1074,11 +1104,21 @@ const CustomerFormModal = ({ onClose, onCustomerCreated }) => {
     setError("");
 
     try {
-      const response = await apiService.post("/customers", formData);
-      if (response.success) {
-        onCustomerCreated(response.data);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/customers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        onCustomerCreated(data.data);
       } else {
-        setError(response.message || "Failed to create customer");
+        setError(data.message || "Failed to create customer");
       }
     } catch (error) {
       setError("Failed to create customer");

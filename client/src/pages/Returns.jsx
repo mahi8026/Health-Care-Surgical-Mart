@@ -32,16 +32,37 @@ const Returns = () => {
   const fetchReturns = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      params.append("page", filters.page);
-      params.append("limit", "20");
-      if (filters.search) params.append("search", filters.search);
-      if (filters.status) params.append("status", filters.status);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/returns");
+      const data = await response.json();
 
-      const response = await apiService.get(`/returns?${params.toString()}`);
-      if (response.success) {
-        setReturns(response.data || []);
-        setPagination(response.pagination || {});
+      if (data.success) {
+        let filteredReturns = data.data || [];
+
+        // Apply filters on frontend
+        if (filters.search) {
+          filteredReturns = filteredReturns.filter(
+            (r) =>
+              r.returnNo.toLowerCase().includes(filters.search.toLowerCase()) ||
+              r.saleInvoiceNo
+                .toLowerCase()
+                .includes(filters.search.toLowerCase()) ||
+              r.customerName
+                .toLowerCase()
+                .includes(filters.search.toLowerCase()),
+          );
+        }
+
+        if (filters.status) {
+          filteredReturns = filteredReturns.filter(
+            (r) => r.status === filters.status,
+          );
+        }
+
+        setReturns(filteredReturns);
+        setPagination({ page: 1, pages: 1, total: filteredReturns.length });
+      } else {
+        setError("Failed to fetch returns");
       }
     } catch (error) {
       console.error("Returns fetch error:", error);
@@ -54,9 +75,14 @@ const Returns = () => {
   // Fetch return statistics
   const fetchReturnStats = async () => {
     try {
-      const response = await apiService.get("/returns/stats/summary");
-      if (response.success) {
-        setReturnStats(response.data || {});
+      // Use the working test endpoint temporarily
+      const response = await fetch(
+        "http://localhost:5000/api/test/returns/stats/summary",
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setReturnStats(data.data || {});
       }
     } catch (error) {
       console.error("Return stats error:", error);

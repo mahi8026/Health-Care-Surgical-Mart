@@ -15,6 +15,26 @@ const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
 
+// Helper function to handle ObjectId conversion for both MongoDB and mock database
+function toObjectId(id) {
+  if (!id) return null;
+
+  // If it's already an ObjectId, return as is
+  if (id instanceof ObjectId) return id;
+
+  // If it's a string that looks like a MongoDB ObjectId (24 hex chars), convert it
+  if (
+    typeof id === "string" &&
+    id.length === 24 &&
+    /^[0-9a-fA-F]{24}$/.test(id)
+  ) {
+    return new ObjectId(id);
+  }
+
+  // For mock database or other string IDs, return as string
+  return id;
+}
+
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
@@ -49,7 +69,7 @@ router.get(
 
     // Supplier filter
     if (supplierId) {
-      matchQuery.supplierId = new ObjectId(supplierId);
+      matchQuery.supplierId = toObjectId(supplierId);
     }
 
     const pipeline = [
@@ -130,7 +150,7 @@ router.get(
     const purchase = await shopDb
       .collection("purchases")
       .aggregate([
-        { $match: { _id: new ObjectId(req.params.id) } },
+        { $match: { _id: toObjectId(req.params.id) } },
         {
           $lookup: {
             from: "suppliers",
@@ -161,7 +181,7 @@ router.get(
     for (let item of purchaseData.items) {
       const product = await shopDb
         .collection("products")
-        .findOne({ _id: new ObjectId(item.productId) });
+        .findOne({ _id: toObjectId(item.productId) });
       item.product = product;
     }
 
@@ -197,7 +217,7 @@ router.post(
     // Validate supplier exists
     const supplier = await shopDb
       .collection("suppliers")
-      .findOne({ _id: new ObjectId(supplierId) });
+      .findOne({ _id: toObjectId(supplierId) });
 
     if (!supplier) {
       throw createError.notFound("Supplier not found");
@@ -219,7 +239,7 @@ router.post(
       // Validate product exists
       const product = await shopDb
         .collection("products")
-        .findOne({ _id: new ObjectId(productId) });
+        .findOne({ _id: toObjectId(productId) });
 
       if (!product) {
         throw createError.badRequest(`Product not found: ${productId}`);
@@ -229,10 +249,11 @@ router.post(
       grandTotal += totalCost;
 
       validatedItems.push({
-        productId: new ObjectId(productId),
-        qty: parseInt(qty),
-        unitCost: parseFloat(unitCost),
-        totalCost,
+        productId: toObjectId(productId),
+        name: product.name, // Add product name as required by schema
+        qty: Number(parseFloat(qty)), // Ensure it's a proper double
+        rate: Number(parseFloat(unitCost)), // Ensure it's a proper double
+        total: Number(parseFloat(totalCost)), // Ensure it's a proper double
       });
     }
 
@@ -252,17 +273,25 @@ router.post(
       }
     }
 
+    // Get supplier name for the schema
+    const supplierName = supplier.name;
+
     const purchaseData = {
-      supplierId: new ObjectId(supplierId),
-      invoiceNo: finalInvoiceNo,
+      purchaseNo: finalInvoiceNo, // Use purchaseNo instead of invoiceNo
+      supplierName: supplierName, // Required by schema
+      supplierPhone: supplier.phone || "", // Optional
+      supplierAddress: supplier.address || "", // Optional
       items: validatedItems,
-      grandTotal: parseFloat(grandTotal.toFixed(2)),
-      purchaseDate: new Date(purchaseDate),
-      notes: notes?.trim() || null,
-      status: "pending", // pending, received, cancelled
+      totalAmount: Number(parseFloat(grandTotal.toFixed(2))), // Required by schema
+      paidAmount: 0, // Default to 0
+      dueAmount: Number(parseFloat(grandTotal.toFixed(2))), // Same as totalAmount initially
+      paymentStatus: "Pending", // Default status
+      purchaseDate: new Date(purchaseDate), // Required by schema
+      createdBy: toObjectId(req.user._id), // Required by schema
+      createdByName: req.user.name, // Optional but useful
+      notes: notes?.trim() || "", // Optional
       createdAt: new Date(),
       updatedAt: new Date(),
-      createdBy: new ObjectId(req.user.id),
     };
 
     const result = await shopDb.collection("purchases").insertOne(purchaseData);
@@ -289,7 +318,7 @@ router.put(
     // Get purchase order
     const purchase = await shopDb
       .collection("purchases")
-      .findOne({ _id: new ObjectId(req.params.id) });
+      .findOne({ _id: toObjectId(req.params.id) });
 
     if (!purchase) {
       throw createError.notFound("Purchase order not found");
@@ -351,7 +380,7 @@ router.put(
             isLowStock,
             lastUpdated: new Date(),
             lastPurchaseDate: new Date(),
-            updatedBy: new ObjectId(req.user.id),
+            updatedBy: new ObjectId(req.user._id),
           },
         },
       );
@@ -377,7 +406,7 @@ router.put(
         $set: {
           status: "received",
           receivedAt: new Date(),
-          receivedBy: new ObjectId(req.user.id),
+          receivedBy: new ObjectId(req.user._id),
           receivedItems: itemsToReceive,
           receivingNotes: notes?.trim() || null,
           updatedAt: new Date(),
@@ -427,7 +456,7 @@ router.put(
         $set: {
           status: "cancelled",
           cancelledAt: new Date(),
-          cancelledBy: new ObjectId(req.user.id),
+          cancelledBy: new ObjectId(req.user._id),
           cancellationReason: reason?.trim() || null,
           updatedAt: new Date(),
         },

@@ -10,6 +10,7 @@ const Purchases = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,18 +40,34 @@ const Purchases = () => {
   // Fetch purchases
   const fetchPurchases = async (page = 1) => {
     try {
-      const params = new URLSearchParams();
-      params.append("page", page);
-      params.append("limit", "20");
-      if (searchTerm) params.append("search", searchTerm);
-      if (statusFilter !== "all") params.append("status", statusFilter);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/purchases");
+      const data = await response.json();
 
-      const response = await apiService.get(`/purchases?${params.toString()}`);
-      if (response.success) {
-        setPurchases(response.data);
-        setCurrentPage(response.pagination.page);
-        setTotalPages(response.pagination.pages);
-        setTotalPurchases(response.pagination.total);
+      if (data.success) {
+        // Apply filters on frontend
+        let filteredPurchases = data.data;
+
+        if (searchTerm) {
+          filteredPurchases = filteredPurchases.filter(
+            (p) =>
+              p.purchaseNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              p.supplier?.name.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
+
+        if (statusFilter !== "all") {
+          filteredPurchases = filteredPurchases.filter(
+            (p) => p.status === statusFilter
+          );
+        }
+
+        setPurchases(filteredPurchases);
+        setCurrentPage(1);
+        setTotalPages(1);
+        setTotalPurchases(filteredPurchases.length);
+      } else {
+        setError("Failed to fetch purchases");
       }
     } catch (error) {
       console.error("Fetch purchases error:", error);
@@ -61,9 +78,12 @@ const Purchases = () => {
   // Fetch suppliers
   const fetchSuppliers = async () => {
     try {
-      const response = await apiService.get("/suppliers?limit=100");
-      if (response.success) {
-        setSuppliers(response.data);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/suppliers");
+      const data = await response.json();
+
+      if (data.success) {
+        setSuppliers(data.data);
       }
     } catch (error) {
       console.error("Fetch suppliers error:", error);
@@ -73,11 +93,12 @@ const Purchases = () => {
   // Fetch products
   const fetchProducts = async () => {
     try {
-      const response = await apiService.get(
-        "/products?limit=500&isActive=true",
-      );
-      if (response.success) {
-        setProducts(response.data);
+      // Use the working test endpoint temporarily
+      const response = await fetch("http://localhost:5000/api/test/products");
+      const data = await response.json();
+
+      if (data.success) {
+        setProducts(data.data.filter((p) => p.isActive));
       }
     } catch (error) {
       console.error("Fetch products error:", error);
@@ -179,9 +200,35 @@ const Purchases = () => {
       return;
     }
 
+    // Check if user is logged in
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    if (!token) {
+      setError("You are not logged in. Please log in first.");
+      return;
+    }
+
+    console.log("Current user:", user);
+    console.log("User role:", user.role);
+    console.log("User permissions:", user.permissions);
+
     try {
       setLoading(true);
+      console.log("Creating purchase order with data:", {
+        ...createForm,
+        itemsDetails: createForm.items.map((item) => ({
+          productId: item.productId,
+          qty: item.qty,
+          unitCost: item.unitCost,
+          totalCost: item.totalCost,
+        })),
+      });
+      console.log("Using token:", token ? "Token exists" : "No token");
+
       const response = await apiService.post("/purchases", createForm);
+      console.log("Create purchase response:", response);
+
       if (response.success) {
         setShowCreateModal(false);
         setCreateForm({
@@ -193,12 +240,30 @@ const Purchases = () => {
         });
         fetchPurchases();
         setError("");
+        alert("Purchase order created successfully!");
       } else {
         setError(response.message || "Failed to create purchase order");
       }
     } catch (error) {
-      setError("Failed to create purchase order");
       console.error("Create purchase error:", error);
+
+      // Check if it's an authentication error
+      if (
+        error.message.includes("Authentication") ||
+        error.message.includes("401")
+      ) {
+        setError("Your session has expired. Please log in again.");
+        // Don't redirect automatically, let user decide
+      } else if (
+        error.message.includes("permission") ||
+        error.message.includes("403")
+      ) {
+        setError(
+          "You don't have permission to create purchase orders. Please contact your administrator.",
+        );
+      } else {
+        setError(error.message || "Failed to create purchase order");
+      }
     } finally {
       setLoading(false);
     }
@@ -614,24 +679,77 @@ const CreatePurchaseModal = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Supplier *
               </label>
-              <select
-                value={createForm.supplierId}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    supplierId: e.target.value,
-                  }))
-                }
-                className="input-field"
-                required
-              >
-                <option value="">Select Supplier</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier._id} value={supplier._id}>
-                    {supplier.name} - {supplier.company}
-                  </option>
-                ))}
-              </select>
+              {suppliers.length === 0 ? (
+                <div className="space-y-2">
+                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                    No suppliers found. You need to create suppliers first.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = prompt("Enter supplier name:");
+                      const company = prompt("Enter company name:");
+                      const phone = prompt("Enter phone number:");
+                      const email = prompt("Enter email (optional):");
+
+                      if (name && company && phone) {
+                        // Create supplier via API
+                        fetch("/api/suppliers", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${localStorage.getItem("token")}`,
+                          },
+                          body: JSON.stringify({
+                            name: name.trim(),
+                            company: company.trim(),
+                            phone: phone.trim(),
+                            email: email?.trim() || "",
+                            address: "",
+                          }),
+                        })
+                          .then((res) => res.json())
+                          .then((data) => {
+                            if (data.success) {
+                              // Refresh suppliers list
+                              window.location.reload();
+                            } else {
+                              alert(
+                                "Failed to create supplier: " + data.message,
+                              );
+                            }
+                          })
+                          .catch((err) => {
+                            alert("Error creating supplier: " + err.message);
+                          });
+                      }
+                    }}
+                    className="btn-secondary text-sm"
+                  >
+                    <i className="fas fa-plus mr-1"></i>
+                    Quick Add Supplier
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={createForm.supplierId}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      supplierId: e.target.value,
+                    }))
+                  }
+                  className="input-field"
+                  required
+                >
+                  <option value="">Select Supplier</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier._id} value={supplier._id}>
+                      {supplier.name} - {supplier.company}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -1,9 +1,15 @@
 const { MongoClient, ServerApiVersion } = require("mongodb");
 require("dotenv").config();
 
-const uri =
-  process.env.MONGODB_URI ||
-  "mongodb+srv://Health_Care_DB:kp1lkE5Wx9y9bbwP@cluster0.rqyzhey.mongodb.net/?appName=Cluster0";
+// SECURITY: Never hardcode credentials!
+// Always use environment variables
+if (!process.env.MONGODB_URI) {
+  console.error("❌ MONGODB_URI environment variable is not set!");
+  console.error("Please add MONGODB_URI to your .env file");
+  process.exit(1);
+}
+
+const uri = process.env.MONGODB_URI;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
