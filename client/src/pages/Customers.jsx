@@ -38,12 +38,11 @@ const Customers = () => {
   // Fetch customers
   const fetchCustomers = async (page = 1) => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/customers");
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/customers");
 
-      if (data.success) {
-        let filteredCustomers = data.data;
+      if (response.success) {
+        let filteredCustomers = response.data;
 
         // Apply search filter on frontend
         if (searchTerm) {
@@ -71,12 +70,15 @@ const Customers = () => {
         setTotalCustomers(filteredCustomers.length);
 
         // Calculate statistics
-        calculateStats(data.data);
+        calculateStats(response.data);
       } else {
         setError("Failed to fetch customers");
       }
     } catch (error) {
       console.error("Fetch customers error:", error);
+      if (error.message?.includes("401")) {
+        window.location.href = "/login";
+      }
       setError("Failed to fetch customers");
     }
   };

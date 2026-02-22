@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useFirebaseAuth as useAuth } from "../contexts/FirebaseAuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const Login = () => {

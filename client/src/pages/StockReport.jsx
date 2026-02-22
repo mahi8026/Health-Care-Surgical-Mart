@@ -30,19 +30,14 @@ const StockReport = () => {
     try {
       setLoading(true);
 
-      // Use the working test endpoints temporarily
-      const [stockResponse, valuationResponse, dashboardResponse] =
-        await Promise.all([
-          fetch("http://localhost:5000/api/test/reports/stock"),
-          fetch("http://localhost:5000/api/test/reports/stock-valuation"),
-          fetch("http://localhost:5000/api/test/reports/dashboard"),
-        ]);
+      // Use real MongoDB endpoints
+      const [stockData, valuationData, dashboardData] = await Promise.all([
+        apiService.get("/reports/stock"),
+        apiService.get("/reports/stock-valuation"),
+        apiService.get("/reports/dashboard"),
+      ]);
 
-      const stockData = await stockResponse.json();
-      const valuationData = await valuationResponse.json();
-      const dashboardData = await dashboardResponse.json();
-
-      if (stockData.success) {
+      if (stockData?.success) {
         let stockItems = stockData.data || [];
 
         // Apply filters on frontend
@@ -104,16 +99,25 @@ const StockReport = () => {
         setStockSummary(summary);
       }
 
-      if (valuationData.success) {
+      if (valuationData?.success) {
         setStockValuation(valuationData.data);
       }
 
-      if (dashboardData.success) {
+      if (dashboardData?.success) {
         setLowStockItems(dashboardData.data.lowStockProducts || []);
       }
     } catch (error) {
       console.error("Stock data fetch error:", error);
-      setError("Failed to fetch stock data");
+
+      // Handle authentication errors
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError("Authentication failed. Please login again.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+      } else {
+        setError("Failed to fetch stock data");
+      }
     } finally {
       setLoading(false);
     }

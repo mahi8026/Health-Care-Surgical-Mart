@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }) => {
         body.shopId = shopId;
       }
 
+      // Use real authenticated endpoint
       const response = await apiService.post("/auth/login", body);
 
       if (response.success && response.data) {

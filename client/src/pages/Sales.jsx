@@ -30,6 +30,7 @@ const Sales = () => {
     customerMobile: "",
     customerAddress: "",
     selectedProduct: "",
+    customProductName: "",
     saleRate: "",
     quantity: "",
     discount: 0,
@@ -43,20 +44,25 @@ const Sales = () => {
   // Fetch products for POS
   const fetchProducts = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/products");
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/products");
 
-      if (data.success) {
+      if (response.success) {
         // Filter to only show products with stock > 0 for POS
-        const availableProducts = data.data.filter((p) => p.stockQuantity > 0);
+        const availableProducts = response.data.filter(
+          (p) => p.stockQuantity > 0,
+        );
         setProducts(availableProducts);
       } else {
-        console.error("Failed to fetch products:", data.message);
+        console.error("Failed to fetch products:", response.message);
         setProducts([]);
       }
     } catch (error) {
       console.error("Fetch products error:", error);
+      if (error.message?.includes("401")) {
+        // Redirect to login
+        window.location.href = "/login";
+      }
       setProducts([]);
     }
   };
@@ -64,13 +70,12 @@ const Sales = () => {
   // Fetch customers
   const fetchCustomers = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/customers");
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/customers");
 
-      if (data.success) {
+      if (response.success) {
         // Apply search filter on frontend if needed
-        let filteredCustomers = data.data;
+        let filteredCustomers = response.data;
         if (customerSearchTerm) {
           filteredCustomers = filteredCustomers.filter(
             (customer) =>
@@ -86,7 +91,7 @@ const Sales = () => {
         }
         setCustomers(filteredCustomers.slice(0, 20)); // Limit to 20 results
       } else {
-        console.error("Failed to fetch customers:", data.message);
+        console.error("Failed to fetch customers:", response.message);
         setCustomers([]);
       }
     } catch (error) {
@@ -110,37 +115,52 @@ const Sales = () => {
 
   // Add product to cart
   const addToCart = () => {
-    if (!posData.selectedProduct || !posData.quantity || !posData.saleRate) {
-      setError("Please select product, enter quantity and sale rate");
+    if (!posData.quantity || !posData.saleRate) {
+      setError("Please enter quantity and sale rate");
       setTimeout(() => setError(""), 3000);
       return;
     }
 
-    const product = products.find((p) => p._id === posData.selectedProduct);
-    if (!product) {
-      setError("Product not found");
+    if (!posData.customProductName.trim()) {
+      setError("Please enter product name");
+      setTimeout(() => setError(""), 3000);
       return;
     }
 
     const quantity = parseFloat(posData.quantity);
     const rate = parseFloat(posData.saleRate);
 
-    if (quantity > product.stockQuantity) {
-      setError(`Only ${product.stockQuantity} units available`);
-      setTimeout(() => setError(""), 3000);
-      return;
+    // Check stock only if a product from inventory is selected
+    if (posData.selectedProduct) {
+      const product = products.find((p) => p._id === posData.selectedProduct);
+      if (product && quantity > product.stockQuantity) {
+        setError(`Only ${product.stockQuantity} units available in stock`);
+        setTimeout(() => setError(""), 3000);
+        return;
+      }
     }
 
+    // Use custom product name or generate unique ID for custom items
+    const productId = posData.selectedProduct || `custom-${Date.now()}`;
+    const productName = posData.customProductName.trim();
+
     const existingItemIndex = cart.findIndex(
-      (item) => item.productId === product._id,
+      (item) => item.productId === productId && item.name === productName,
     );
 
     if (existingItemIndex >= 0) {
       const newQuantity = cart[existingItemIndex].quantity + quantity;
-      if (newQuantity > product.stockQuantity) {
-        setError(`Total quantity cannot exceed ${product.stockQuantity} units`);
-        setTimeout(() => setError(""), 3000);
-        return;
+
+      // Check stock for inventory items
+      if (posData.selectedProduct) {
+        const product = products.find((p) => p._id === posData.selectedProduct);
+        if (product && newQuantity > product.stockQuantity) {
+          setError(
+            `Total quantity cannot exceed ${product.stockQuantity} units`,
+          );
+          setTimeout(() => setError(""), 3000);
+          return;
+        }
       }
 
       const updatedCart = [...cart];
@@ -151,18 +171,24 @@ const Sales = () => {
       };
       setCart(updatedCart);
     } else {
+      const product = posData.selectedProduct
+        ? products.find((p) => p._id === posData.selectedProduct)
+        : null;
+
       const cartItem = {
-        productId: product._id,
-        name: product.name,
-        category:
-          typeof product.category === "object"
+        productId: productId,
+        name: productName,
+        category: product
+          ? typeof product.category === "object"
             ? product.category.name
-            : product.category,
+            : product.category
+          : "Custom Item",
         rate: rate,
         quantity: quantity,
         total: quantity * rate,
-        unit: product.unit,
-        maxStock: product.stockQuantity,
+        unit: product?.unit || "pcs",
+        maxStock: product?.stockQuantity || 999999,
+        isCustom: !posData.selectedProduct,
       };
       setCart([...cart, cartItem]);
     }
@@ -171,6 +197,7 @@ const Sales = () => {
     setPosData((prev) => ({
       ...prev,
       selectedProduct: "",
+      customProductName: "",
       saleRate: "",
       quantity: "",
     }));
@@ -199,6 +226,24 @@ const Sales = () => {
       cart.map((item) =>
         item.productId === productId
           ? { ...item, quantity: newQuantity, total: newQuantity * item.rate }
+          : item,
+      ),
+    );
+  };
+
+  // Update cart item price
+  const updateCartPrice = (productId, newPrice) => {
+    const price = parseFloat(newPrice) || 0;
+    if (price < 0) {
+      setError("Price cannot be negative");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+
+    setCart(
+      cart.map((item) =>
+        item.productId === productId
+          ? { ...item, rate: price, total: item.quantity * price }
           : item,
       ),
     );
@@ -236,15 +281,18 @@ const Sales = () => {
       bankPaidParsed: parseFloat(posData.bankPaid) || 0,
     });
 
-    if (totalPaid < grandTotal) {
-      setError(
-        `Insufficient payment amount. Total: ${grandTotal.toFixed(2)}, Paid: ${totalPaid.toFixed(2)}`,
-      );
-      return;
-    }
+    // Allow partial payment (due sales) - no minimum payment required
+    // if (totalPaid < grandTotal) {
+    //   setError(
+    //     `Insufficient payment amount. Total: ${grandTotal.toFixed(2)}, Paid: ${totalPaid.toFixed(2)}`,
+    //   );
+    //   return;
+    // }
 
     setLoading(true);
     try {
+      const dueAmount = Math.max(0, grandTotal - totalPaid);
+
       const saleData = {
         invoiceNumber: posData.invoiceNo,
         customer: selectedCustomer
@@ -268,25 +316,19 @@ const Sales = () => {
         grandTotal,
         cashPaid: parseFloat(posData.cashPaid) || 0,
         bankPaid: parseFloat(posData.bankPaid) || 0,
+        dueAmount: dueAmount,
+        paymentStatus: dueAmount > 0 ? "Partial" : "Paid",
         notes: posData.reference,
       };
 
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/sales", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(saleData),
-      });
+      // Use real authenticated endpoint
+      const response = await apiService.post("/sales", saleData);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.success) {
         // Create sale object for invoice
         const saleForInvoice = {
-          ...data.data,
-          invoiceNo: data.data.invoiceNo || posData.invoiceNo,
+          ...response.data,
+          invoiceNo: response.data.invoiceNo || posData.invoiceNo,
           items: cart.map((item) => ({
             ...item,
             name: item.name,
@@ -311,8 +353,10 @@ const Sales = () => {
           grandTotal,
           cashPaid: parseFloat(posData.cashPaid) || 0,
           bankPaid: parseFloat(posData.bankPaid) || 0,
+          dueAmount: dueAmount,
           changeAmount: returnAmount,
           returnAmount: returnAmount,
+          paymentStatus: dueAmount > 0 ? "Partial" : "Paid",
           saleDate: new Date(),
         };
 
@@ -326,10 +370,15 @@ const Sales = () => {
         // Refresh products to update stock
         fetchProducts();
       } else {
-        setError(data.message || "Failed to process sale");
+        setError(response.message || "Failed to process sale");
       }
     } catch (error) {
-      setError("Failed to process sale");
+      if (error.message?.includes("401")) {
+        setError("Session expired. Please login again.");
+        setTimeout(() => (window.location.href = "/login"), 2000);
+      } else {
+        setError(error.message || "Failed to process sale");
+      }
       console.error("Process sale error:", error);
     } finally {
       setLoading(false);
@@ -350,6 +399,7 @@ const Sales = () => {
       customerMobile: "",
       customerAddress: "",
       selectedProduct: "",
+      customProductName: "",
       saleRate: "",
       quantity: "",
       discount: 0,
@@ -368,6 +418,7 @@ const Sales = () => {
       setPosData((prev) => ({
         ...prev,
         selectedProduct: productId,
+        customProductName: product.name,
         saleRate: product.sellingPrice.toString(),
       }));
     }
@@ -605,6 +656,24 @@ const Sales = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+                <span>Product Name</span>
+                <span className="text-xs text-gray-500 italic">
+                  (Editable for custom items)
+                </span>
+              </label>
+              <input
+                type="text"
+                value={posData.customProductName}
+                onChange={(e) =>
+                  handlePosDataChange("customProductName", e.target.value)
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter or edit product name..."
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -663,7 +732,7 @@ const Sales = () => {
               onClick={addToCart}
               className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded font-semibold transition-colors"
               disabled={
-                !posData.selectedProduct ||
+                !posData.customProductName.trim() ||
                 !posData.quantity ||
                 !posData.saleRate
               }
@@ -840,16 +909,40 @@ const Sales = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Due
+              </label>
+              <input
+                type="text"
+                value={Math.max(0, grandTotal - totalPaid).toFixed(2)}
+                readOnly
+                className={`w-full px-3 py-2 border border-gray-300 rounded font-bold ${
+                  grandTotal - totalPaid > 0
+                    ? "bg-red-100 text-red-700"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              />
+            </div>
+
             {/* Payment Status Indicator */}
             <div className="bg-gray-50 p-3 rounded border">
               <div className="flex justify-between text-sm mb-1">
                 <span>Payment Status:</span>
                 <span
                   className={`font-semibold ${
-                    totalPaid >= grandTotal ? "text-green-600" : "text-red-600"
+                    totalPaid >= grandTotal
+                      ? "text-green-600"
+                      : totalPaid > 0
+                        ? "text-orange-600"
+                        : "text-red-600"
                   }`}
                 >
-                  {totalPaid >= grandTotal ? "Sufficient" : "Insufficient"}
+                  {totalPaid >= grandTotal
+                    ? "Paid"
+                    : totalPaid > 0
+                      ? "Partial"
+                      : "Unpaid"}
                 </span>
               </div>
               <div className="flex justify-between text-xs text-gray-600">
@@ -857,8 +950,8 @@ const Sales = () => {
                 <span>Paid: ৳{totalPaid.toFixed(2)}</span>
               </div>
               {totalPaid < grandTotal && (
-                <div className="text-xs text-red-600 mt-1">
-                  Need ৳{(grandTotal - totalPaid).toFixed(2)} more
+                <div className="text-xs text-red-600 mt-1 font-semibold">
+                  Due: ৳{(grandTotal - totalPaid).toFixed(2)}
                 </div>
               )}
             </div>
@@ -866,9 +959,7 @@ const Sales = () => {
             <div className="grid grid-cols-2 gap-4 pt-4">
               <button
                 onClick={processSale}
-                disabled={
-                  loading || cart.length === 0 || totalPaid < grandTotal
-                }
+                disabled={loading || cart.length === 0}
                 className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-3 px-4 rounded font-semibold transition-colors"
               >
                 {loading ? (
@@ -877,7 +968,19 @@ const Sales = () => {
                     Processing...
                   </>
                 ) : (
-                  "Sale"
+                  <>
+                    {grandTotal - totalPaid > 0 ? (
+                      <>
+                        <i className="fas fa-clock mr-2"></i>
+                        Sale (Due)
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-check mr-2"></i>
+                        Sale
+                      </>
+                    )}
+                  </>
                 )}
               </button>
               <button
@@ -918,10 +1021,30 @@ const Sales = () => {
               cart.map((item, index) => (
                 <tr key={item.productId} className="hover:bg-gray-50">
                   <td className="px-4 py-3">{index + 1}</td>
-                  <td className="px-4 py-3 font-medium">{item.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{item.name}</div>
+                    {item.isCustom && (
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded mt-1 inline-block">
+                        <i className="fas fa-tag mr-1"></i>
+                        Custom Item
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">{item.category}</td>
                   <td className="px-4 py-3 text-right">
-                    ৳{item.rate.toFixed(2)}
+                    <div className="flex items-center justify-end">
+                      <span className="text-gray-500 mr-1">৳</span>
+                      <input
+                        type="number"
+                        value={item.rate}
+                        onChange={(e) =>
+                          updateCartPrice(item.productId, e.target.value)
+                        }
+                        className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end space-x-2">
@@ -1104,24 +1227,21 @@ const CustomerFormModal = ({ onClose, onCustomerCreated }) => {
     setError("");
 
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/customers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+      // Use real authenticated endpoint
+      const response = await apiService.post("/customers", formData);
 
-      const data = await response.json();
-
-      if (data.success) {
-        onCustomerCreated(data.data);
+      if (response.success) {
+        onCustomerCreated(response.data);
       } else {
-        setError(data.message || "Failed to create customer");
+        setError(response.message || "Failed to create customer");
       }
     } catch (error) {
-      setError("Failed to create customer");
+      if (error.message?.includes("401")) {
+        setError("Session expired. Please login again.");
+        setTimeout(() => (window.location.href = "/login"), 2000);
+      } else {
+        setError(error.message || "Failed to create customer");
+      }
       console.error("Create customer error:", error);
     } finally {
       setLoading(false);

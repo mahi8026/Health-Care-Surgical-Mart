@@ -18,13 +18,14 @@ jspm_packages/
 # ============================================
 .env
 .env.*
-!.env.example
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 client/.env
 server/.env
+**/.env
+**/.env.*
 
 # ============================================
 # Logs (IMPORTANT - Can be large)
@@ -65,10 +66,50 @@ junit.xml
 server/coverage/
 client/coverage/
 
-# Test files in root
+# ============================================
+# Test and Utility Scripts in Root
+# ============================================
+# Test files
 test-*.js
 test-*.html
 test-*.json
+*-test.js
+*-test.html
+*-test.json
+
+# Check/Verify scripts
+check-*.js
+verify-*.js
+*-check.js
+*-verify.js
+
+# Fix/Sync scripts
+fix-*.js
+sync-*.js
+*-fix.js
+*-sync.js
+
+# Create/Seed scripts
+create-*.js
+seed-*.js
+*-create.js
+*-seed.js
+
+# Cleanup/Debug scripts
+cleanup-*.js
+debug-*.js
+*-cleanup.js
+*-debug.js
+
+# Batch/Shell scripts in root
+*.bat
+*.sh
+!scripts/*.sh
+!scripts/*.bat
+
+# Debug HTML files
+debug-*.html
+*-debug.html
 
 # ============================================
 # Cache & Temporary Files
@@ -219,11 +260,37 @@ bundle-analyzer-report.html
 stats.json
 
 # ============================================
-# Documentation (Generated)
+# Documentation (Generated/Temporary)
 # ============================================
-# Keep manually created docs, ignore generated ones
+# Keep manually created docs, ignore generated/temporary ones
 docs/api/
 docs/coverage/
+
+# Temporary markdown files (keep main docs like README.md)
+*_TEMP.md
+*_OLD.md
+*_BACKUP.md
+*_SUMMARY.md
+*_FIX*.md
+*_COMPLETE.md
+*_STATUS.md
+*_GUIDE.md
+*_SETUP.md
+*_INSTALLATION.md
+*_INTEGRATION.md
+*_QUICK*.md
+
+# Specific temporary docs patterns
+CLEANUP*.md
+CLEAR*.md
+CONFIRM*.md
+CURRENT*.md
+COMPREHENSIVE*.md
+FIREBASE_*.md
+ALL_TESTS*.md
+BUG_FIXES*.md
+FINAL_*.md
+QUICK_*.md
 
 # ============================================
 # Miscellaneous
@@ -250,11 +317,6 @@ docs/coverage/
 *.bak
 *.old
 
-# Temporary markdown files (keep main docs)
-*_TEMP.md
-*_OLD.md
-*_BACKUP.md
-
 # Test data
 test-data/
 mock-data/
@@ -274,3 +336,7 @@ local.config.json
 !README.md
 !LICENSE
 !CHANGELOG.md
+!CONTRIBUTING.md
+!docs/README.md
+!scripts/*.sh
+!scripts/*.bat

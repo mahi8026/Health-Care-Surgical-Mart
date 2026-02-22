@@ -139,7 +139,8 @@ function getShopDatabase(shopId) {
     return getMockShopDatabase(shopId);
   }
 
-  const dbName = `shop_${shopId.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`;
+  // Use shopId directly as database name (no prefix)
+  const dbName = shopId;
   return client.db(dbName);
 }
 
@@ -237,17 +238,26 @@ async function listAllShops() {
   }
 
   try {
+    // Get list of shops from system database
+    const systemDb = getSystemDatabase();
+    const shops = await systemDb.collection("shops").find({}).toArray();
+
     const admin = client.db().admin();
     const { databases } = await admin.listDatabases();
 
-    return databases
-      .filter((db) => db.name.startsWith("shop_"))
-      .map((db) => ({
-        shopId: db.name.replace("shop_", ""),
-        dbName: db.name,
-        sizeOnDisk: db.sizeOnDisk,
-        empty: db.empty,
-      }))
+    // Match shops with their databases
+    return shops
+      .map((shop) => {
+        const dbInfo = databases.find((db) => db.name === shop.shopId);
+        return {
+          shopId: shop.shopId,
+          dbName: shop.shopId,
+          sizeOnDisk: dbInfo?.sizeOnDisk || 0,
+          empty: dbInfo?.empty || true,
+          shopName: shop.name,
+          status: shop.status,
+        };
+      })
       .sort((a, b) => a.shopId.localeCompare(b.shopId));
   } catch (error) {
     logger.error("Error listing shops:", error);

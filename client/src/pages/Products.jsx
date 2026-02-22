@@ -20,17 +20,16 @@ const Products = () => {
   const categories = ["Medical", "Lab", "Surgical"];
   const units = ["pcs", "box", "pack", "bottle", "strip", "vial"];
 
-  // Fetch products
+  // Fetch products from real database
   const fetchProducts = async () => {
     try {
       setLoading(true);
 
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/products");
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/products");
 
-      if (data.success) {
-        let filteredProducts = data.data;
+      if (response.success) {
+        let filteredProducts = response.data;
 
         // Apply search filter on frontend
         if (searchTerm) {
@@ -68,18 +67,35 @@ const Products = () => {
 
         setProducts(filteredProducts);
       } else {
-        setError(data.message || "Failed to fetch products");
+        setError(response.message || "Failed to fetch products");
       }
     } catch (error) {
-      setError("Failed to fetch products");
       console.error("Fetch products error:", error);
+      if (
+        error.message?.includes("401") ||
+        error.message?.includes("Unauthorized")
+      ) {
+        setError("Session expired. Please login again.");
+        // Redirect to login after a delay
+        setTimeout(() => (window.location.href = "/login"), 2000);
+      } else {
+        setError("Failed to fetch products");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Initial fetch only
   useEffect(() => {
     fetchProducts();
+  }, []);
+
+  // Apply filters when they change
+  useEffect(() => {
+    if (products.length > 0) {
+      fetchProducts();
+    }
   }, [searchTerm, selectedCategory, stockFilter]);
 
   // Handle bulk selection
@@ -152,6 +168,8 @@ const Products = () => {
       );
 
       await Promise.all(promises);
+
+      // Remove from displayed products
       setProducts(products.filter((p) => !selectedProducts.includes(p._id)));
       setSelectedProducts([]);
       setShowBulkActions(false);
@@ -160,10 +178,13 @@ const Products = () => {
       console.error("Bulk delete error:", error);
     }
   };
+
   const handleDelete = async (productId) => {
     try {
       const response = await apiService.delete(`/products/${productId}`);
+
       if (response.success) {
+        // Remove from displayed products
         setProducts(products.filter((p) => p._id !== productId));
         setShowDeleteConfirm(null);
       } else {
@@ -530,8 +551,20 @@ const Products = () => {
             setShowAddModal(false);
             setEditingProduct(null);
           }}
-          onSave={() => {
-            fetchProducts();
+          onSave={(updatedProduct) => {
+            if (updatedProduct) {
+              if (editingProduct) {
+                // Update existing product in list
+                setProducts(
+                  products.map((p) =>
+                    p._id === updatedProduct._id ? updatedProduct : p,
+                  ),
+                );
+              } else {
+                // Add new product to list
+                setProducts([updatedProduct, ...products]);
+              }
+            }
             setShowAddModal(false);
             setEditingProduct(null);
           }}
@@ -623,6 +656,37 @@ const ProductModal = ({
   onSave,
   onError,
 }) => {
+  // Generate SKU function
+  const generateSKU = (name, category, brand) => {
+    if (!name) {
+      return "";
+    }
+
+    // Extract initials and create SKU pattern
+    const categoryCode = category
+      ? category.substring(0, 3).toUpperCase()
+      : "GEN";
+    const brandCode = brand ? brand.substring(0, 3).toUpperCase() : "";
+
+    // Get first 3 letters of product name (remove spaces and special chars)
+    const nameCode = name
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .substring(0, 4)
+      .toUpperCase();
+
+    // Generate random number for uniqueness
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+
+    // Combine parts: CATEGORY-BRAND-NAME-RANDOM
+    // Example: MED-PAR-ACET-5432
+    const skuParts = [categoryCode];
+    if (brandCode) skuParts.push(brandCode);
+    skuParts.push(nameCode);
+    skuParts.push(randomNum);
+
+    return skuParts.join("-");
+  };
+
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -655,18 +719,26 @@ const ProductModal = ({
     setLoading(true);
 
     try {
-      const endpoint = product ? `/products/${product._id}` : "/products";
-      const method = product ? "put" : "post";
-
-      const response = await apiService[method](endpoint, formData);
+      // Use real authenticated endpoints
+      const response = product
+        ? await apiService.put(`/products/${product._id}`, formData)
+        : await apiService.post("/products", formData);
 
       if (response.success) {
-        onSave();
+        // Pass the created/updated product back to parent
+        onSave(response.data);
       } else {
         onError(response.message || "Failed to save product");
       }
     } catch (error) {
-      onError("Failed to save product");
+      if (
+        error.message?.includes("401") ||
+        error.message?.includes("Unauthorized")
+      ) {
+        onError("Session expired. Please login again.");
+      } else {
+        onError(error.message || "Failed to save product");
+      }
       console.error("Save product error:", error);
     } finally {
       setLoading(false);
@@ -748,15 +820,36 @@ const ProductModal = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 SKU *
               </label>
-              <input
-                type="text"
-                name="sku"
-                value={formData.sku}
-                onChange={handleChange}
-                required
-                className="input-field"
-                placeholder="Enter SKU"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleChange}
+                  required
+                  className="input-field flex-1"
+                  placeholder="Enter SKU or auto-generate"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const generatedSKU = generateSKU(
+                      formData.name,
+                      formData.category,
+                      formData.brand,
+                    );
+                    setFormData((prev) => ({ ...prev, sku: generatedSKU }));
+                  }}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium whitespace-nowrap"
+                  title="Auto-generate SKU"
+                >
+                  <i className="fas fa-magic mr-1"></i>
+                  Generate
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Click "Generate" to auto-create SKU from product details
+              </p>
             </div>
 
             <div>

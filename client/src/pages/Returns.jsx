@@ -32,12 +32,11 @@ const Returns = () => {
   const fetchReturns = async () => {
     try {
       setLoading(true);
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/returns");
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/returns");
 
-      if (data.success) {
-        let filteredReturns = data.data || [];
+      if (response.success) {
+        let filteredReturns = response.data || [];
 
         // Apply filters on frontend
         if (filters.search) {
@@ -66,6 +65,9 @@ const Returns = () => {
       }
     } catch (error) {
       console.error("Returns fetch error:", error);
+      if (error.message?.includes("401")) {
+        window.location.href = "/login";
+      }
       setError("Failed to fetch returns");
     } finally {
       setLoading(false);
@@ -75,17 +77,17 @@ const Returns = () => {
   // Fetch return statistics
   const fetchReturnStats = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch(
-        "http://localhost:5000/api/test/returns/stats/summary",
-      );
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/returns/stats/summary");
 
-      if (data.success) {
-        setReturnStats(data.data || {});
+      if (response.success) {
+        setReturnStats(response.data || {});
       }
     } catch (error) {
       console.error("Return stats error:", error);
+      if (error.message?.includes("401")) {
+        window.location.href = "/login";
+      }
     }
   };
 

@@ -6,6 +6,96 @@ const express = require("express");
 const router = express.Router();
 
 /**
+ * POST /api/test/auth/login
+ * Simple login without real authentication
+ */
+router.post("/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Mock users for testing
+    const mockUsers = {
+      "superadmin@medicalpos.com": {
+        password: "SuperAdmin@123",
+        user: {
+          id: "super1",
+          name: "Super Admin",
+          email: "superadmin@medicalpos.com",
+          role: "SUPER_ADMIN",
+          shopId: null,
+        },
+      },
+      "john@healthcareplus.com": {
+        password: "Admin@123",
+        user: {
+          id: "admin1",
+          name: "John Doe",
+          email: "john@healthcareplus.com",
+          role: "SHOP_ADMIN",
+          shopId: "shop123",
+        },
+      },
+      "admin@healthcaremart.com": {
+        password: "Admin@123",
+        user: {
+          id: "admin2",
+          name: "Admin User",
+          email: "admin@healthcaremart.com",
+          role: "SHOP_ADMIN",
+          shopId: "shop123",
+        },
+      },
+      "staff@shop.com": {
+        password: "Staff@123",
+        user: {
+          id: "staff1",
+          name: "Staff Member",
+          email: "staff@shop.com",
+          role: "STAFF",
+          shopId: "shop123",
+        },
+      },
+      "staff@healthcaremart.com": {
+        password: "Staff@123",
+        user: {
+          id: "staff2",
+          name: "Staff Member",
+          email: "staff@healthcaremart.com",
+          role: "STAFF",
+          shopId: "shop123",
+        },
+      },
+    };
+
+    const userCredentials = mockUsers[email];
+
+    if (!userCredentials || userCredentials.password !== password) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // Generate a mock token
+    const token = `mock-token-${Date.now()}-${userCredentials.user.id}`;
+
+    res.json({
+      success: true,
+      message: "Login successful",
+      data: {
+        token,
+        user: userCredentials.user,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/test/dashboard
  * Simple dashboard data without authentication
  */
@@ -254,6 +344,112 @@ router.get("/products", async (req, res) => {
       success: true,
       count: products.length,
       data: products,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/test/products
+ * Create product without authentication
+ */
+router.post("/products", async (req, res) => {
+  try {
+    const productData = req.body;
+
+    // Simulate successful product creation
+    const newProduct = {
+      _id: `product-${Date.now()}`,
+      name: productData.name,
+      sku: productData.sku,
+      category: productData.category,
+      brand: productData.brand || "",
+      purchasePrice: parseFloat(productData.purchasePrice) || 0,
+      sellingPrice: parseFloat(productData.sellingPrice) || 0,
+      unit: productData.unit,
+      minStockLevel: parseInt(productData.minStockLevel) || 0,
+      stockQuantity: parseInt(productData.minStockLevel) || 10, // Set initial stock to minStockLevel or 10
+      isLowStock: false,
+      isActive: true,
+      description: productData.description || "",
+      batchNo: productData.batchNo || "",
+      expiryDate: productData.expiryDate || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    res.json({
+      success: true,
+      message: "Product created successfully",
+      data: newProduct,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/test/products/:id
+ * Update product without authentication
+ */
+router.put("/products/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const productData = req.body;
+
+    // Simulate successful product update
+    const updatedProduct = {
+      _id: id,
+      name: productData.name,
+      sku: productData.sku,
+      category: productData.category,
+      brand: productData.brand || "",
+      purchasePrice: parseFloat(productData.purchasePrice) || 0,
+      sellingPrice: parseFloat(productData.sellingPrice) || 0,
+      unit: productData.unit,
+      minStockLevel: parseInt(productData.minStockLevel) || 0,
+      stockQuantity: productData.stockQuantity || 0,
+      isLowStock: productData.isLowStock || false,
+      isActive:
+        productData.isActive !== undefined ? productData.isActive : true,
+      description: productData.description || "",
+      batchNo: productData.batchNo || "",
+      expiryDate: productData.expiryDate || null,
+      updatedAt: new Date(),
+    };
+
+    res.json({
+      success: true,
+      message: "Product updated successfully",
+      data: updatedProduct,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/test/products/:id
+ * Delete product without authentication
+ */
+router.delete("/products/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    res.json({
+      success: true,
+      message: "Product deleted successfully",
+      data: { _id: id },
     });
   } catch (error) {
     res.status(500).json({
@@ -558,6 +754,46 @@ router.get("/purchases", async (req, res) => {
 });
 
 /**
+ * POST /api/test/purchases
+ * Create purchase order without authentication
+ */
+router.post("/purchases", async (req, res) => {
+  try {
+    const purchaseData = req.body;
+
+    // Simulate successful purchase order creation
+    const newPurchase = {
+      _id: `purchase-${Date.now()}`,
+      purchaseNo: purchaseData.invoiceNo || `PO-${Date.now()}`,
+      supplier: {
+        _id: purchaseData.supplierId,
+        name: purchaseData.supplierName,
+      },
+      purchaseDate: purchaseData.purchaseDate || new Date(),
+      items: purchaseData.items || [],
+      subtotal: purchaseData.subtotal || 0,
+      discount: purchaseData.discount || 0,
+      vatAmount: purchaseData.vatAmount || 0,
+      grandTotal: purchaseData.grandTotal || 0,
+      status: purchaseData.status || "pending",
+      notes: purchaseData.notes || "",
+      createdAt: new Date(),
+    };
+
+    res.json({
+      success: true,
+      message: "Purchase order created successfully",
+      data: newPurchase,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/test/suppliers
  * Simple suppliers data without authentication
  */
@@ -597,6 +833,39 @@ router.get("/suppliers", async (req, res) => {
       success: true,
       count: suppliers.length,
       data: suppliers,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/test/suppliers
+ * Create supplier without authentication
+ */
+router.post("/suppliers", async (req, res) => {
+  try {
+    const supplierData = req.body;
+
+    // Simulate successful supplier creation
+    const newSupplier = {
+      _id: `supplier-${Date.now()}`,
+      name: supplierData.name,
+      company: supplierData.company,
+      phone: supplierData.phone,
+      email: supplierData.email || "",
+      address: supplierData.address || "",
+      isActive: true,
+      createdAt: new Date(),
+    };
+
+    res.json({
+      success: true,
+      message: "Supplier created successfully",
+      data: newSupplier,
     });
   } catch (error) {
     res.status(500).json({
@@ -824,18 +1093,33 @@ router.get("/financial-reports/profit-loss", async (req, res) => {
   try {
     const profitLoss = {
       revenue: {
-        sales: 45000,
-        otherIncome: 1000,
-        total: 46000,
+        grossRevenue: 46000,
+        returns: {
+          totalReturns: 1000,
+          returnRate: 2.17,
+        },
+        netRevenue: 45000,
+        totalSales: 200,
+        totalVAT: 2000,
       },
-      expenses: {
-        purchases: 30000,
+      costs: {
+        costOfGoodsSold: 30000,
         operatingExpenses: 5000,
-        otherExpenses: 1000,
-        total: 36000,
+        otherExpenses: 0,
+        totalCosts: 35000,
       },
-      netProfit: 10000,
-      profitMargin: 21.74,
+      profit: {
+        grossProfit: 15000,
+        grossProfitMargin: 33.33,
+        netProfit: 10000,
+        netProfitMargin: 22.22,
+      },
+      metrics: {
+        returnRate: 2.17,
+        averageOrderValue: 225,
+        profitPerSale: 50,
+        totalTransactions: 200,
+      },
     };
 
     res.json({
@@ -857,12 +1141,42 @@ router.get("/financial-reports/profit-loss", async (req, res) => {
 router.get("/financial-reports/daily-summary", async (req, res) => {
   try {
     const summary = {
-      date: new Date(),
-      sales: 225,
-      purchases: 0,
-      expenses: 50,
-      profit: 175,
-      transactions: 3,
+      sales: {
+        count: 3,
+        revenue: 225,
+        cash: 150,
+        bank: 75,
+      },
+      returns: {
+        count: 0,
+        refund: 0,
+      },
+      net: {
+        revenue: 225,
+        transactions: 3,
+      },
+      hourlySales: [
+        { hour: 9, sales: 1 },
+        { hour: 10, sales: 0 },
+        { hour: 11, sales: 1 },
+        { hour: 12, sales: 0 },
+        { hour: 13, sales: 0 },
+        { hour: 14, sales: 1 },
+        { hour: 15, sales: 0 },
+        { hour: 16, sales: 0 },
+      ],
+      topProducts: [
+        {
+          productName: "Digital Thermometer",
+          totalQuantity: 1,
+          totalRevenue: 40,
+        },
+        {
+          productName: "Paracetamol 500mg",
+          totalQuantity: 2,
+          totalRevenue: 10,
+        },
+      ],
     };
 
     res.json({
@@ -883,24 +1197,44 @@ router.get("/financial-reports/daily-summary", async (req, res) => {
  */
 router.get("/financial-reports/product-profitability", async (req, res) => {
   try {
-    const profitability = [
-      {
-        productName: "Paracetamol 500mg",
-        totalSold: 100,
-        revenue: 500,
-        cost: 250,
-        profit: 250,
-        profitMargin: 50,
-      },
-      {
-        productName: "Digital Thermometer",
-        totalSold: 25,
-        revenue: 625,
-        cost: 375,
-        profit: 250,
-        profitMargin: 40,
-      },
-    ];
+    const profitability = {
+      categories: [
+        {
+          _id: "Medicine",
+          totalRevenue: 500,
+          grossProfit: 250,
+          profitMargin: 50,
+          productCount: 5,
+        },
+        {
+          _id: "Equipment",
+          totalRevenue: 625,
+          grossProfit: 250,
+          profitMargin: 40,
+          productCount: 3,
+        },
+      ],
+      products: [
+        {
+          productName: "Paracetamol 500mg",
+          sku: "MED-001",
+          category: "Medicine",
+          totalQuantitySold: 100,
+          totalRevenue: 500,
+          grossProfit: 250,
+          profitMargin: 50,
+        },
+        {
+          productName: "Digital Thermometer",
+          sku: "EQP-001",
+          category: "Equipment",
+          totalQuantitySold: 25,
+          totalRevenue: 625,
+          grossProfit: 250,
+          profitMargin: 40,
+        },
+      ],
+    };
 
     res.json({
       success: true,
@@ -921,11 +1255,28 @@ router.get("/financial-reports/product-profitability", async (req, res) => {
 router.get("/financial-reports/return-analysis", async (req, res) => {
   try {
     const analysis = {
-      totalReturns: 1,
-      totalRefundAmount: 50,
-      returnRate: 2.22,
-      topReturnedProducts: [
-        { productName: "Paracetamol 500mg", returnCount: 1, refundAmount: 50 },
+      summary: {
+        totalReturns: 1,
+        returnRate: 2.22,
+        revenueImpact: 1.5,
+        totalRefundAmount: 50,
+      },
+      byReason: [
+        {
+          _id: "Defective",
+          count: 1,
+          totalRefund: 50,
+          averageRefund: 50,
+        },
+      ],
+      byProduct: [
+        {
+          productName: "Paracetamol 500mg",
+          sku: "MED-001",
+          returnCount: 1,
+          totalReturned: 10,
+          totalRefund: 50,
+        },
       ],
     };
 
@@ -948,17 +1299,32 @@ router.get("/financial-reports/return-analysis", async (req, res) => {
 router.get("/financial-reports/cash-flow", async (req, res) => {
   try {
     const cashFlow = {
-      inflow: {
-        sales: 45000,
-        otherIncome: 1000,
-        total: 46000,
+      inflows: {
+        totalSales: 45000,
+        cashSales: 30000,
+        bankSales: 15000,
       },
-      outflow: {
+      outflows: {
         purchases: 30000,
-        expenses: 6000,
-        total: 36000,
+        returns: [
+          {
+            _id: "cash",
+            count: 1,
+            totalRefund: 50,
+          },
+        ],
+        totalOutflows: 30050,
       },
-      netCashFlow: 10000,
+      netCashFlow: 14950,
+      dailyCashFlow: [
+        { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), cashIn: 5000 },
+        { date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), cashIn: 6000 },
+        { date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), cashIn: 7000 },
+        { date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), cashIn: 8000 },
+        { date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), cashIn: 7500 },
+        { date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), cashIn: 6500 },
+        { date: new Date(), cashIn: 5000 },
+      ],
     };
 
     res.json({
@@ -1047,6 +1413,310 @@ router.get("/settings", async (req, res) => {
     res.json({
       success: true,
       data: settings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/test/settings/shop
+ * Get shop settings without authentication
+ */
+router.get("/settings/shop", async (req, res) => {
+  try {
+    const settings = {
+      name: "Health Care Surgical Mart",
+      address: "123 Medical Street, Healthcare District, Dhaka, Bangladesh",
+      phone: "+880 1234 567890",
+      email: "info@healthcaremart.com",
+      website: "https://www.healthcaremart.com",
+      logo: "",
+      description: "A Trust Medical Equipment Company",
+      registrationNumber: "REG-123456789",
+      taxNumber: "TAX-123456789",
+      currency: "BDT",
+      timezone: "Asia/Dhaka",
+    };
+
+    res.json({
+      success: true,
+      data: settings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/test/settings/shop
+ * Update shop settings without authentication
+ */
+router.put("/settings/shop", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "Shop settings updated successfully",
+      data: req.body,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/test/settings/tax
+ * Get tax settings without authentication
+ */
+router.get("/settings/tax", async (req, res) => {
+  try {
+    const settings = {
+      defaultTaxRate: 15,
+      enableTax: true,
+      taxName: "VAT",
+      taxNumber: "VAT-123456789",
+      taxInclusive: false,
+    };
+
+    res.json({
+      success: true,
+      data: settings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/test/settings/tax
+ * Update tax settings without authentication
+ */
+router.put("/settings/tax", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "Tax settings updated successfully",
+      data: req.body,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/test/settings/system
+ * Get system settings without authentication
+ */
+router.get("/settings/system", async (req, res) => {
+  try {
+    const settings = {
+      lowStockThreshold: 10,
+      autoBackup: false,
+      backupFrequency: "daily",
+      emailNotifications: true,
+      smsNotifications: false,
+      printReceipts: true,
+      defaultPaymentMethod: "cash",
+      invoicePrefix: "INV",
+      invoiceStartNumber: 1,
+      dateFormat: "DD/MM/YYYY",
+      timeFormat: "12",
+    };
+
+    res.json({
+      success: true,
+      data: settings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/test/settings/system
+ * Update system settings without authentication
+ */
+router.put("/settings/system", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "System settings updated successfully",
+      data: req.body,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/test/settings/receipt
+ * Get receipt settings without authentication
+ */
+router.get("/settings/receipt", async (req, res) => {
+  try {
+    const settings = {
+      showLogo: true,
+      showAddress: true,
+      showPhone: true,
+      showEmail: true,
+      showWebsite: false,
+      footerText: "Thank you for your business!",
+      headerText: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ",
+      paperSize: "80mm",
+    };
+
+    res.json({
+      success: true,
+      data: settings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/test/settings/receipt
+ * Update receipt settings without authentication
+ */
+router.put("/settings/receipt", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "Receipt settings updated successfully",
+      data: req.body,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+module.exports = router;
+
+/**
+ * GET /api/test/users
+ * Get users list without authentication
+ */
+router.get("/users", async (req, res) => {
+  try {
+    const users = [
+      {
+        _id: "user1",
+        name: "Admin User",
+        email: "admin@healthcaremart.com",
+        role: "SHOP_ADMIN",
+        isActive: true,
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      },
+      {
+        _id: "user2",
+        name: "Staff Member",
+        email: "staff@healthcaremart.com",
+        role: "STAFF",
+        isActive: true,
+        createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      },
+      {
+        _id: "user3",
+        name: "John Doe",
+        email: "john@healthcaremart.com",
+        role: "STAFF",
+        isActive: false,
+        createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+      },
+    ];
+
+    res.json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/test/users
+ * Create user without authentication
+ */
+router.post("/users", async (req, res) => {
+  try {
+    const newUser = {
+      _id: `user${Date.now()}`,
+      ...req.body,
+      createdAt: new Date(),
+    };
+
+    res.json({
+      success: true,
+      message: "User created successfully",
+      data: newUser,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/test/users/:id
+ * Update user without authentication
+ */
+router.put("/users/:id", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "User updated successfully",
+      data: { _id: req.params.id, ...req.body },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/test/users/:id
+ * Delete user without authentication
+ */
+router.delete("/users/:id", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "User deleted successfully",
     });
   } catch (error) {
     res.status(500).json({

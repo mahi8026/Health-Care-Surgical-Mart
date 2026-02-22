@@ -54,36 +54,32 @@ const FinancialReports = () => {
       setLoading(true);
       setError("");
 
-      // Use the working test endpoints temporarily
-      const [plResponse, dsResponse, ppResponse, raResponse, cfResponse] =
-        await Promise.all([
-          fetch("http://localhost:5000/api/test/financial-reports/profit-loss"),
-          fetch(
-            "http://localhost:5000/api/test/financial-reports/daily-summary",
-          ),
-          fetch(
-            "http://localhost:5000/api/test/financial-reports/product-profitability",
-          ),
-          fetch(
-            "http://localhost:5000/api/test/financial-reports/return-analysis",
-          ),
-          fetch("http://localhost:5000/api/test/financial-reports/cash-flow"),
-        ]);
+      // Use real MongoDB endpoints
+      const [plData, dsData, ppData, raData, cfData] = await Promise.all([
+        apiService.get("/reports/financial/profit-loss"),
+        apiService.get("/reports/financial/daily-summary"),
+        apiService.get("/reports/financial/product-profitability"),
+        apiService.get("/reports/financial/return-analysis"),
+        apiService.get("/reports/financial/cash-flow"),
+      ]);
 
-      const plData = await plResponse.json();
-      const dsData = await dsResponse.json();
-      const ppData = await ppResponse.json();
-      const raData = await raResponse.json();
-      const cfData = await cfResponse.json();
-
-      if (plData.success) setProfitLossData(plData.data);
-      if (dsData.success) setDailySummary(dsData.data);
-      if (ppData.success) setProductProfitability(ppData.data);
-      if (raData.success) setReturnAnalysis(raData.data);
-      if (cfData.success) setCashFlow(cfData.data);
+      if (plData?.success) setProfitLossData(plData.data);
+      if (dsData?.success) setDailySummary(dsData.data);
+      if (ppData?.success) setProductProfitability(ppData.data);
+      if (raData?.success) setReturnAnalysis(raData.data);
+      if (cfData?.success) setCashFlow(cfData.data);
     } catch (error) {
       console.error("Financial data fetch error:", error);
-      setError("Failed to fetch financial data");
+
+      // Handle authentication errors
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError("Authentication failed. Please login again.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+      } else {
+        setError("Failed to fetch financial data");
+      }
     } finally {
       setLoading(false);
     }
@@ -183,12 +179,12 @@ const FinancialReports = () => {
       )}
 
       {/* Key Metrics Cards */}
-      {profitLossData && (
+      {profitLossData && profitLossData.profit && profitLossData.revenue && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
             {
               title: "Net Revenue",
-              value: formatCurrency(profitLossData.revenue.netRevenue),
+              value: formatCurrency(profitLossData.revenue.netRevenue || 0),
               change: "+12.5%",
               icon: "fas fa-dollar-sign",
               color: "text-green-600",
@@ -196,25 +192,29 @@ const FinancialReports = () => {
             },
             {
               title: "Gross Profit",
-              value: formatCurrency(profitLossData.profit.grossProfit),
-              change: formatPercentage(profitLossData.profit.grossProfitMargin),
+              value: formatCurrency(profitLossData.profit.grossProfit || 0),
+              change: formatPercentage(
+                profitLossData.profit.grossProfitMargin || 0,
+              ),
               icon: "fas fa-chart-line",
               color: "text-blue-600",
               bg: "bg-blue-100",
             },
             {
               title: "Net Profit",
-              value: formatCurrency(profitLossData.profit.netProfit),
-              change: formatPercentage(profitLossData.profit.netProfitMargin),
+              value: formatCurrency(profitLossData.profit.netProfit || 0),
+              change: formatPercentage(
+                profitLossData.profit.netProfitMargin || 0,
+              ),
               icon: "fas fa-coins",
               color: "text-purple-600",
               bg: "bg-purple-100",
             },
             {
               title: "Return Rate",
-              value: formatPercentage(profitLossData.metrics.returnRate),
+              value: formatPercentage(profitLossData.metrics?.returnRate || 0),
               change: formatCurrency(
-                profitLossData.revenue.returns.totalReturns,
+                profitLossData.revenue.returns?.totalReturns || 0,
               ),
               icon: "fas fa-undo",
               color: "text-orange-600",

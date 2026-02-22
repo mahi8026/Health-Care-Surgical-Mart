@@ -39,52 +39,63 @@ const Dashboard = () => {
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/dashboard");
-      const data = await response.json();
+      const response = await apiService.get("/reports/dashboard");
 
-      if (data.success) {
-        setDashboardData(data.data);
+      if (response.success) {
+        setDashboardData(response.data);
       } else {
         setError("Failed to fetch dashboard data");
       }
     } catch (error) {
       console.error("Dashboard data error:", error);
-      setError("Failed to load dashboard data");
+      if (
+        error.message?.includes("401") ||
+        error.message?.includes("Authentication")
+      ) {
+        setError("Session expired. Please login again.");
+        setTimeout(() => (window.location.href = "/login"), 2000);
+      } else {
+        setError("Failed to load dashboard data");
+      }
     }
   };
 
   // Fetch stock valuation data
   const fetchStockData = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch(
-        "http://localhost:5000/api/test/stock-valuation",
-      );
-      const data = await response.json();
+      const response = await apiService.get("/reports/stock-valuation");
 
-      if (data.success) {
-        setStockData(data.data);
+      if (response.success) {
+        setStockData(response.data);
       }
     } catch (error) {
       console.error("Stock data error:", error);
+      if (
+        error.message?.includes("401") ||
+        error.message?.includes("Authentication")
+      ) {
+        setTimeout(() => (window.location.href = "/login"), 2000);
+      }
     }
   };
 
   // Fetch expense summary data
   const fetchExpenseData = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch(
-        "http://localhost:5000/api/test/expense-analytics",
+      // Fetch month-over-month comparison
+      const comparisonResponse = await apiService.get(
+        "/expense-analytics/month-over-month?months=6",
       );
-      const data = await response.json();
 
-      if (data.success) {
-        const currentMonth =
-          data.data.comparison[data.data.comparison.length - 1];
-        const previousMonth =
-          data.data.comparison[data.data.comparison.length - 2];
+      // Fetch category distribution
+      const distributionResponse = await apiService.get(
+        "/expense-analytics/category-distribution",
+      );
+
+      if (comparisonResponse.success) {
+        const comparison = comparisonResponse.data.comparison || [];
+        const currentMonth = comparison[comparison.length - 1];
+        const previousMonth = comparison[comparison.length - 2];
 
         setExpenseData({
           currentMonth: currentMonth || {
@@ -93,7 +104,7 @@ const Dashboard = () => {
             changes: { amount: 0 },
           },
           previousMonth: previousMonth || { totalAmount: 0, expenseCount: 0 },
-          categories: data.data.distribution || [], // Use distribution array
+          categories: distributionResponse.data?.distribution || [],
           summary: {
             totalAmount: currentMonth?.totalAmount || 0,
             expenseCount: currentMonth?.expenseCount || 0,
@@ -102,6 +113,12 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error("Expense data error:", error);
+      if (
+        error.message?.includes("401") ||
+        error.message?.includes("Authentication")
+      ) {
+        setTimeout(() => (window.location.href = "/login"), 2000);
+      }
     }
   };
 

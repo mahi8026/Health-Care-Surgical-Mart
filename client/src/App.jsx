@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "./contexts/AuthContext";
+import { useFirebaseAuth as useAuth } from "./contexts/FirebaseAuthContext";
 import { PERMISSIONS } from "./utils/permissions";
 
 // Pages
@@ -17,6 +17,7 @@ import StockReport from "./pages/StockReport";
 import ExpenseCategories from "./pages/ExpenseCategories";
 import ExpensesPage from "./pages/ExpensesPage";
 import AddExpensePage from "./pages/AddExpensePage";
+import FirebaseAuthTest from "./pages/FirebaseAuthTest";
 
 // Components
 import { Layout, LoadingSpinner, ProtectedRoute } from "./components";
@@ -44,6 +45,9 @@ function App() {
           path="/login"
           element={!user ? <Login /> : <Navigate to="/dashboard" replace />}
         />
+
+        {/* Firebase Authentication Test Page - Public for testing */}
+        <Route path="/firebase-test" element={<FirebaseAuthTest />} />
 
         {/* Protected Routes - Require Authentication */}
         <Route

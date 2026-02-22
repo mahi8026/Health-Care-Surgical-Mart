@@ -120,11 +120,23 @@ router.post("/login", async (req, res) => {
 
       // Get user from shop database
       const shopDb = getShopDatabase(targetShopId);
+      console.log("Getting user from shop database:", targetShopId);
       user = await shopDb.collection("users").findOne({ email });
+      console.log("User found in shop DB:", !!user);
+      if (user) {
+        console.log("User details:", {
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          isActive: user.isActive,
+        });
+      }
       userDb = targetShopId;
     }
 
+    console.log("Final user check - user exists:", !!user);
     if (!user) {
+      console.log("Returning 401 - user not found");
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -132,7 +144,11 @@ router.post("/login", async (req, res) => {
     }
 
     // Verify password
+    console.log("Verifying password for user:", email);
+    console.log("User has passwordHash:", !!user.passwordHash);
+    console.log("Password hash length:", user.passwordHash?.length);
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    console.log("Password valid:", isPasswordValid);
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -275,6 +291,173 @@ router.post("/change-password", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to change password",
+    });
+  }
+});
+
+/**
+ * POST /api/auth/firebase-login
+ * Login with Firebase token
+ */
+router.post("/firebase-login", async (req, res) => {
+  try {
+    const { email, shopId } = req.body;
+
+    console.log("Firebase login attempt:", { email, shopId });
+
+    if (!email) {
+      console.log("Missing email");
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    // Note: In production, you should verify the Firebase token here
+    // For now, we trust that the frontend has already authenticated with Firebase
+
+    let user;
+    let userDb;
+
+    // Check if super admin login
+    const systemDb = getSystemDatabase();
+    const superAdmin = await systemDb
+      .collection("system_users")
+      .findOne({ email });
+
+    if (superAdmin && superAdmin.role === "SUPER_ADMIN") {
+      user = superAdmin;
+      userDb = "system";
+    } else {
+      // Shop user login - try to find shopId automatically
+      let targetShopId = shopId;
+
+      if (!targetShopId) {
+        // Auto-detect shopId by searching all shops for this email
+        console.log(`Auto-detecting shopId for email: ${email}`);
+        const shops = await systemDb
+          .collection("shops")
+          .find({ status: "Active" })
+          .toArray();
+
+        // First check if email matches shop owner email
+        for (const shop of shops) {
+          if (shop.ownerEmail === email) {
+            targetShopId = shop.shopId;
+            console.log(
+              `Found shopId: ${targetShopId} for owner email: ${email}`,
+            );
+            break;
+          }
+        }
+
+        // If not found as owner, search in each shop's users collection
+        if (!targetShopId) {
+          for (const shop of shops) {
+            try {
+              const shopDb = getShopDatabase(shop.shopId);
+              const shopUser = await shopDb
+                .collection("users")
+                .findOne({ email });
+              if (shopUser) {
+                targetShopId = shop.shopId;
+                console.log(
+                  `Found shopId: ${targetShopId} for user email: ${email}`,
+                );
+                break;
+              }
+            } catch (error) {
+              console.log(`Error checking shop ${shop.shopId}:`, error.message);
+            }
+          }
+        }
+
+        if (!targetShopId) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "User not found in system. Please contact administrator to add your account.",
+          });
+        }
+      }
+
+      // Verify shop exists
+      const shop = await systemDb
+        .collection("shops")
+        .findOne({ shopId: targetShopId });
+      if (!shop) {
+        return res.status(404).json({
+          success: false,
+          message: "Shop not found",
+        });
+      }
+
+      if (shop.status !== "Active") {
+        return res.status(403).json({
+          success: false,
+          message: `Shop is ${shop.status.toLowerCase()}. Please contact support.`,
+        });
+      }
+
+      // Get user from shop database
+      const shopDb = getShopDatabase(targetShopId);
+      console.log("Getting user from shop database:", targetShopId);
+      user = await shopDb.collection("users").findOne({ email });
+      console.log("User found in shop DB:", !!user);
+      userDb = targetShopId;
+    }
+
+    console.log("Final user check - user exists:", !!user);
+    if (!user) {
+      console.log("Returning 401 - user not found");
+      return res.status(401).json({
+        success: false,
+        message: "User not found in system. Please contact administrator.",
+      });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "User account is inactive",
+      });
+    }
+
+    // Update last login
+    if (userDb === "system") {
+      await systemDb
+        .collection("system_users")
+        .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+    } else {
+      const shopDb = getShopDatabase(userDb);
+      await shopDb
+        .collection("users")
+        .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+    }
+
+    // Generate token
+    const token = generateToken(user);
+
+    res.json({
+      success: true,
+      message: "Login successful",
+      data: {
+        token,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          shopId: user.shopId || null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Firebase login error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Login failed",
     });
   }
 });

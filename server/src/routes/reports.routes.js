@@ -618,4 +618,699 @@ router.get(
   }),
 );
 
+/**
+ * GET /api/reports/financial/profit-loss
+ * Get profit and loss statement
+ */
+router.get(
+  "/financial/profit-loss",
+  requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+    const { startDate, endDate } = req.query;
+
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
+    // Get sales data
+    const salesData = await shopDb
+      .collection("sales")
+      .aggregate([
+        {
+          $match: {
+            ...(Object.keys(dateFilter).length > 0 && {
+              saleDate: dateFilter,
+            }),
+            paymentStatus: "Paid",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalSales: { $sum: 1 },
+            grossRevenue: { $sum: "$totalAmount" },
+            totalVAT: { $sum: "$vatAmount" },
+            totalDiscount: { $sum: "$discountAmount" },
+          },
+        },
+      ])
+      .toArray();
+
+    // Get returns data
+    const returnsData = await shopDb
+      .collection("returns")
+      .aggregate([
+        {
+          $match: {
+            ...(Object.keys(dateFilter).length > 0 && {
+              returnDate: dateFilter,
+            }),
+            status: "Approved",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalReturns: { $sum: 1 },
+            totalRefund: { $sum: "$refundAmount" },
+          },
+        },
+      ])
+      .toArray();
+
+    // Get expenses data
+    const expensesData = await shopDb
+      .collection("expenses")
+      .aggregate([
+        {
+          $match: {
+            ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalExpenses: { $sum: "$amount" },
+          },
+        },
+      ])
+      .toArray();
+
+    // Get COGS (Cost of Goods Sold)
+    const cogsData = await shopDb
+      .collection("sales")
+      .aggregate([
+        {
+          $match: {
+            ...(Object.keys(dateFilter).length > 0 && {
+              saleDate: dateFilter,
+            }),
+            paymentStatus: "Paid",
+          },
+        },
+        { $unwind: "$items" },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.productId",
+            foreignField: "_id",
+            as: "product",
+          },
+        },
+        { $unwind: "$product" },
+        {
+          $group: {
+            _id: null,
+            totalCOGS: {
+              $sum: {
+                $multiply: ["$items.quantity", "$product.purchasePrice"],
+              },
+            },
+          },
+        },
+      ])
+      .toArray();
+
+    const sales = salesData[0] || {
+      totalSales: 0,
+      grossRevenue: 0,
+      totalVAT: 0,
+      totalDiscount: 0,
+    };
+    const returns = returnsData[0] || { totalReturns: 0, totalRefund: 0 };
+    const expenses = expensesData[0] || { totalExpenses: 0 };
+    const cogs = cogsData[0] || { totalCOGS: 0 };
+
+    const netRevenue = sales.grossRevenue - returns.totalRefund;
+    const grossProfit = netRevenue - cogs.totalCOGS;
+    const netProfit = grossProfit - expenses.totalExpenses;
+
+    res.json({
+      success: true,
+      data: {
+        revenue: {
+          grossRevenue: sales.grossRevenue,
+          totalSales: sales.totalSales,
+          totalVAT: sales.totalVAT,
+          totalDiscount: sales.totalDiscount,
+          returns: {
+            totalReturns: returns.totalRefund,
+            count: returns.totalReturns,
+          },
+          netRevenue,
+        },
+        costs: {
+          costOfGoodsSold: cogs.totalCOGS,
+          operatingExpenses: expenses.totalExpenses,
+          totalCosts: cogs.totalCOGS + expenses.totalExpenses,
+        },
+        profit: {
+          grossProfit,
+          netProfit,
+          grossProfitMargin:
+            netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0,
+          netProfitMargin: netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0,
+        },
+        metrics: {
+          averageOrderValue:
+            sales.totalSales > 0 ? netRevenue / sales.totalSales : 0,
+          profitPerSale:
+            sales.totalSales > 0 ? netProfit / sales.totalSales : 0,
+          returnRate:
+            sales.totalSales > 0
+              ? (returns.totalReturns / sales.totalSales) * 100
+              : 0,
+        },
+      },
+    });
+  }),
+);
+
+/**
+ * GET /api/reports/financial/daily-summary
+ * Get daily financial summary
+ */
+router.get(
+  "/financial/daily-summary",
+  requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+    const today = new Date();
+    const startOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+
+    // Get today's sales
+    const salesData = await shopDb
+      .collection("sales")
+      .aggregate([
+        {
+          $match: {
+            saleDate: { $gte: startOfDay },
+            paymentStatus: "Paid",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            revenue: { $sum: "$totalAmount" },
+            cash: {
+              $sum: {
+                $cond: [{ $eq: ["$paymentMethod", "Cash"] }, "$totalAmount", 0],
+              },
+            },
+            bank: {
+              $sum: {
+                $cond: [{ $eq: ["$paymentMethod", "Bank"] }, "$totalAmount", 0],
+              },
+            },
+          },
+        },
+      ])
+      .toArray();
+
+    // Get today's returns
+    const returnsData = await shopDb
+      .collection("returns")
+      .aggregate([
+        {
+          $match: {
+            returnDate: { $gte: startOfDay },
+            status: "Approved",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            refund: { $sum: "$refundAmount" },
+          },
+        },
+      ])
+      .toArray();
+
+    // Get hourly sales pattern
+    const hourlySales = await shopDb
+      .collection("sales")
+      .aggregate([
+        {
+          $match: {
+            saleDate: { $gte: startOfDay },
+            paymentStatus: "Paid",
+          },
+        },
+        {
+          $project: {
+            hour: { $hour: "$saleDate" },
+          },
+        },
+        {
+          $group: {
+            _id: "$hour",
+            sales: { $sum: 1 },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            hour: "$_id",
+            sales: 1,
+          },
+        },
+        { $sort: { hour: 1 } },
+      ])
+      .toArray();
+
+    // Get top products today
+    const topProducts = await shopDb
+      .collection("sales")
+      .aggregate([
+        {
+          $match: {
+            saleDate: { $gte: startOfDay },
+            paymentStatus: "Paid",
+          },
+        },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.productId",
+            productName: { $first: "$items.productName" },
+            totalQuantity: { $sum: "$items.quantity" },
+            totalRevenue: { $sum: "$items.subtotal" },
+          },
+        },
+        { $sort: { totalRevenue: -1 } },
+        { $limit: 10 },
+      ])
+      .toArray();
+
+    const sales = salesData[0] || { count: 0, revenue: 0, cash: 0, bank: 0 };
+    const returns = returnsData[0] || { count: 0, refund: 0 };
+
+    res.json({
+      success: true,
+      data: {
+        sales,
+        returns,
+        net: {
+          revenue: sales.revenue - returns.refund,
+          transactions: sales.count - returns.count,
+        },
+        hourlySales,
+        topProducts,
+      },
+    });
+  }),
+);
+
+/**
+ * GET /api/reports/financial/product-profitability
+ * Get product profitability analysis
+ */
+router.get(
+  "/financial/product-profitability",
+  requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+
+    // Get product profitability
+    const products = await shopDb
+      .collection("sales")
+      .aggregate([
+        { $match: { paymentStatus: "Paid" } },
+        { $unwind: "$items" },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.productId",
+            foreignField: "_id",
+            as: "product",
+          },
+        },
+        { $unwind: "$product" },
+        {
+          $group: {
+            _id: "$items.productId",
+            productName: { $first: "$items.productName" },
+            sku: { $first: "$product.sku" },
+            category: { $first: "$product.category" },
+            totalQuantitySold: { $sum: "$items.quantity" },
+            totalRevenue: { $sum: "$items.subtotal" },
+            totalCost: {
+              $sum: {
+                $multiply: ["$items.quantity", "$product.purchasePrice"],
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            productName: 1,
+            sku: 1,
+            category: 1,
+            totalQuantitySold: 1,
+            totalRevenue: 1,
+            totalCost: 1,
+            grossProfit: { $subtract: ["$totalRevenue", "$totalCost"] },
+            profitMargin: {
+              $cond: [
+                { $gt: ["$totalRevenue", 0] },
+                {
+                  $multiply: [
+                    {
+                      $divide: [
+                        { $subtract: ["$totalRevenue", "$totalCost"] },
+                        "$totalRevenue",
+                      ],
+                    },
+                    100,
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+        },
+        { $sort: { grossProfit: -1 } },
+        { $limit: 50 },
+      ])
+      .toArray();
+
+    // Get category profitability
+    const categories = await shopDb
+      .collection("sales")
+      .aggregate([
+        { $match: { paymentStatus: "Paid" } },
+        { $unwind: "$items" },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.productId",
+            foreignField: "_id",
+            as: "product",
+          },
+        },
+        { $unwind: "$product" },
+        {
+          $group: {
+            _id: "$product.category",
+            productCount: { $addToSet: "$items.productId" },
+            totalRevenue: { $sum: "$items.subtotal" },
+            totalCost: {
+              $sum: {
+                $multiply: ["$items.quantity", "$product.purchasePrice"],
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            productCount: { $size: "$productCount" },
+            totalRevenue: 1,
+            totalCost: 1,
+            grossProfit: { $subtract: ["$totalRevenue", "$totalCost"] },
+            profitMargin: {
+              $cond: [
+                { $gt: ["$totalRevenue", 0] },
+                {
+                  $multiply: [
+                    {
+                      $divide: [
+                        { $subtract: ["$totalRevenue", "$totalCost"] },
+                        "$totalRevenue",
+                      ],
+                    },
+                    100,
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+        },
+        { $sort: { grossProfit: -1 } },
+      ])
+      .toArray();
+
+    res.json({
+      success: true,
+      data: {
+        products,
+        categories,
+      },
+    });
+  }),
+);
+
+/**
+ * GET /api/reports/financial/return-analysis
+ * Get return analysis
+ */
+router.get(
+  "/financial/return-analysis",
+  requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+
+    // Get total sales for return rate calculation
+    const totalSales = await shopDb.collection("sales").countDocuments({
+      paymentStatus: "Paid",
+    });
+
+    // Get returns summary
+    const returnsSummary = await shopDb
+      .collection("returns")
+      .aggregate([
+        { $match: { status: "Approved" } },
+        {
+          $group: {
+            _id: null,
+            totalReturns: { $sum: 1 },
+            totalRefund: { $sum: "$refundAmount" },
+          },
+        },
+      ])
+      .toArray();
+
+    // Get returns by reason
+    const byReason = await shopDb
+      .collection("returns")
+      .aggregate([
+        { $match: { status: "Approved" } },
+        {
+          $group: {
+            _id: "$reason",
+            count: { $sum: 1 },
+            totalRefund: { $sum: "$refundAmount" },
+          },
+        },
+        { $sort: { count: -1 } },
+      ])
+      .toArray();
+
+    // Get returns by product
+    const byProduct = await shopDb
+      .collection("returns")
+      .aggregate([
+        { $match: { status: "Approved" } },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.productId",
+            productName: { $first: "$items.productName" },
+            returnCount: { $sum: 1 },
+            totalQuantity: { $sum: "$items.quantity" },
+            totalRefund: { $sum: "$items.subtotal" },
+          },
+        },
+        { $sort: { returnCount: -1 } },
+        { $limit: 10 },
+      ])
+      .toArray();
+
+    const summary = returnsSummary[0] || { totalReturns: 0, totalRefund: 0 };
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalReturns: summary.totalReturns,
+          totalRefund: summary.totalRefund,
+          returnRate:
+            totalSales > 0 ? (summary.totalReturns / totalSales) * 100 : 0,
+        },
+        byReason,
+        byProduct,
+      },
+    });
+  }),
+);
+
+/**
+ * GET /api/reports/financial/cash-flow
+ * Get cash flow analysis
+ */
+router.get(
+  "/financial/cash-flow",
+  requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+    const { startDate, endDate } = req.query;
+
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
+    // Get cash inflows (sales)
+    const cashInflows = await shopDb
+      .collection("sales")
+      .aggregate([
+        {
+          $match: {
+            ...(Object.keys(dateFilter).length > 0 && {
+              saleDate: dateFilter,
+            }),
+            paymentStatus: "Paid",
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: "%Y-%m-%d", date: "$saleDate" },
+            },
+            totalInflow: { $sum: "$totalAmount" },
+            cash: {
+              $sum: {
+                $cond: [{ $eq: ["$paymentMethod", "Cash"] }, "$totalAmount", 0],
+              },
+            },
+            bank: {
+              $sum: {
+                $cond: [{ $eq: ["$paymentMethod", "Bank"] }, "$totalAmount", 0],
+              },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    // Get cash outflows (expenses + purchases)
+    const expenses = await shopDb
+      .collection("expenses")
+      .aggregate([
+        {
+          $match: {
+            ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+          },
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+            totalExpenses: { $sum: "$amount" },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    const purchases = await shopDb
+      .collection("purchases")
+      .aggregate([
+        {
+          $match: {
+            ...(Object.keys(dateFilter).length > 0 && {
+              purchaseDate: dateFilter,
+            }),
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: "%Y-%m-%d", date: "$purchaseDate" },
+            },
+            totalPurchases: { $sum: "$totalAmount" },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    // Calculate net cash flow
+    const cashFlowData = {};
+
+    cashInflows.forEach((item) => {
+      if (!cashFlowData[item._id]) {
+        cashFlowData[item._id] = {
+          date: item._id,
+          inflow: 0,
+          outflow: 0,
+          netFlow: 0,
+        };
+      }
+      cashFlowData[item._id].inflow = item.totalInflow;
+    });
+
+    expenses.forEach((item) => {
+      if (!cashFlowData[item._id]) {
+        cashFlowData[item._id] = {
+          date: item._id,
+          inflow: 0,
+          outflow: 0,
+          netFlow: 0,
+        };
+      }
+      cashFlowData[item._id].outflow += item.totalExpenses;
+    });
+
+    purchases.forEach((item) => {
+      if (!cashFlowData[item._id]) {
+        cashFlowData[item._id] = {
+          date: item._id,
+          inflow: 0,
+          outflow: 0,
+          netFlow: 0,
+        };
+      }
+      cashFlowData[item._id].outflow += item.totalPurchases;
+    });
+
+    // Calculate net flow
+    Object.keys(cashFlowData).forEach((date) => {
+      cashFlowData[date].netFlow =
+        cashFlowData[date].inflow - cashFlowData[date].outflow;
+    });
+
+    const cashFlowArray = Object.values(cashFlowData).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+
+    res.json({
+      success: true,
+      data: {
+        cashFlow: cashFlowArray,
+        summary: {
+          totalInflow: cashFlowArray.reduce(
+            (sum, item) => sum + item.inflow,
+            0,
+          ),
+          totalOutflow: cashFlowArray.reduce(
+            (sum, item) => sum + item.outflow,
+            0,
+          ),
+          netCashFlow: cashFlowArray.reduce(
+            (sum, item) => sum + item.netFlow,
+            0,
+          ),
+        },
+      },
+    });
+  }),
+);
+
 module.exports = router;

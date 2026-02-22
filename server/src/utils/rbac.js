@@ -85,6 +85,23 @@ const PERMISSIONS = {
   DELETE_EXPENSE: "delete_expense",
   VIEW_EXPENSES: "view_expenses",
   UPLOAD_RECEIPT: "upload_receipt",
+
+  // Settings
+  VIEW_SETTINGS: "view_settings",
+  EDIT_SETTINGS: "edit_settings",
+  MANAGE_SETTINGS: "manage_settings",
+
+  // Customers (additional)
+  MANAGE_CUSTOMERS: "manage_customers",
+
+  // Products (additional)
+  MANAGE_PRODUCTS: "manage_products",
+
+  // Sales (additional)
+  MANAGE_SALES: "manage_sales",
+
+  // Reports (additional)
+  VIEW_REPORTS: "view_reports",
 };
 
 // Role-Permission Mapping
@@ -169,6 +186,17 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.DELETE_EXPENSE,
     PERMISSIONS.VIEW_EXPENSES,
     PERMISSIONS.UPLOAD_RECEIPT,
+
+    // Settings management
+    PERMISSIONS.VIEW_SETTINGS,
+    PERMISSIONS.EDIT_SETTINGS,
+    PERMISSIONS.MANAGE_SETTINGS,
+
+    // Additional permissions
+    PERMISSIONS.MANAGE_CUSTOMERS,
+    PERMISSIONS.MANAGE_PRODUCTS,
+    PERMISSIONS.MANAGE_SALES,
+    PERMISSIONS.VIEW_REPORTS,
   ],
 
   [ROLES.STAFF]: [
@@ -203,6 +231,9 @@ const ROLE_PERMISSIONS = {
 
     // Limited expense access (view only)
     PERMISSIONS.VIEW_EXPENSES,
+
+    // View settings only
+    PERMISSIONS.VIEW_SETTINGS,
   ],
 };
 

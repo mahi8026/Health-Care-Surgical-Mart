@@ -6,19 +6,19 @@
  */
 
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "../.env") });
+require("dotenv").config({ path: path.join(__dirname, "../../server/.env") });
 
 const {
   connectToDatabase,
   getShopDatabase,
   getSystemDatabase,
-} = require("../src/config/database");
-const { logger } = require("../src/config/logging");
+} = require("../../server/src/config/database");
+const { logger } = require("../../server/src/config/logging");
 const bcrypt = require("bcryptjs");
 const { ObjectId } = require("mongodb");
 const {
   seedDefaultExpenseCategories,
-} = require("../src/services/expense-category-seeder");
+} = require("../../server/src/services/expense-category-seeder");
 
 // Sample data
 const sampleShops = [

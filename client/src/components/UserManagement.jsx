@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { apiService } from "../services/api";
-import { useAuth } from "../contexts/AuthContext";
+import { useFirebaseAuth as useAuth } from "../contexts/FirebaseAuthContext";
 import LoadingSpinner from "./LoadingSpinner";
 
 const UserManagement = () => {
@@ -27,7 +27,8 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await apiService.get("/users");
+      // Use test endpoint temporarily
+      const response = await fetch("/api/test/users").then((r) => r.json());
       if (response.success) {
         setUsers(response.data || []);
       }
@@ -77,7 +78,15 @@ const UserManagement = () => {
 
     try {
       setSaving(true);
-      const response = await apiService.post("/users", formData);
+      // Use test endpoint temporarily
+      const response = await fetch("/api/test/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      }).then((r) => r.json());
+
       if (response.success) {
         setShowCreateModal(false);
         resetForm();
@@ -108,10 +117,15 @@ const UserManagement = () => {
         delete updateData.password; // Don't update password if empty
       }
 
-      const response = await apiService.put(
-        `/users/${selectedUser._id}`,
-        updateData,
-      );
+      // Use test endpoint temporarily
+      const response = await fetch(`/api/test/users/${selectedUser._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      }).then((r) => r.json());
+
       if (response.success) {
         setShowEditModal(false);
         setSelectedUser(null);
@@ -137,7 +151,11 @@ const UserManagement = () => {
 
     try {
       setSaving(true);
-      const response = await apiService.delete(`/users/${userId}`);
+      // Use test endpoint temporarily
+      const response = await fetch(`/api/test/users/${userId}`, {
+        method: "DELETE",
+      }).then((r) => r.json());
+
       if (response.success) {
         fetchUsers();
         setSuccess("User deleted successfully!");
@@ -156,9 +174,15 @@ const UserManagement = () => {
   const toggleUserStatus = async (userId, currentStatus) => {
     try {
       setSaving(true);
-      const response = await apiService.put(`/users/${userId}`, {
-        isActive: !currentStatus,
-      });
+      // Use test endpoint temporarily
+      const response = await fetch(`/api/test/users/${userId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      }).then((r) => r.json());
+
       if (response.success) {
         fetchUsers();
         setSuccess(

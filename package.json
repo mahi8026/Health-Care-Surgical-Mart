@@ -67,5 +67,8 @@
     "pharmacy"
   ],
   "author": "Medical Store POS Team",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "firebase": "^12.9.0"
+  }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { apiService } from "../services/api";
-import { useAuth } from "../contexts/AuthContext";
+import { useFirebaseAuth as useAuth } from "../contexts/FirebaseAuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import UserManagement from "../components/UserManagement";
 
@@ -65,12 +65,13 @@ const Settings = () => {
     try {
       setLoading(true);
 
+      // Use test endpoints temporarily
       const [shopResponse, taxResponse, systemResponse, receiptResponse] =
         await Promise.all([
-          apiService.get("/settings/shop"),
-          apiService.get("/settings/tax"),
-          apiService.get("/settings/system"),
-          apiService.get("/settings/receipt"),
+          fetch("/api/test/settings/shop").then((r) => r.json()),
+          fetch("/api/test/settings/tax").then((r) => r.json()),
+          fetch("/api/test/settings/system").then((r) => r.json()),
+          fetch("/api/test/settings/receipt").then((r) => r.json()),
         ]);
 
       if (shopResponse.success) {
@@ -99,7 +100,14 @@ const Settings = () => {
       setSaving(true);
       setError("");
 
-      const response = await apiService.put(`/settings/${settingsType}`, data);
+      // Use test endpoints temporarily
+      const response = await fetch(`/api/test/settings/${settingsType}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      }).then((r) => r.json());
 
       if (response.success) {
         setSuccess("Settings saved successfully!");

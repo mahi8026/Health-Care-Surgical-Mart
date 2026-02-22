@@ -39,7 +39,7 @@ const ProfessionalInvoice = ({ sale, onClose }) => {
     <div className="invoice-content bg-white p-6 max-w-4xl mx-auto">
       {/* Header */}
       <header className="mb-4">
-        <div className="flex items-center bg-gradient-to-r from-green-800 to-green-300 justify-between gap-4 mb-4 p-4 rounded-lg">
+        <div className="flex items-center justify-between gap-4 mb-4 p-4 rounded-lg">
           {/* Logo */}
           <div className="flex-shrink-0">
             <img
@@ -50,14 +50,14 @@ const ProfessionalInvoice = ({ sale, onClose }) => {
           </div>
 
           {/* Company Name */}
-          <div className="flex-grow text-center">
-            <h1 className="text-3xl font-bold text-white">
+          <div className="flex-grow mt-5 text-center">
+            <h1 className="text-4xl font-bold text-green-800">
               Health Care Surgical Mart
             </h1>
-            <div className="bg-orange-500 text-white px-4 py-1 inline-block mt-1 text-sm font-medium">
+            <div className="bg-orange-500 text-white px-4 py-1 inline-block mt-3 text-sm font-medium">
               A Trust Medical Equipment Company
             </div>
-            <p className="text-[10px] text-white mt-2 leading-tight">
+            <p className="text-[15px] text-green-800 mt-3 leading-tight">
               All Kinds of Medical Equipment, Hospital Furniture, Pathological
               Reagent, Surgical Instrument, Import & Whole Sales, Service Order
               Supply
@@ -248,15 +248,38 @@ const ProfessionalInvoice = ({ sale, onClose }) => {
                   ৳
                 </span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">Return</span>
-                <span className="font-medium">
-                  {formatCurrency(
-                    sale?.changeAmount || sale?.returnAmount || returnAmount,
-                  )}{" "}
-                  ৳
-                </span>
-              </div>
+              {(sale?.dueAmount > 0 ||
+                (sale?.grandTotal || grandTotal) -
+                  ((sale?.cashPaid || 0) + (sale?.bankPaid || 0)) >
+                  0) && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-600 font-semibold">Due</span>
+                  <span className="font-bold text-red-600">
+                    {formatCurrency(
+                      sale?.dueAmount ||
+                        Math.max(
+                          0,
+                          (sale?.grandTotal || grandTotal) -
+                            ((sale?.cashPaid || 0) + (sale?.bankPaid || 0)),
+                        ),
+                    )}{" "}
+                    ৳
+                  </span>
+                </div>
+              )}
+              {(sale?.changeAmount > 0 ||
+                sale?.returnAmount > 0 ||
+                returnAmount > 0) && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-600">Return</span>
+                  <span className="font-medium">
+                    {formatCurrency(
+                      sale?.changeAmount || sale?.returnAmount || returnAmount,
+                    )}{" "}
+                    ৳
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -279,131 +302,100 @@ const ProfessionalInvoice = ({ sale, onClose }) => {
 
   return (
     <>
-      {/* Print Styles */}
+      {/* Print Styles - Optimized for Single Page A4 */}
       <style>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 0.3cm;
+            margin: 0.4cm 0.6cm;
           }
           
-          body * {
-            visibility: hidden;
-          }
-          
-          .invoice-content,
-          .invoice-content * {
-            visibility: visible;
-          }
-          
+          body * { visibility: hidden; }
+          .invoice-content, .invoice-content * { visibility: visible; }
           .invoice-content {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
-            padding: 0.3cm !important;
+            padding: 0 !important;
             margin: 0 !important;
+            max-width: 100% !important;
           }
+          .print-hide { display: none !important; }
           
-          .print-hide {
-            display: none !important;
-          }
+          /* Ultra-compact spacing */
+          .invoice-content header { margin-bottom: 0.12cm !important; }
+          .invoice-content section { margin-bottom: 0.15cm !important; }
+          .invoice-content .mb-4 { margin-bottom: 0.1cm !important; }
+          .invoice-content .mb-3 { margin-bottom: 0.08cm !important; }
+          .invoice-content .mb-2 { margin-bottom: 0.06cm !important; }
+          .invoice-content .mb-1 { margin-bottom: 0.04cm !important; }
+          .invoice-content .mt-8 { margin-top: 0.2cm !important; }
+          .invoice-content .mt-5 { margin-top: 0.06cm !important; }
+          .invoice-content .mt-3 { margin-top: 0.05cm !important; }
+          .invoice-content .mt-2 { margin-top: 0.04cm !important; }
+          .invoice-content .mt-1 { margin-top: 0.03cm !important; }
           
-          /* Reduce all spacing for print */
-          .invoice-content header {
-            margin-bottom: 0.3cm !important;
-          }
+          /* Minimal padding */
+          .invoice-content .p-6 { padding: 0.1cm !important; }
+          .invoice-content .p-4 { padding: 0.08cm !important; }
+          .invoice-content .p-3 { padding: 0.06cm !important; }
+          .invoice-content .py-2 { padding-top: 0.05cm !important; padding-bottom: 0.05cm !important; }
+          .invoice-content .py-1 { padding-top: 0.03cm !important; padding-bottom: 0.03cm !important; }
+          .invoice-content .px-4 { padding-left: 0.08cm !important; padding-right: 0.08cm !important; }
+          .invoice-content .px-2 { padding-left: 0.06cm !important; padding-right: 0.06cm !important; }
           
-          .invoice-content section {
-            margin-bottom: 0.3cm !important;
-          }
+          /* Minimal gaps */
+          .invoice-content .gap-6 { gap: 0.12cm !important; }
+          .invoice-content .gap-4 { gap: 0.1cm !important; }
+          .invoice-content .space-y-2 > * + * { margin-top: 0.05cm !important; }
+          .invoice-content .space-y-0\\.5 > * + * { margin-top: 0.03cm !important; }
           
-          .invoice-content .mb-4 {
-            margin-bottom: 0.2cm !important;
-          }
+          /* Compact header */
+          .invoice-content header img { width: 50px !important; height: 36px !important; }
+          .invoice-content header h1 { font-size: 14px !important; line-height: 1.1 !important; }
+          .invoice-content header .text-\\[15px\\] { font-size: 7px !important; line-height: 1.1 !important; }
+          .invoice-content .inline-block { padding: 0.03cm 0.08cm !important; }
           
-          .invoice-content .mb-3 {
-            margin-bottom: 0.15cm !important;
-          }
+          /* Compact fonts */
+          .invoice-content .text-4xl { font-size: 14px !important; line-height: 1.1 !important; }
+          .invoice-content .text-sm { font-size: 8px !important; line-height: 1.2 !important; }
+          .invoice-content .text-xs { font-size: 7px !important; line-height: 1.1 !important; }
+          .invoice-content .text-\\[10px\\] { font-size: 6.5px !important; line-height: 1.1 !important; }
+          .invoice-content .text-base { font-size: 8.5px !important; line-height: 1.2 !important; }
           
-          .invoice-content .mb-2 {
-            margin-bottom: 0.1cm !important;
-          }
+          /* Compact table */
+          .invoice-content table { font-size: 7.5px !important; }
+          .invoice-content thead th { padding: 0.06cm 0.05cm !important; font-size: 7px !important; }
+          .invoice-content tbody td { padding: 0.05cm !important; font-size: 7.5px !important; line-height: 1.1 !important; }
           
-          .invoice-content .mt-8 {
-            margin-top: 0.3cm !important;
-          }
+          /* Compact signature */
+          .invoice-content .h-10 { height: 16px !important; }
+          .invoice-content .w-40 { width: 80px !important; }
           
-          .invoice-content .p-6 {
-            padding: 0.2cm !important;
-          }
+          /* Colors */
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .bg-green-600 { background-color: #16a34a !important; color: white !important; }
+          .bg-orange-500 { background-color: #f97316 !important; color: white !important; }
+          .bg-gray-50 { background-color: #f9fafb !important; }
+          .bg-blue-50 { background-color: #eff6ff !important; }
+          .bg-green-100 { background-color: #dcfce7 !important; }
+          .text-green-600 { color: #16a34a !important; }
+          .text-green-800 { color: #166534 !important; }
+          .text-red-600 { color: #dc2626 !important; }
+          .text-blue-800 { color: #1e40af !important; }
+          .text-blue-700 { color: #1d4ed8 !important; }
+          .text-gray-400 { color: #9ca3af !important; }
+          .text-gray-500 { color: #6b7280 !important; }
+          .text-gray-600 { color: #4b5563 !important; }
+          .text-gray-700 { color: #374151 !important; }
+          .text-gray-900 { color: #111827 !important; }
           
-          .invoice-content .p-3 {
-            padding: 0.15cm !important;
-          }
-          
-          .invoice-content .gap-6 {
-            gap: 0.3cm !important;
-          }
-          
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          
-          .bg-green-600 {
-            background-color: #16a34a !important;
-            color: white !important;
-          }
-          
-          .bg-orange-500 {
-            background-color: #f97316 !important;
-            color: white !important;
-          }
-          
-          .bg-gradient-to-r {
-            background: linear-gradient(to right, #166534, #86efac) !important;
-          }
-          
-          .from-green-800 {
-            --tw-gradient-from: #166534 !important;
-          }
-          
-          .to-green-300 {
-            --tw-gradient-to: #86efac !important;
-          }
-          
-          .bg-gray-50 {
-            background-color: #f9fafb !important;
-          }
-          
-          .bg-blue-50 {
-            background-color: #eff6ff !important;
-          }
-          
-          .text-green-600 {
-            color: #16a34a !important;
-          }
-          
-          .text-green-700 {
-            color: #15803d !important;
-          }
-          
-          .text-red-600 {
-            color: #dc2626 !important;
-          }
-          
-          .text-blue-800 {
-            color: #1e40af !important;
-          }
-          
-          .text-blue-700 {
-            color: #1d4ed8 !important;
-          }
-          
-          .border-green-600 {
-            border-color: #16a34a !important;
-          }
+          /* Page break control */
+          .invoice-content { page-break-inside: avoid !important; }
+          .invoice-content header, .invoice-content section { page-break-inside: avoid !important; }
+          * { box-shadow: none !important; }
+          .rounded, .rounded-lg { border-radius: 2px !important; }
         }
       `}</style>
 

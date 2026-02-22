@@ -4,361 +4,364 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import SearchableProductSelect from "../components/SearchableProductSelect";
 
 const Purchases = () => {
-  const [purchases, setPurchases] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  // State management
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
 
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalPurchases, setTotalPurchases] = useState(0);
-
-  // Create Purchase Form State
-  const [createForm, setCreateForm] = useState({
-    supplierId: "",
-    invoiceNo: "",
+  // Purchase Form State
+  const [purchaseData, setPurchaseData] = useState({
+    invoiceNo: `PO-${Date.now()}`,
     purchaseDate: new Date().toISOString().split("T")[0],
-    notes: "",
-    items: [],
-  });
-
-  // Current item being added
-  const [currentItem, setCurrentItem] = useState({
-    productId: "",
-    qty: "",
+    reference: "",
+    supplierName: "",
+    supplierContact: "",
+    supplierAddress: "",
+    selectedProduct: "",
     unitCost: "",
+    quantity: "",
+    discount: 0,
+    discountPercent: 0,
+    vat: 0,
+    vatPercent: 0,
+    notes: "",
   });
 
-  // Fetch purchases
-  const fetchPurchases = async (page = 1) => {
+  // Fetch products
+  const fetchProducts = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/purchases");
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/products");
 
-      if (data.success) {
-        // Apply filters on frontend
-        let filteredPurchases = data.data;
-
-        if (searchTerm) {
-          filteredPurchases = filteredPurchases.filter(
-            (p) =>
-              p.purchaseNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              p.supplier?.name.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
-
-        if (statusFilter !== "all") {
-          filteredPurchases = filteredPurchases.filter(
-            (p) => p.status === statusFilter
-          );
-        }
-
-        setPurchases(filteredPurchases);
-        setCurrentPage(1);
-        setTotalPages(1);
-        setTotalPurchases(filteredPurchases.length);
+      if (response.success) {
+        // Filter to only show active products
+        setProducts(response.data.filter((p) => p.isActive));
       } else {
-        setError("Failed to fetch purchases");
+        console.error("Failed to fetch products:", response.message);
+        setProducts([]);
       }
     } catch (error) {
-      console.error("Fetch purchases error:", error);
-      setError("Failed to fetch purchases");
+      console.error("Fetch products error:", error);
+      if (error.message?.includes("401")) {
+        window.location.href = "/login";
+      }
+      setProducts([]);
     }
   };
 
   // Fetch suppliers
   const fetchSuppliers = async () => {
     try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/suppliers");
-      const data = await response.json();
+      // Use real authenticated endpoint
+      const response = await apiService.get("/suppliers");
 
-      if (data.success) {
-        setSuppliers(data.data);
+      if (response.success) {
+        setSuppliers(response.data);
+      } else {
+        console.error("Failed to fetch suppliers:", response.message);
+        setSuppliers([]);
       }
     } catch (error) {
       console.error("Fetch suppliers error:", error);
-    }
-  };
-
-  // Fetch products
-  const fetchProducts = async () => {
-    try {
-      // Use the working test endpoint temporarily
-      const response = await fetch("http://localhost:5000/api/test/products");
-      const data = await response.json();
-
-      if (data.success) {
-        setProducts(data.data.filter((p) => p.isActive));
+      if (error.message?.includes("401")) {
+        window.location.href = "/login";
       }
-    } catch (error) {
-      console.error("Fetch products error:", error);
+      setSuppliers([]);
     }
   };
 
-  // Initial data load
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchPurchases(), fetchSuppliers(), fetchProducts()]);
-      setLoading(false);
-    };
-    loadData();
+    fetchProducts();
+    fetchSuppliers();
   }, []);
 
-  // Search and filter effect
-  useEffect(() => {
-    const delayedSearch = setTimeout(() => {
-      fetchPurchases(1);
-    }, 500);
-
-    return () => clearTimeout(delayedSearch);
-  }, [searchTerm, statusFilter]);
-
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-BD", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-    }).format(amount);
+  // Handle form changes
+  const handlePurchaseDataChange = (field, value) => {
+    setPurchaseData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Format date
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-    });
+  // Handle product selection
+  const handleProductSelect = (productId) => {
+    const product = products.find((p) => p._id === productId);
+    if (product) {
+      setPurchaseData((prev) => ({
+        ...prev,
+        selectedProduct: productId,
+        unitCost:
+          product.purchasePrice?.toString() ||
+          product.sellingPrice?.toString() ||
+          "",
+      }));
+    }
   };
 
-  // Add item to purchase
-  const addItemToPurchase = () => {
-    if (!currentItem.productId || !currentItem.qty || !currentItem.unitCost) {
-      setError("Please fill all item fields");
+  // Add product to cart
+  const addToCart = () => {
+    if (
+      !purchaseData.selectedProduct ||
+      !purchaseData.quantity ||
+      !purchaseData.unitCost
+    ) {
+      setError("Please select product, enter quantity and unit cost");
       setTimeout(() => setError(""), 3000);
       return;
     }
 
-    const product = products.find((p) => p._id === currentItem.productId);
+    const quantity = parseFloat(purchaseData.quantity);
+    const cost = parseFloat(purchaseData.unitCost);
+    const product = products.find(
+      (p) => p._id === purchaseData.selectedProduct,
+    );
+
     if (!product) {
       setError("Product not found");
       return;
     }
 
-    const qty = parseFloat(currentItem.qty);
-    const unitCost = parseFloat(currentItem.unitCost);
-    const totalCost = qty * unitCost;
+    const existingItemIndex = cart.findIndex(
+      (item) => item.productId === purchaseData.selectedProduct,
+    );
 
-    const newItem = {
-      productId: product._id,
-      productName: product.name,
-      qty,
-      unitCost,
-      totalCost,
-    };
+    if (existingItemIndex >= 0) {
+      const newQuantity = cart[existingItemIndex].quantity + quantity;
+      const updatedCart = [...cart];
+      updatedCart[existingItemIndex] = {
+        ...updatedCart[existingItemIndex],
+        quantity: newQuantity,
+        total: newQuantity * cost,
+      };
+      setCart(updatedCart);
+    } else {
+      const cartItem = {
+        productId: product._id,
+        name: product.name,
+        category:
+          typeof product.category === "object"
+            ? product.category.name
+            : product.category,
+        cost: cost,
+        quantity: quantity,
+        total: quantity * cost,
+        unit: product.unit || "pcs",
+      };
+      setCart([...cart, cartItem]);
+    }
 
-    setCreateForm((prev) => ({
+    // Clear product selection
+    setPurchaseData((prev) => ({
       ...prev,
-      items: [...prev.items, newItem],
-    }));
-
-    setCurrentItem({
-      productId: "",
-      qty: "",
+      selectedProduct: "",
       unitCost: "",
-    });
-  };
-
-  // Remove item from purchase
-  const removeItemFromPurchase = (index) => {
-    setCreateForm((prev) => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index),
+      quantity: "",
     }));
   };
 
-  // Calculate total
-  const calculateTotal = () => {
-    return createForm.items.reduce((sum, item) => sum + item.totalCost, 0);
+  // Remove from cart
+  const removeFromCart = (productId) => {
+    setCart(cart.filter((item) => item.productId !== productId));
   };
 
-  // Create purchase order
-  const createPurchaseOrder = async () => {
-    if (!createForm.supplierId || createForm.items.length === 0) {
-      setError("Please select supplier and add at least one item");
+  // Update cart quantity
+  const updateCartQuantity = (productId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeFromCart(productId);
       return;
     }
 
-    // Check if user is logged in
-    const token = localStorage.getItem("token");
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    setCart(
+      cart.map((item) =>
+        item.productId === productId
+          ? { ...item, quantity: newQuantity, total: newQuantity * item.cost }
+          : item,
+      ),
+    );
+  };
 
-    if (!token) {
-      setError("You are not logged in. Please log in first.");
+  // Update cart item cost
+  const updateCartCost = (productId, newCost) => {
+    const cost = parseFloat(newCost) || 0;
+    if (cost < 0) {
+      setError("Cost cannot be negative");
+      setTimeout(() => setError(""), 3000);
       return;
     }
 
-    console.log("Current user:", user);
-    console.log("User role:", user.role);
-    console.log("User permissions:", user.permissions);
+    setCart(
+      cart.map((item) =>
+        item.productId === productId
+          ? { ...item, cost: cost, total: item.quantity * cost }
+          : item,
+      ),
+    );
+  };
 
+  // Calculate totals
+  const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+  const discountAmount =
+    purchaseData.discountPercent > 0
+      ? (subtotal * purchaseData.discountPercent) / 100
+      : purchaseData.discount;
+  const afterDiscount = subtotal - discountAmount;
+  const vatAmount =
+    purchaseData.vatPercent > 0
+      ? (afterDiscount * purchaseData.vatPercent) / 100
+      : purchaseData.vat;
+  const grandTotal = afterDiscount + vatAmount;
+
+  // Process purchase order
+  const processPurchase = async () => {
+    if (cart.length === 0) {
+      setError("Please add items to cart");
+      return;
+    }
+
+    if (!selectedSupplier && !purchaseData.supplierName) {
+      setError("Please select or enter supplier information");
+      return;
+    }
+
+    setLoading(true);
     try {
-      setLoading(true);
-      console.log("Creating purchase order with data:", {
-        ...createForm,
-        itemsDetails: createForm.items.map((item) => ({
+      const purchaseOrderData = {
+        supplierId: selectedSupplier?._id,
+        supplierName: selectedSupplier?.name || purchaseData.supplierName,
+        invoiceNo: purchaseData.invoiceNo,
+        purchaseDate: purchaseData.purchaseDate,
+        items: cart.map((item) => ({
           productId: item.productId,
-          qty: item.qty,
-          unitCost: item.unitCost,
-          totalCost: item.totalCost,
+          productName: item.name,
+          qty: item.quantity,
+          unitCost: item.cost,
+          totalCost: item.total,
         })),
-      });
-      console.log("Using token:", token ? "Token exists" : "No token");
+        subtotal,
+        discount: discountAmount,
+        vatAmount,
+        vatPercent: purchaseData.vatPercent,
+        grandTotal,
+        notes: purchaseData.notes,
+        status: "pending",
+      };
 
-      const response = await apiService.post("/purchases", createForm);
-      console.log("Create purchase response:", response);
+      // Use real authenticated endpoint
+      const response = await apiService.post("/purchases", purchaseOrderData);
 
       if (response.success) {
-        setShowCreateModal(false);
-        setCreateForm({
-          supplierId: "",
-          invoiceNo: "",
-          purchaseDate: new Date().toISOString().split("T")[0],
-          notes: "",
-          items: [],
-        });
-        fetchPurchases();
-        setError("");
         alert("Purchase order created successfully!");
+        clearPurchase();
+        setError("");
+        // Refresh products to update stock
+        fetchProducts();
       } else {
         setError(response.message || "Failed to create purchase order");
       }
     } catch (error) {
-      console.error("Create purchase error:", error);
-
-      // Check if it's an authentication error
-      if (
-        error.message.includes("Authentication") ||
-        error.message.includes("401")
-      ) {
-        setError("Your session has expired. Please log in again.");
-        // Don't redirect automatically, let user decide
-      } else if (
-        error.message.includes("permission") ||
-        error.message.includes("403")
-      ) {
-        setError(
-          "You don't have permission to create purchase orders. Please contact your administrator.",
-        );
+      if (error.message?.includes("401")) {
+        setError("Session expired. Please login again.");
+        setTimeout(() => (window.location.href = "/login"), 2000);
       } else {
         setError(error.message || "Failed to create purchase order");
       }
+      console.error("Process purchase error:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Receive purchase order
-  const receivePurchaseOrder = async (purchaseId, receivedItems = null) => {
-    try {
-      setLoading(true);
-      const response = await apiService.put(
-        `/purchases/${purchaseId}/receive`,
-        {
-          receivedItems,
-          notes: "Items received and stock updated",
-        },
-      );
-      if (response.success) {
-        setShowReceiveModal(false);
-        setSelectedPurchase(null);
-        fetchPurchases();
-        setError("");
-      } else {
-        setError(response.message || "Failed to receive purchase order");
-      }
-    } catch (error) {
-      setError("Failed to receive purchase order");
-      console.error("Receive purchase error:", error);
-    } finally {
-      setLoading(false);
-    }
+  // Clear purchase
+  const clearPurchase = () => {
+    setCart([]);
+    setSelectedSupplier(null);
+    setPurchaseData({
+      invoiceNo: `PO-${Date.now()}`,
+      purchaseDate: new Date().toISOString().split("T")[0],
+      reference: "",
+      supplierName: "",
+      supplierContact: "",
+      supplierAddress: "",
+      selectedProduct: "",
+      unitCost: "",
+      quantity: "",
+      discount: 0,
+      discountPercent: 0,
+      vat: 0,
+      vatPercent: 0,
+      notes: "",
+    });
   };
-
-  // Cancel purchase order
-  const cancelPurchaseOrder = async (purchaseId, reason) => {
-    try {
-      setLoading(true);
-      const response = await apiService.put(`/purchases/${purchaseId}/cancel`, {
-        reason,
-      });
-      if (response.success) {
-        fetchPurchases();
-        setError("");
-      } else {
-        setError(response.message || "Failed to cancel purchase order");
-      }
-    } catch (error) {
-      setError("Failed to cancel purchase order");
-      console.error("Cancel purchase error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Get status badge
-  const getStatusBadge = (status) => {
-    const badges = {
-      pending: "bg-yellow-100 text-yellow-800",
-      received: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
-    };
-    return badges[status] || "bg-gray-100 text-gray-800";
-  };
-
-  if (loading && purchases.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-100 p-4">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Purchase Management
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Manage purchase orders, suppliers, and inventory receiving
-          </p>
+      <div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-4 rounded-t-lg">
+        <div className="grid grid-cols-5 gap-4 text-white">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Purchase Order No
+            </label>
+            <input
+              type="text"
+              value={purchaseData.invoiceNo}
+              onChange={(e) =>
+                handlePurchaseDataChange("invoiceNo", e.target.value)
+              }
+              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white placeholder-white/70"
+              placeholder="PO Number"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Purchase Date
+            </label>
+            <input
+              type="date"
+              value={purchaseData.purchaseDate}
+              onChange={(e) =>
+                handlePurchaseDataChange("purchaseDate", e.target.value)
+              }
+              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Reference</label>
+            <input
+              type="text"
+              value={purchaseData.reference}
+              onChange={(e) =>
+                handlePurchaseDataChange("reference", e.target.value)
+              }
+              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white placeholder-white/70"
+              placeholder="Reference"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Status</label>
+            <select
+              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white"
+              disabled
+            >
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={clearPurchase}
+              className="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded border border-white/30 transition-colors"
+            >
+              <i className="fas fa-refresh mr-2"></i>
+              New Purchase
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <i className="fas fa-plus"></i>
-          New Purchase Order
-        </button>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
           <div className="flex items-center">
             <i className="fas fa-exclamation-circle mr-2"></i>
             <span>{error}</span>
@@ -372,375 +375,48 @@ const Purchases = () => {
         </div>
       )}
 
-      {/* Filters and Search */}
-      <div className="card">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by invoice number or supplier..."
-                className="input-field pl-10"
-              />
-            </div>
-          </div>
-          <div className="w-full md:w-48">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="input-field"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="received">Received</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          {
-            title: "Total Orders",
-            value: totalPurchases,
-            icon: "fas fa-shopping-cart",
-            color: "text-blue-600",
-            bg: "bg-blue-100",
-          },
-          {
-            title: "Pending Orders",
-            value: purchases.filter((p) => p.status === "pending").length,
-            icon: "fas fa-clock",
-            color: "text-yellow-600",
-            bg: "bg-yellow-100",
-          },
-          {
-            title: "Received Orders",
-            value: purchases.filter((p) => p.status === "received").length,
-            icon: "fas fa-check-circle",
-            color: "text-green-600",
-            bg: "bg-green-100",
-          },
-          {
-            title: "Total Value",
-            value: formatCurrency(
-              purchases.reduce((sum, p) => sum + (p.grandTotal || 0), 0),
-            ),
-            icon: "fas fa-dollar-sign",
-            color: "text-purple-600",
-            bg: "bg-purple-100",
-          },
-        ].map((stat, index) => (
-          <div key={index} className="card">
-            <div className="flex items-center">
-              <div className={`p-3 rounded-lg ${stat.bg}`}>
-                <i className={`${stat.icon} ${stat.color} text-xl`}></i>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">
-                  {stat.title}
-                </p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Purchases Table */}
-      <div className="card">
-        <div className="table-container">
-          <table className="table">
-            <thead className="table-header">
-              <tr>
-                <th className="table-header-cell">Invoice No</th>
-                <th className="table-header-cell">Supplier</th>
-                <th className="table-header-cell">Date</th>
-                <th className="table-header-cell">Items</th>
-                <th className="table-header-cell">Total Amount</th>
-                <th className="table-header-cell">Status</th>
-                <th className="table-header-cell">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {purchases.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="table-cell text-center py-8">
-                    <i className="fas fa-shopping-cart text-gray-400 text-4xl mb-4"></i>
-                    <p className="text-gray-500">No purchase orders found</p>
-                    <button
-                      onClick={() => setShowCreateModal(true)}
-                      className="btn-primary mt-4"
-                    >
-                      Create First Purchase Order
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                purchases.map((purchase) => (
-                  <tr key={purchase._id} className="hover:bg-gray-50">
-                    <td className="table-cell">
-                      <div className="font-medium text-gray-900">
-                        {purchase.invoiceNo}
-                      </div>
-                    </td>
-                    <td className="table-cell">
-                      <div className="font-medium text-gray-900">
-                        {purchase.supplier?.name || "Unknown Supplier"}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {purchase.supplier?.company}
-                      </div>
-                    </td>
-                    <td className="table-cell">
-                      {formatDate(purchase.purchaseDate)}
-                    </td>
-                    <td className="table-cell">
-                      <span className="text-sm text-gray-600">
-                        {purchase.items?.length || 0} items
-                      </span>
-                    </td>
-                    <td className="table-cell">
-                      <span className="font-medium text-gray-900">
-                        {formatCurrency(purchase.grandTotal)}
-                      </span>
-                    </td>
-                    <td className="table-cell">
-                      <span
-                        className={`badge ${getStatusBadge(purchase.status)}`}
-                      >
-                        {purchase.status}
-                      </span>
-                    </td>
-                    <td className="table-cell">
-                      <div className="flex items-center space-x-2">
-                        {purchase.status === "pending" && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setSelectedPurchase(purchase);
-                                setShowReceiveModal(true);
-                              }}
-                              className="text-green-600 hover:text-green-900"
-                              title="Receive Order"
-                            >
-                              <i className="fas fa-check"></i>
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    "Are you sure you want to cancel this purchase order?",
-                                  )
-                                ) {
-                                  cancelPurchaseOrder(
-                                    purchase._id,
-                                    "Cancelled by user",
-                                  );
-                                }
-                              }}
-                              className="text-red-600 hover:text-red-900"
-                              title="Cancel Order"
-                            >
-                              <i className="fas fa-times"></i>
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => {
-                            // View purchase details
-                            console.log("View purchase:", purchase);
-                          }}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
-                        >
-                          <i className="fas fa-eye"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200">
-            <div className="text-sm text-gray-700">
-              Showing {(currentPage - 1) * 20 + 1} to{" "}
-              {Math.min(currentPage * 20, totalPurchases)} of {totalPurchases}{" "}
-              results
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => fetchPurchases(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => fetchPurchases(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Create Purchase Modal */}
-      {showCreateModal && (
-        <CreatePurchaseModal
-          suppliers={suppliers}
-          products={products}
-          createForm={createForm}
-          setCreateForm={setCreateForm}
-          currentItem={currentItem}
-          setCurrentItem={setCurrentItem}
-          addItemToPurchase={addItemToPurchase}
-          removeItemFromPurchase={removeItemFromPurchase}
-          calculateTotal={calculateTotal}
-          createPurchaseOrder={createPurchaseOrder}
-          onClose={() => setShowCreateModal(false)}
-          loading={loading}
-          formatCurrency={formatCurrency}
-        />
-      )}
-
-      {/* Receive Purchase Modal */}
-      {showReceiveModal && selectedPurchase && (
-        <ReceivePurchaseModal
-          purchase={selectedPurchase}
-          onReceive={(receivedItems) =>
-            receivePurchaseOrder(selectedPurchase._id, receivedItems)
-          }
-          onClose={() => {
-            setShowReceiveModal(false);
-            setSelectedPurchase(null);
-          }}
-          loading={loading}
-          formatCurrency={formatCurrency}
-        />
-      )}
-    </div>
-  );
-};
-
-// Create Purchase Modal Component
-const CreatePurchaseModal = ({
-  suppliers,
-  products,
-  createForm,
-  setCreateForm,
-  currentItem,
-  setCurrentItem,
-  addItemToPurchase,
-  removeItemFromPurchase,
-  calculateTotal,
-  createPurchaseOrder,
-  onClose,
-  loading,
-  formatCurrency,
-}) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white max-w-4xl w-full max-h-screen overflow-y-auto rounded-lg shadow-2xl">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Create Purchase Order
+      {/* Main Content - Three Column Layout */}
+      <div className="grid grid-cols-3 gap-4 bg-white rounded-b-lg shadow-lg">
+        {/* Supplier Information */}
+        <div className="p-4">
+          <div className="bg-purple-600 text-white p-3 rounded-t-lg">
+            <h3 className="font-semibold flex items-center">
+              <i className="fas fa-truck mr-2"></i>
+              Supplier Information
             </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <i className="fas fa-times text-xl"></i>
-            </button>
           </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Purchase Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-purple-50 p-4 rounded-b-lg space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Supplier *
+                Supplier
               </label>
-              {suppliers.length === 0 ? (
-                <div className="space-y-2">
-                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                    No suppliers found. You need to create suppliers first.
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const name = prompt("Enter supplier name:");
-                      const company = prompt("Enter company name:");
-                      const phone = prompt("Enter phone number:");
-                      const email = prompt("Enter email (optional):");
-
-                      if (name && company && phone) {
-                        // Create supplier via API
-                        fetch("/api/suppliers", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${localStorage.getItem("token")}`,
-                          },
-                          body: JSON.stringify({
-                            name: name.trim(),
-                            company: company.trim(),
-                            phone: phone.trim(),
-                            email: email?.trim() || "",
-                            address: "",
-                          }),
-                        })
-                          .then((res) => res.json())
-                          .then((data) => {
-                            if (data.success) {
-                              // Refresh suppliers list
-                              window.location.reload();
-                            } else {
-                              alert(
-                                "Failed to create supplier: " + data.message,
-                              );
-                            }
-                          })
-                          .catch((err) => {
-                            alert("Error creating supplier: " + err.message);
-                          });
-                      }
-                    }}
-                    className="btn-secondary text-sm"
-                  >
-                    <i className="fas fa-plus mr-1"></i>
-                    Quick Add Supplier
-                  </button>
-                </div>
-              ) : (
+              <div className="flex">
                 <select
-                  value={createForm.supplierId}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      supplierId: e.target.value,
-                    }))
-                  }
-                  className="input-field"
-                  required
+                  value={selectedSupplier?._id || ""}
+                  onChange={(e) => {
+                    if (e.target.value === "") {
+                      setSelectedSupplier(null);
+                      handlePurchaseDataChange("supplierName", "");
+                    } else {
+                      const supplier = suppliers.find(
+                        (s) => s._id === e.target.value,
+                      );
+                      setSelectedSupplier(supplier);
+                      handlePurchaseDataChange(
+                        "supplierName",
+                        supplier?.name || "",
+                      );
+                      handlePurchaseDataChange(
+                        "supplierContact",
+                        supplier?.phone || "",
+                      );
+                      handlePurchaseDataChange(
+                        "supplierAddress",
+                        supplier?.address || "",
+                      );
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-l focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="">Select Supplier</option>
                   {suppliers.map((supplier) => (
@@ -749,262 +425,542 @@ const CreatePurchaseModal = ({
                     </option>
                   ))}
                 </select>
-              )}
+                <button
+                  onClick={() => setShowSupplierModal(true)}
+                  className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-r"
+                >
+                  <i className="fas fa-plus"></i>
+                </button>
+              </div>
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Invoice Number
+                Supplier Name
               </label>
               <input
                 type="text"
-                value={createForm.invoiceNo}
+                value={purchaseData.supplierName}
                 onChange={(e) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    invoiceNo: e.target.value,
-                  }))
+                  handlePurchaseDataChange("supplierName", e.target.value)
                 }
-                className="input-field"
-                placeholder="Auto-generated if empty"
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Supplier Name"
               />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Purchase Date *
+                Contact Number
               </label>
               <input
-                type="date"
-                value={createForm.purchaseDate}
+                type="text"
+                value={purchaseData.supplierContact}
                 onChange={(e) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    purchaseDate: e.target.value,
-                  }))
+                  handlePurchaseDataChange("supplierContact", e.target.value)
                 }
-                className="input-field"
-                required
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Contact Number"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Address
+              </label>
+              <textarea
+                value={purchaseData.supplierAddress}
+                onChange={(e) =>
+                  handlePurchaseDataChange("supplierAddress", e.target.value)
+                }
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Supplier Address"
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Notes
               </label>
-              <input
-                type="text"
-                value={createForm.notes}
+              <textarea
+                value={purchaseData.notes}
                 onChange={(e) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    notes: e.target.value,
-                  }))
+                  handlePurchaseDataChange("notes", e.target.value)
                 }
-                className="input-field"
-                placeholder="Optional notes"
+                rows="2"
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Additional notes..."
               />
             </div>
           </div>
+        </div>
 
-          {/* Add Items Section */}
-          <div className="border-t border-gray-200 pt-6">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">
-              Add Items
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Product Information */}
+        <div className="p-4">
+          <div className="bg-purple-600 text-white p-3 rounded-t-lg">
+            <h3 className="font-semibold flex items-center">
+              <i className="fas fa-box mr-2"></i>
+              Product Information
+            </h3>
+          </div>
+          <div className="bg-purple-50 p-4 rounded-b-lg space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product
+              </label>
+              <SearchableProductSelect
+                products={products}
+                value={purchaseData.selectedProduct}
+                onChange={(productId) => handleProductSelect(productId)}
+                placeholder="Search and select product..."
+                showStock={true}
+                autoFocus={false}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Product *
-                </label>
-                <SearchableProductSelect
-                  products={products}
-                  value={currentItem.productId}
-                  onChange={(productId) =>
-                    setCurrentItem((prev) => ({
-                      ...prev,
-                      productId: productId,
-                    }))
-                  }
-                  placeholder="Search and select product..."
-                  showStock={true}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity *
-                </label>
-                <input
-                  type="number"
-                  value={currentItem.qty}
-                  onChange={(e) =>
-                    setCurrentItem((prev) => ({
-                      ...prev,
-                      qty: e.target.value,
-                    }))
-                  }
-                  className="input-field"
-                  placeholder="0"
-                  min="1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Cost *
+                  Unit Cost
                 </label>
                 <input
                   type="number"
-                  value={currentItem.unitCost}
+                  value={purchaseData.unitCost}
                   onChange={(e) =>
-                    setCurrentItem((prev) => ({
-                      ...prev,
-                      unitCost: e.target.value,
-                    }))
+                    handlePurchaseDataChange("unitCost", e.target.value)
                   }
-                  className="input-field"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="0.00"
                   min="0"
                   step="0.01"
                 />
               </div>
-              <div className="flex items-end">
-                <button
-                  onClick={addItemToPurchase}
-                  className="btn-primary w-full"
-                >
-                  <i className="fas fa-plus mr-2"></i>
-                  Add Item
-                </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  value={purchaseData.quantity}
+                  onChange={(e) =>
+                    handlePurchaseDataChange("quantity", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="0"
+                  min="0"
+                  step="1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Total
+              </label>
+              <input
+                type="text"
+                value={
+                  purchaseData.unitCost && purchaseData.quantity
+                    ? (
+                        parseFloat(purchaseData.unitCost) *
+                        parseFloat(purchaseData.quantity)
+                      ).toFixed(2)
+                    : "0.00"
+                }
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"
+              />
+            </div>
+
+            <button
+              onClick={addToCart}
+              className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 px-4 rounded font-semibold transition-colors"
+              disabled={
+                !purchaseData.selectedProduct ||
+                !purchaseData.quantity ||
+                !purchaseData.unitCost
+              }
+            >
+              <i className="fas fa-plus mr-2"></i>
+              Add to Cart
+            </button>
+
+            {/* Cart Summary */}
+            <div className="bg-white p-3 rounded border border-purple-200 mt-4">
+              <div className="text-sm font-medium text-gray-700 mb-2">
+                Cart Summary
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Items:</span>
+                  <span className="font-semibold">{cart.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Qty:</span>
+                  <span className="font-semibold">
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-2 border-t">
+                  <span className="text-gray-700 font-medium">Subtotal:</span>
+                  <span className="font-bold text-purple-600">
+                    ৳{subtotal.toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Items List */}
-          {createForm.items.length > 0 && (
-            <div className="border-t border-gray-200 pt-6">
-              <h4 className="text-lg font-medium text-gray-900 mb-4">
-                Purchase Items
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Product
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Qty
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Unit Cost
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Total
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {createForm.items.map((item, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {item.productName}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                          {item.qty}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                          {formatCurrency(item.unitCost)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
-                          {formatCurrency(item.totalCost)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => removeItemFromPurchase(index)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td
-                        colSpan="3"
-                        className="px-4 py-3 text-sm font-medium text-gray-900 text-right"
-                      >
-                        Grand Total:
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
-                        {formatCurrency(calculateTotal())}
-                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
+        {/* Amount Details */}
+        <div className="p-4">
+          <div className="bg-purple-600 text-white p-3 rounded-t-lg">
+            <h3 className="font-semibold flex items-center">
+              <i className="fas fa-calculator mr-2"></i>
+              Amount Details
+            </h3>
+          </div>
+          <div className="bg-purple-50 p-4 rounded-b-lg space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                SubTotal
+              </label>
+              <input
+                type="text"
+                value={subtotal.toFixed(2)}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Discount
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  value={purchaseData.discount}
+                  onChange={(e) =>
+                    handlePurchaseDataChange(
+                      "discount",
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
+                  className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                />
+                <div className="flex">
+                  <span className="bg-gray-200 px-3 py-2 border border-r-0 border-gray-300 rounded-l">
+                    %
+                  </span>
+                  <input
+                    type="number"
+                    value={purchaseData.discountPercent}
+                    onChange={(e) =>
+                      handlePurchaseDataChange(
+                        "discountPercent",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-r focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="0"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
               </div>
             </div>
-          )}
-        </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-          <button onClick={onClose} className="btn-secondary">
-            Cancel
-          </button>
-          <button
-            onClick={createPurchaseOrder}
-            disabled={
-              loading || !createForm.supplierId || createForm.items.length === 0
-            }
-            className="btn-primary"
-          >
-            {loading ? (
-              <>
-                <LoadingSpinner size="sm" className="mr-2" />
-                Creating...
-              </>
-            ) : (
-              "Create Purchase Order"
-            )}
-          </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                VAT/Tax
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  value={purchaseData.vat}
+                  onChange={(e) =>
+                    handlePurchaseDataChange(
+                      "vat",
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
+                  className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                />
+                <div className="flex">
+                  <span className="bg-gray-200 px-3 py-2 border border-r-0 border-gray-300 rounded-l">
+                    %
+                  </span>
+                  <input
+                    type="number"
+                    value={purchaseData.vatPercent}
+                    onChange={(e) =>
+                      handlePurchaseDataChange(
+                        "vatPercent",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-r focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="0"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Grand Total
+              </label>
+              <input
+                type="text"
+                value={grandTotal.toFixed(2)}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 font-bold text-lg"
+              />
+            </div>
+
+            {/* Purchase Summary */}
+            <div className="bg-white p-3 rounded border border-purple-200">
+              <div className="text-sm font-medium text-gray-700 mb-2">
+                Purchase Summary
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal:</span>
+                  <span>৳{subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Discount:</span>
+                  <span className="text-red-600">
+                    -৳{discountAmount.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">VAT/Tax:</span>
+                  <span>+৳{vatAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t font-semibold">
+                  <span className="text-gray-700">Total Amount:</span>
+                  <span className="text-purple-600">
+                    ৳{grandTotal.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <button
+                onClick={processPurchase}
+                disabled={loading || cart.length === 0}
+                className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-3 px-4 rounded font-semibold transition-colors"
+              >
+                {loading ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-check mr-2"></i>
+                    Create Order
+                  </>
+                )}
+              </button>
+              <button
+                onClick={clearPurchase}
+                className="bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded font-semibold transition-colors"
+              >
+                <i className="fas fa-refresh mr-2"></i>
+                Clear
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Cart Table */}
+      <div className="mt-4 bg-white rounded-lg shadow-lg overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-purple-600 text-white">
+            <tr>
+              <th className="px-4 py-3 text-left">SL</th>
+              <th className="px-4 py-3 text-left">Product Name</th>
+              <th className="px-4 py-3 text-left">Category</th>
+              <th className="px-4 py-3 text-right">Unit Cost</th>
+              <th className="px-4 py-3 text-right">Quantity</th>
+              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {cart.length === 0 ? (
+              <tr>
+                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                  <i className="fas fa-shopping-cart text-4xl mb-4"></i>
+                  <p className="text-lg">No items in cart</p>
+                  <p className="text-sm">
+                    Add products to create purchase order
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              cart.map((item, index) => (
+                <tr key={item.productId} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">{index + 1}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{item.name}</div>
+                  </td>
+                  <td className="px-4 py-3">{item.category}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end">
+                      <span className="text-gray-500 mr-1">৳</span>
+                      <input
+                        type="number"
+                        value={item.cost}
+                        onChange={(e) =>
+                          updateCartCost(item.productId, e.target.value)
+                        }
+                        className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() =>
+                          updateCartQuantity(item.productId, item.quantity - 1)
+                        }
+                        className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded text-xs flex items-center justify-center"
+                      >
+                        <i className="fas fa-minus"></i>
+                      </button>
+                      <span className="w-12 text-center font-medium">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() =>
+                          updateCartQuantity(item.productId, item.quantity + 1)
+                        }
+                        className="w-6 h-6 bg-green-500 hover:bg-green-600 text-white rounded text-xs flex items-center justify-center"
+                      >
+                        <i className="fas fa-plus"></i>
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold">
+                    ৳{item.total.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => removeFromCart(item.productId)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                    >
+                      <i className="fas fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          {cart.length > 0 && (
+            <tfoot className="bg-purple-50 border-t-2 border-purple-600">
+              <tr>
+                <td
+                  colSpan="5"
+                  className="px-4 py-3 text-right font-bold text-gray-700"
+                >
+                  Grand Total:
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-purple-600 text-lg">
+                  ৳{grandTotal.toFixed(2)}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      {/* Supplier Modal */}
+      {showSupplierModal && (
+        <SupplierModal
+          onClose={() => setShowSupplierModal(false)}
+          onSupplierCreated={() => {
+            fetchSuppliers();
+            setShowSupplierModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };
 
-// Receive Purchase Modal Component
-const ReceivePurchaseModal = ({
-  purchase,
-  onReceive,
-  onClose,
-  loading,
-  formatCurrency,
-}) => {
-  const [receivedItems, setReceivedItems] = useState(
-    purchase.items?.map((item) => ({
-      ...item,
-      receivedQty: item.qty,
-    })) || [],
-  );
+// Supplier Modal Component
+const SupplierModal = ({ onClose, onSupplierCreated }) => {
+  const [formData, setFormData] = useState({
+    name: "",
+    company: "",
+    phone: "",
+    email: "",
+    address: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const updateReceivedQty = (index, qty) => {
-    setReceivedItems((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, receivedQty: qty } : item,
-      ),
-    );
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.company || !formData.phone) {
+      setError("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // Use real authenticated endpoint
+      const response = await apiService.post("/suppliers", formData);
+
+      if (response.success) {
+        alert("Supplier created successfully!");
+        onSupplierCreated();
+      } else {
+        setError(response.message || "Failed to create supplier");
+      }
+    } catch (error) {
+      if (error.message?.includes("401")) {
+        setError("Session expired. Please login again.");
+        setTimeout(() => (window.location.href = "/login"), 2000);
+      } else {
+        setError(error.message || "Failed to create supplier");
+      }
+      console.error("Create supplier error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white max-w-3xl w-full max-h-screen overflow-y-auto rounded-lg shadow-2xl">
+      <div className="bg-white max-w-md w-full rounded-lg shadow-2xl">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-900">
-              Receive Purchase Order - {purchase.invoiceNo}
+              Add New Supplier
             </h3>
             <button
               onClick={onClose}
@@ -1015,83 +971,115 @@ const ReceivePurchaseModal = ({
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="mb-6">
-            <h4 className="text-md font-medium text-gray-900 mb-4">
-              Adjust received quantities if needed:
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Product
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Ordered
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Received
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Unit Cost
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {receivedItems.map((item, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {item.productName || `Product ${item.productId}`}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        {item.qty}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <input
-                          type="number"
-                          value={item.receivedQty}
-                          onChange={(e) =>
-                            updateReceivedQty(
-                              index,
-                              parseInt(e.target.value) || 0,
-                            )
-                          }
-                          className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-right"
-                          min="0"
-                          max={item.qty}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        {formatCurrency(item.unitCost)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+              {error}
             </div>
-          </div>
-        </div>
+          )}
 
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-          <button onClick={onClose} className="btn-secondary">
-            Cancel
-          </button>
-          <button
-            onClick={() => onReceive(receivedItems)}
-            disabled={loading}
-            className="btn-primary"
-          >
-            {loading ? (
-              <>
-                <LoadingSpinner size="sm" className="mr-2" />
-                Receiving...
-              </>
-            ) : (
-              "Receive Items & Update Stock"
-            )}
-          </button>
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Supplier Name *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter supplier name"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company Name *
+            </label>
+            <input
+              type="text"
+              value={formData.company}
+              onChange={(e) =>
+                setFormData({ ...formData, company: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter company name"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number *
+            </label>
+            <input
+              type="text"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter phone number"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter email (optional)"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Address
+            </label>
+            <textarea
+              value={formData.address}
+              onChange={(e) =>
+                setFormData({ ...formData, address: e.target.value })
+              }
+              rows="3"
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter address (optional)"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded font-semibold"
+            >
+              {loading ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  Creating...
+                </>
+              ) : (
+                "Create Supplier"
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
