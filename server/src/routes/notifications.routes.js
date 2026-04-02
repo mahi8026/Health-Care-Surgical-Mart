@@ -6,12 +6,15 @@ const { logger } = require('../config/logging');
 
 const express = require("express");
 const router = express.Router();
-const notificationService = require("../services/notification.service");
+const EmailService = require("../services/email/email.service");
+const SMSService = require("../services/sms/sms.service");
 const { authenticate } = require("../middleware/auth-multi-tenant");
 const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler } = require("../config/error-handling");
+const { ObjectId } = require("mongodb");
+const { logger } = require("../config/logging");
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -33,18 +36,29 @@ router.post(
       });
     }
 
-    const result = await notificationService.sendEmail({
-      to: email,
-      subject: "Test Email from Health Care Surgical Mart",
-      html: `
-        <h2>Email Configuration Test</h2>
-        <p>This is a test email from your Health Care Surgical Mart POS system.</p>
-        <p>If you received this email, your email configuration is working correctly!</p>
-        <p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
-      `,
-    });
+    try {
+      const result = await EmailService.send({
+        to: email,
+        subject: "Test Email from Health Care Surgical Mart",
+        templateName: "test_email",
+        variables: {
+          timestamp: new Date().toLocaleString(),
+          shopName: "Health Care Surgical Mart",
+        },
+      });
 
-    res.json(result);
+      res.json({
+        success: true,
+        message: "Test email sent successfully",
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Test email error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send test email",
+      });
+    }
   }),
 );
 
@@ -65,18 +79,34 @@ router.post(
       });
     }
 
-    const result = await notificationService.sendSMS({
-      to: phone,
-      message: `Test SMS from Health Care Surgical Mart. Your SMS configuration is working! Time: ${new Date().toLocaleTimeString()}`,
-    });
+    try {
+      const result = await SMSService.send({
+        to: phone,
+        templateName: "test_sms",
+        variables: {
+          time: new Date().toLocaleTimeString(),
+        },
+        shopId: req.user.shopId,
+      });
 
-    res.json(result);
+      res.json({
+        success: true,
+        message: "Test SMS sent successfully",
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Test SMS error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send test SMS",
+      });
+    }
   }),
 );
 
 /**
  * POST /api/notifications/test-whatsapp
- * Test WhatsApp configuration
+ * Test WhatsApp configuration (via Twilio)
  */
 router.post(
   "/test-whatsapp",
@@ -91,12 +121,29 @@ router.post(
       });
     }
 
-    const result = await notificationService.sendWhatsApp({
-      to: phone,
-      message: `🏥 *Test Message*\n\nYour WhatsApp configuration is working correctly!\n\n⏰ Time: ${new Date().toLocaleTimeString()}\n\n- Health Care Surgical Mart`,
-    });
+    // WhatsApp is handled through Twilio SMS service
+    try {
+      const result = await SMSService.send({
+        to: phone,
+        templateName: "test_whatsapp",
+        variables: {
+          time: new Date().toLocaleTimeString(),
+        },
+        shopId: req.user.shopId,
+      });
 
-    res.json(result);
+      res.json({
+        success: true,
+        message: "Test WhatsApp message sent successfully",
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Test WhatsApp error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send test WhatsApp message",
+      });
+    }
   }),
 );
 
@@ -109,7 +156,7 @@ router.post(
   requirePermission(PERMISSIONS.MANAGE_CUSTOMERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { message, customerIds, sendEmail, sendSMS, sendWhatsApp } = req.body;
+    const { message, customerIds, sendEmail, sendSMS } = req.body;
 
     if (!message || !message.text) {
       return res.status(400).json({
@@ -142,21 +189,62 @@ router.post(
       });
     }
 
-    // Get shop settings
-    const settings = await shopDb.collection("settings").findOne({});
-    const notificationSettings = {
-      emailNotifications: sendEmail && settings?.emailNotifications,
-      smsNotifications: sendSMS && settings?.smsNotifications,
-      whatsappNotifications: sendWhatsApp && settings?.whatsappNotifications,
+    const results = {
+      email: { sent: 0, failed: 0 },
+      sms: { sent: 0, failed: 0 },
     };
 
-    const result = await notificationService.sendPromotionalMessage(
-      customers,
-      message,
-      notificationSettings,
-    );
+    // Send emails
+    if (sendEmail) {
+      for (const customer of customers) {
+        if (customer.email) {
+          try {
+            await EmailService.send({
+              to: customer.email,
+              subject: message.subject || "Special Offer from Health Care Surgical Mart",
+              templateName: "promotional",
+              variables: {
+                customerName: customer.name,
+                message: message.text,
+              },
+            });
+            results.email.sent++;
+          } catch (error) {
+            logger.error(`Failed to send email to ${customer.email}:`, error);
+            results.email.failed++;
+          }
+        }
+      }
+    }
 
-    res.json(result);
+    // Send SMS
+    if (sendSMS) {
+      for (const customer of customers) {
+        if (customer.phone) {
+          try {
+            await SMSService.send({
+              to: customer.phone,
+              templateName: "promotional",
+              variables: {
+                customerName: customer.name,
+                message: message.text,
+              },
+              shopId: req.user.shopId,
+            });
+            results.sms.sent++;
+          } catch (error) {
+            logger.error(`Failed to send SMS to ${customer.phone}:`, error);
+            results.sms.failed++;
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Promotional messages sent",
+      data: results,
+    });
   }),
 );
 
@@ -170,15 +258,13 @@ router.post(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const stockCollectionName = shopDb.getCollectionName("stock");
-
     // Get low stock products
     const products = await shopDb
       .collection("products")
       .aggregate([
         {
           $lookup: {
-            from: stockCollectionName,
+            from: "stock",
             localField: "_id",
             foreignField: "productId",
             as: "stockInfo",
@@ -223,16 +309,35 @@ router.post(
       })
       .toArray();
 
-    // Get shop settings
-    const settings = await shopDb.collection("settings").findOne({});
+    const results = { sent: 0, failed: 0 };
 
-    const result = await notificationService.sendLowStockAlert(
-      products,
-      admins,
-      settings || {},
-    );
+    // Send email alerts to admins
+    for (const admin of admins) {
+      if (admin.email) {
+        try {
+          await EmailService.send({
+            to: admin.email,
+            subject: `⚠️ Low Stock Alert - ${products.length} Products`,
+            templateName: "low_stock_alert",
+            variables: {
+              adminName: admin.name,
+              productCount: products.length,
+              products: products,
+            },
+          });
+          results.sent++;
+        } catch (error) {
+          logger.error(`Failed to send alert to ${admin.email}:`, error);
+          results.failed++;
+        }
+      }
+    }
 
-    res.json(result);
+    res.json({
+      success: true,
+      message: "Low stock alerts sent",
+      data: results,
+    });
   }),
 );
 
@@ -266,17 +371,51 @@ router.post(
       });
     }
 
-    // Get shop settings
-    const settings = await shopDb.collection("settings").findOne({});
+    const results = { email: false, sms: false };
 
-    const result = await notificationService.sendPaymentReminder(
-      customer,
-      dueAmount,
-      dueDate,
-      settings || {},
-    );
+    // Send email reminder
+    if (customer.email) {
+      try {
+        await EmailService.send({
+          to: customer.email,
+          subject: `Payment Reminder - BDT ${dueAmount} Due`,
+          templateName: "payment_reminder",
+          variables: {
+            customerName: customer.name,
+            dueAmount: dueAmount,
+            dueDate: new Date(dueDate).toLocaleDateString(),
+          },
+        });
+        results.email = true;
+      } catch (error) {
+        logger.error("Failed to send payment reminder email:", error);
+      }
+    }
 
-    res.json(result);
+    // Send SMS reminder
+    if (customer.phone) {
+      try {
+        await SMSService.send({
+          to: customer.phone,
+          templateName: "payment_reminder",
+          variables: {
+            customerName: customer.name,
+            dueAmount: dueAmount,
+            dueDate: new Date(dueDate).toLocaleDateString(),
+          },
+          shopId: req.user.shopId,
+        });
+        results.sms = true;
+      } catch (error) {
+        logger.error("Failed to send payment reminder SMS:", error);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Payment reminder sent",
+      data: results,
+    });
   }),
 );
 

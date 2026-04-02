@@ -94,6 +94,25 @@ const setupRoutes = (app) => {
     logger.info("Loading notifications routes...");
     app.use("/api/notifications", require("../routes/notifications.routes"));
 
+    // SMS routes
+    logger.info("Loading SMS routes...");
+    app.use("/api/sms", require("../routes/sms.routes"));
+
+    // Email routes
+    logger.info("Loading Email routes...");
+    app.use("/api/email", require("../routes/email.routes"));
+
+    // Webhook routes (no JWT auth - validated by provider signatures)
+    logger.info("Loading Webhook routes...");
+    app.use(
+      "/api/webhooks/sendgrid",
+      require("../routes/webhooks/sendgrid.webhook"),
+    );
+    app.use(
+      "/api/webhooks/twilio",
+      require("../routes/webhooks/twilio.webhook"),
+    );
+
     // Test route (no auth required)
     app.get("/api/test", (req, res) => {
       res.json({

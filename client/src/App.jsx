@@ -18,6 +18,9 @@ import ExpenseCategories from "./pages/ExpenseCategories";
 import ExpensesPage from "./pages/ExpensesPage";
 import AddExpensePage from "./pages/AddExpensePage";
 import FirebaseAuthTest from "./pages/FirebaseAuthTest";
+import SMSDashboard from "./pages/SMSDashboard";
+import EmailDashboard from "./pages/EmailDashboard";
+import NotificationSettings from "./pages/NotificationSettings";
 
 // Components
 import { Layout, LoadingSpinner, ProtectedRoute } from "./components";
@@ -175,6 +178,36 @@ function App() {
             element={
               <ProtectedRoute permission={PERMISSIONS.VIEW_SETTINGS}>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* SMS Dashboard - Requires VIEW_SETTINGS permission */}
+          <Route
+            path="sms"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.VIEW_SETTINGS}>
+                <SMSDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Email Dashboard - Requires VIEW_SETTINGS permission */}
+          <Route
+            path="email"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.VIEW_SETTINGS}>
+                <EmailDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Notification Settings - Requires VIEW_SETTINGS permission */}
+          <Route
+            path="notification-settings"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.VIEW_SETTINGS}>
+                <NotificationSettings />
               </ProtectedRoute>
             }
           />

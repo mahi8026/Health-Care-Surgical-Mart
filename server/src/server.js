@@ -167,20 +167,38 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Static file serving with caching
-app.use(
-  express.static(path.join(__dirname, "../../client/dist"), {
-    maxAge: process.env.NODE_ENV === "production" ? "1d" : "0",
-    etag: true,
-    lastModified: true,
-  }),
-);
+// Static file serving with caching (only in production with built client)
+if (process.env.NODE_ENV === "production") {
+  const clientPath = path.join(__dirname, "../../client/dist");
+  const fs = require("fs");
+  
+  // Only serve static files if client/dist exists
+  if (fs.existsSync(clientPath)) {
+    app.use(
+      express.static(clientPath, {
+        maxAge: "1d",
+        etag: true,
+        lastModified: true,
+      }),
+    );
+    logger.info("Serving static files from client/dist");
+  } else {
+    logger.warn("Client dist folder not found - API only mode");
+  }
+}
 
 // Setup additional middleware
 setupMiddleware(app);
 
 // Setup security configurations
 setupSecurity(app);
+
+// Request logging middleware (optional - for debugging)
+if (process.env.ENABLE_REQUEST_LOGGING === "true") {
+  const { requestLogger } = require("./middleware/request-logger");
+  app.use(requestLogger);
+  logger.info("Request logging enabled");
+}
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -197,10 +215,36 @@ app.get("/health", (req, res) => {
 // API routes
 setupRoutes(app);
 
-// Serve React application
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
-});
+// Serve React application (only if client/dist exists)
+if (process.env.NODE_ENV === "production") {
+  const clientIndexPath = path.join(__dirname, "../../client/dist/index.html");
+  const fs = require("fs");
+  
+  if (fs.existsSync(clientIndexPath)) {
+    app.get("*", (req, res) => {
+      res.sendFile(clientIndexPath);
+    });
+  } else {
+    // API-only mode - return 404 for non-API routes
+    app.get("*", (req, res) => {
+      res.status(404).json({
+        success: false,
+        message: "API endpoint not found",
+        hint: "This is an API-only server. Frontend is deployed separately.",
+      });
+    });
+  }
+} else {
+  // Development mode - serve client if exists
+  const clientIndexPath = path.join(__dirname, "../../client/dist/index.html");
+  const fs = require("fs");
+  
+  if (fs.existsSync(clientIndexPath)) {
+    app.get("*", (req, res) => {
+      res.sendFile(clientIndexPath);
+    });
+  }
+}
 
 // Error handling
 setupErrorHandling(app);

@@ -124,6 +124,34 @@ export const navigationConfig = [
     divider: true,
   },
 
+  // Integrations Section
+  {
+    id: "sms-dashboard",
+    name: "SMS",
+    icon: "fas fa-sms",
+    path: "/sms",
+    permission: PERMISSIONS.VIEW_SETTINGS,
+    description: "SMS messaging and templates",
+  },
+  {
+    id: "email-dashboard",
+    name: "Email",
+    icon: "fas fa-envelope",
+    path: "/email",
+    permission: PERMISSIONS.VIEW_SETTINGS,
+    description: "Email campaigns and templates",
+    divider: false,
+  },
+  {
+    id: "notification-settings",
+    name: "Notification Settings",
+    icon: "fas fa-bell",
+    path: "/notification-settings",
+    permission: PERMISSIONS.VIEW_SETTINGS,
+    description: "SMS and email provider configuration",
+    divider: true,
+  },
+
   // Settings - Admin only
   {
     id: "settings",
@@ -194,6 +222,10 @@ export const navigationSections = {
   reports: {
     title: "Reports & Analytics",
     items: ["financial-reports"],
+  },
+  integrations: {
+    title: "Integrations",
+    items: ["sms-dashboard", "email-dashboard", "notification-settings"],
   },
   system: {
     title: "System",
