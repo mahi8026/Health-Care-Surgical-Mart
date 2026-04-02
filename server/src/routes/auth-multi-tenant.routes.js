@@ -1,5 +1,6 @@
 /**
  * Multi-Tenant Authentication Routes
+const { logger } = require('../config/logging');
  * Login for all user types
  */
 
@@ -17,10 +18,8 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password, shopId } = req.body;
 
-    console.log("Login attempt:", { email, hasPassword: !!password, shopId });
 
     if (!email || !password) {
-      console.log("Missing email or password");
       return res.status(400).json({
         success: false,
         message: "Email and password are required",
@@ -45,28 +44,16 @@ router.post("/login", async (req, res) => {
 
       if (!targetShopId) {
         // Auto-detect shopId by searching all shops for this email
-        console.log(`Auto-detecting shopId for email: ${email}`);
         const shops = await systemDb
           .collection("shops")
           .find({ status: "Active" })
           .toArray();
 
-        console.log(
-          `Found ${shops.length} active shops:`,
-          shops.map((s) => ({ shopId: s.shopId, ownerEmail: s.ownerEmail })),
-        );
 
         // First check if email matches shop owner email
         for (const shop of shops) {
-          console.log(
-            `Checking shop ${shop.shopId}: ${shop.ownerEmail} === ${email}?`,
-            shop.ownerEmail === email,
-          );
           if (shop.ownerEmail === email) {
             targetShopId = shop.shopId;
-            console.log(
-              `Found shopId: ${targetShopId} for owner email: ${email}`,
-            );
             break;
           }
         }
@@ -81,13 +68,9 @@ router.post("/login", async (req, res) => {
                 .findOne({ email });
               if (shopUser) {
                 targetShopId = shop.shopId;
-                console.log(
-                  `Found shopId: ${targetShopId} for user email: ${email}`,
-                );
                 break;
               }
             } catch (error) {
-              console.log(`Error checking shop ${shop.shopId}:`, error.message);
             }
           }
         }
@@ -120,23 +103,13 @@ router.post("/login", async (req, res) => {
 
       // Get user from shop database
       const shopDb = getShopDatabase(targetShopId);
-      console.log("Getting user from shop database:", targetShopId);
       user = await shopDb.collection("users").findOne({ email });
-      console.log("User found in shop DB:", !!user);
       if (user) {
-        console.log("User details:", {
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          isActive: user.isActive,
-        });
       }
       userDb = targetShopId;
     }
 
-    console.log("Final user check - user exists:", !!user);
     if (!user) {
-      console.log("Returning 401 - user not found");
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -144,11 +117,7 @@ router.post("/login", async (req, res) => {
     }
 
     // Verify password
-    console.log("Verifying password for user:", email);
-    console.log("User has passwordHash:", !!user.passwordHash);
-    console.log("Password hash length:", user.passwordHash?.length);
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    console.log("Password valid:", isPasswordValid);
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -194,7 +163,7 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error:", error);
     res.status(500).json({
       success: false,
       message: "Login failed",
@@ -287,7 +256,7 @@ router.post("/change-password", async (req, res) => {
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error("Change password error:", error);
+    logger.error("Change password error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to change password",
@@ -303,10 +272,8 @@ router.post("/firebase-login", async (req, res) => {
   try {
     const { email, shopId } = req.body;
 
-    console.log("Firebase login attempt:", { email, shopId });
 
     if (!email) {
-      console.log("Missing email");
       return res.status(400).json({
         success: false,
         message: "Email is required",
@@ -334,7 +301,6 @@ router.post("/firebase-login", async (req, res) => {
 
       if (!targetShopId) {
         // Auto-detect shopId by searching all shops for this email
-        console.log(`Auto-detecting shopId for email: ${email}`);
         const shops = await systemDb
           .collection("shops")
           .find({ status: "Active" })
@@ -344,9 +310,6 @@ router.post("/firebase-login", async (req, res) => {
         for (const shop of shops) {
           if (shop.ownerEmail === email) {
             targetShopId = shop.shopId;
-            console.log(
-              `Found shopId: ${targetShopId} for owner email: ${email}`,
-            );
             break;
           }
         }
@@ -361,13 +324,9 @@ router.post("/firebase-login", async (req, res) => {
                 .findOne({ email });
               if (shopUser) {
                 targetShopId = shop.shopId;
-                console.log(
-                  `Found shopId: ${targetShopId} for user email: ${email}`,
-                );
                 break;
               }
             } catch (error) {
-              console.log(`Error checking shop ${shop.shopId}:`, error.message);
             }
           }
         }
@@ -401,15 +360,11 @@ router.post("/firebase-login", async (req, res) => {
 
       // Get user from shop database
       const shopDb = getShopDatabase(targetShopId);
-      console.log("Getting user from shop database:", targetShopId);
       user = await shopDb.collection("users").findOne({ email });
-      console.log("User found in shop DB:", !!user);
       userDb = targetShopId;
     }
 
-    console.log("Final user check - user exists:", !!user);
     if (!user) {
-      console.log("Returning 401 - user not found");
       return res.status(401).json({
         success: false,
         message: "User not found in system. Please contact administrator.",
@@ -454,7 +409,7 @@ router.post("/firebase-login", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Firebase login error:", error);
+    logger.error("Firebase login error:", error);
     res.status(500).json({
       success: false,
       message: "Login failed",

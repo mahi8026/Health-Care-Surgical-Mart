@@ -6,6 +6,7 @@
 const jwt = require("jsonwebtoken");
 const { getShopDatabase, getSystemDatabase } = require("../config/database");
 const { ObjectId } = require("mongodb");
+const { logger } = require("../config/logging");
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your_jwt_secret_key_change_in_production";
@@ -18,17 +19,8 @@ async function authenticate(req, res, next) {
     // Get token from header
     const authHeader = req.headers.authorization;
 
-    console.log("Auth middleware - Request:", {
-      method: req.method,
-      path: req.path,
-      hasAuthHeader: !!authHeader,
-      authHeaderStart: authHeader
-        ? authHeader.substring(0, 20) + "..."
-        : "none",
-    });
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("Auth middleware - No valid auth header");
       return res.status(401).json({
         success: false,
         message: "No token provided",
@@ -36,15 +28,9 @@ async function authenticate(req, res, next) {
     }
 
     const token = authHeader.substring(7);
-    console.log("Auth middleware - Token extracted, length:", token.length);
 
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log("Auth middleware - Token decoded:", {
-      userId: decoded.userId,
-      role: decoded.role,
-      shopId: decoded.shopId,
-    });
 
     // Get user from appropriate database
     let user;
@@ -55,9 +41,6 @@ async function authenticate(req, res, next) {
       });
     } else {
       if (!decoded.shopId) {
-        console.log(
-          "Auth middleware - No shopId in token for non-super-admin user",
-        );
         return res.status(401).json({
           success: false,
           message: "Invalid token: missing shop context",
@@ -70,15 +53,8 @@ async function authenticate(req, res, next) {
       });
     }
 
-    console.log("Auth middleware - User found:", {
-      hasUser: !!user,
-      userName: user?.name,
-      userRole: user?.role,
-      userShopId: user?.shopId,
-    });
 
     if (!user) {
-      console.log("Auth middleware - User not found in database");
       return res.status(401).json({
         success: false,
         message: "User not found",
@@ -86,7 +62,6 @@ async function authenticate(req, res, next) {
     }
 
     if (!user.isActive) {
-      console.log("Auth middleware - User account inactive");
       return res.status(401).json({
         success: false,
         message: "User account is inactive",
@@ -103,19 +78,13 @@ async function authenticate(req, res, next) {
       permissions: user.permissions || [],
     };
 
-    console.log("Auth middleware - Final user object:", {
-      role: req.user.role,
-      shopId: req.user.shopId,
-      hasShopId: !!req.user.shopId,
-    });
 
     // Attach shop database to request for convenience
     if (req.user.shopId) {
       try {
         req.shopDb = getShopDatabase(req.user.shopId);
-        console.log("Auth middleware - Shop DB attached successfully");
       } catch (dbError) {
-        console.error(
+        logger.error(
           "Auth middleware - Failed to get shop database:",
           dbError,
         );
@@ -125,12 +94,11 @@ async function authenticate(req, res, next) {
         });
       }
     } else {
-      console.log("Auth middleware - No shopId, skipping shop DB attachment");
     }
 
     next();
   } catch (error) {
-    console.error("Auth middleware - Error:", error);
+    logger.error("Auth middleware - Error:", error);
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
@@ -145,7 +113,7 @@ async function authenticate(req, res, next) {
       });
     }
 
-    console.error("Authentication error:", error);
+    logger.error("Authentication error:", error);
     return res.status(500).json({
       success: false,
       message: "Authentication failed",
@@ -236,7 +204,7 @@ async function checkShopStatus(req, res, next) {
 
     next();
   } catch (error) {
-    console.error("Shop status check error:", error);
+    logger.error("Shop status check error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to verify shop status",

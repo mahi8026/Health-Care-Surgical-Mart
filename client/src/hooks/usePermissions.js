@@ -3,7 +3,7 @@
  * Custom hook for checking user permissions in components
  */
 
-import { useFirebaseAuth as useAuth } from "../contexts/FirebaseAuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import {
   hasPermission as checkPermission,
   hasAnyPermission as checkAnyPermission,

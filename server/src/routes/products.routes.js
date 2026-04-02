@@ -1,5 +1,6 @@
 /**
  * Products Routes - Multi-Tenant
+const { logger } = require('../config/logging');
  * Handles product CRUD operations for shops
  */
 
@@ -41,13 +42,16 @@ router.get(
       if (isActive !== undefined) matchStage.isActive = isActive === "true";
 
       // Aggregate products with stock data
+      // Get the prefixed collection name for $lookup
+      const stockCollectionName = req.shopDb.getCollectionName("stock");
+
       const products = await req.shopDb
         .collection("products")
         .aggregate([
           { $match: matchStage },
           {
             $lookup: {
-              from: "stock",
+              from: stockCollectionName, // Use prefixed collection name
               localField: "_id",
               foreignField: "productId",
               as: "stock",
@@ -87,7 +91,7 @@ router.get(
         data: products,
       });
     } catch (error) {
-      console.error("Get products error:", error);
+      logger.error("Get products error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to fetch products",
@@ -121,7 +125,7 @@ router.get(
         data: product,
       });
     } catch (error) {
-      console.error("Get product error:", error);
+      logger.error("Get product error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to fetch product",
@@ -218,7 +222,7 @@ router.post(
         data: { _id: result.insertedId, ...product },
       });
     } catch (error) {
-      console.error("Create product error:", error);
+      logger.error("Create product error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to create product",
@@ -338,7 +342,7 @@ router.put(
         message: "Product updated successfully",
       });
     } catch (error) {
-      console.error("Update product error:", error);
+      logger.error("Update product error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to update product",
@@ -378,7 +382,7 @@ router.delete(
         message: "Product deleted successfully",
       });
     } catch (error) {
-      console.error("Delete product error:", error);
+      logger.error("Delete product error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to delete product",

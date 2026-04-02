@@ -1,5 +1,6 @@
 /**
  * Database Initializer
+const { logger } = require('../config/logging');
  * Creates collections with schemas and indexes for a shop database
  */
 
@@ -116,7 +117,7 @@ async function initializeShopDatabase(db) {
 
     return results;
   } catch (error) {
-    console.error("Database initialization error:", error);
+    logger.error("Database initialization error:", error);
     throw error;
   }
 }
@@ -191,7 +192,7 @@ async function initializeSystemDatabase(systemDb) {
 
     return results;
   } catch (error) {
-    console.error("System database initialization error:", error);
+    logger.error("System database initialization error:", error);
     throw error;
   }
 }

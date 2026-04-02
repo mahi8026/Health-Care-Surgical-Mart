@@ -1,11 +1,12 @@
 const { MongoClient, ServerApiVersion } = require("mongodb");
 require("dotenv").config();
+const { logger } = require('../config/logging');
 
 // SECURITY: Never hardcode credentials!
 // Always use environment variables
 if (!process.env.MONGODB_URI) {
-  console.error("❌ MONGODB_URI environment variable is not set!");
-  console.error("Please add MONGODB_URI to your .env file");
+  logger.error("❌ MONGODB_URI environment variable is not set!");
+  logger.error("Please add MONGODB_URI to your .env file");
   process.exit(1);
 }
 
@@ -38,11 +39,10 @@ async function connectToMongoDB() {
   try {
     await client.connect();
     await client.db("admin").command({ ping: 1 });
-    console.log("✅ Successfully connected to MongoDB Atlas!");
     isConnected = true;
     return client;
   } catch (error) {
-    console.error("❌ MongoDB connection failed:", error);
+    logger.error("❌ MongoDB connection failed:", error);
     throw error;
   }
 }
@@ -80,9 +80,8 @@ async function closeConnection() {
   try {
     await client.close();
     isConnected = false;
-    console.log("MongoDB connection closed.");
   } catch (error) {
-    console.error("Error closing MongoDB connection:", error);
+    logger.error("Error closing MongoDB connection:", error);
   }
 }
 
@@ -104,7 +103,7 @@ async function listAllShops() {
         empty: db.empty,
       }));
   } catch (error) {
-    console.error("Error listing shops:", error);
+    logger.error("Error listing shops:", error);
     throw error;
   }
 }

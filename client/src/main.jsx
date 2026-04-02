@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "react-query";
 import { Toaster } from "react-hot-toast";
 
 import App from "./App.jsx";
-import { FirebaseAuthProvider } from "./contexts/FirebaseAuthContext.jsx";
+import { AuthProvider } from "./contexts/AuthContext.jsx";
 import "./styles/index.css";
 
 // Create a client with optimized defaults
@@ -32,7 +32,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           v7_relativeSplatPath: true,
         }}
       >
-        <FirebaseAuthProvider>
+        <AuthProvider>
           <App />
           <Toaster
             position="top-right"
@@ -51,7 +51,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
               },
             }}
           />
-        </FirebaseAuthProvider>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>,

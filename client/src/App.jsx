@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { useFirebaseAuth as useAuth } from "./contexts/FirebaseAuthContext";
+import { useAuth } from "./contexts/AuthContext";
 import { PERMISSIONS } from "./utils/permissions";
 
 // Pages

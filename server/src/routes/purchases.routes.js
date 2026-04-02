@@ -1,5 +1,6 @@
 /**
  * Purchases Routes
+const { logger } = require('../config/logging');
  * Purchase order management and inventory receiving
  */
 
@@ -72,11 +73,13 @@ router.get(
       matchQuery.supplierId = toObjectId(supplierId);
     }
 
+    const suppliersCollectionName = shopDb.getCollectionName("suppliers");
+
     const pipeline = [
       { $match: matchQuery },
       {
         $lookup: {
-          from: "suppliers",
+          from: suppliersCollectionName,
           localField: "supplierId",
           foreignField: "_id",
           as: "supplier",
@@ -147,13 +150,16 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const suppliersCollectionName = shopDb.getCollectionName("suppliers");
+    const usersCollectionName = shopDb.getCollectionName("users");
+
     const purchase = await shopDb
       .collection("purchases")
       .aggregate([
         { $match: { _id: toObjectId(req.params.id) } },
         {
           $lookup: {
-            from: "suppliers",
+            from: suppliersCollectionName,
             localField: "supplierId",
             foreignField: "_id",
             as: "supplier",
@@ -162,7 +168,7 @@ router.get(
         { $unwind: "$supplier" },
         {
           $lookup: {
-            from: "users",
+            from: usersCollectionName,
             localField: "createdBy",
             foreignField: "_id",
             as: "createdByUser",

@@ -1,19 +1,15 @@
 /**
- * Database Configuration - MongoDB Atlas with Mock Fallback
- * Enhanced connection management with connection pooling, monitoring, and error handling
+ * Database Configuration - Single MongoDB Database
+ * Modified to use one database with shop-prefixed collections
  */
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const { logger } = require("./logging");
-const {
-  connectToMockDatabase,
-  getMockShopDatabase,
-  getMockSystemDatabase,
-} = require("./mock-database");
 
 // Connection configuration
 const config = {
   uri: process.env.MONGODB_URI || "mongodb://localhost:27017",
+  dbName: process.env.DB_NAME || "Health_Care_DB",
   options: {
     serverApi: {
       version: ServerApiVersion.v1,
@@ -26,10 +22,10 @@ const config = {
     maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 30000,
 
     // Connection timeout settings
-    connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000, // Increased timeout
-    socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 60000, // Increased timeout
+    connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
+    socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 60000,
     serverSelectionTimeoutMS:
-      parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 30000, // Increased timeout
+      parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 30000,
 
     // Retry settings
     retryWrites: true,
@@ -46,20 +42,19 @@ const config = {
 };
 
 let client = null;
+let database = null;
 let isConnected = false;
-let usingMockDatabase = false;
 
 /**
- * Connect to MongoDB Atlas with enhanced error handling and monitoring
- * Falls back to mock database if MongoDB Atlas connection fails
+ * Connect to MongoDB Atlas - Single Database
  */
 async function connectToDatabase() {
-  if (isConnected && client) {
+  if (isConnected && client && database) {
     return client;
   }
 
   try {
-    logger.info("Connecting to MongoDB Atlas...");
+    logger.info(`Connecting to MongoDB Atlas database: ${config.dbName}...`);
 
     client = new MongoClient(config.uri, config.options);
 
@@ -72,20 +67,6 @@ async function connectToDatabase() {
       logger.info("MongoDB connection pool closed");
     });
 
-    client.on("connectionCreated", () => {
-      // Reduced logging - only log every 10th connection
-      if (Math.random() < 0.1) {
-        logger.debug("MongoDB connections active");
-      }
-    });
-
-    client.on("connectionClosed", () => {
-      // Reduced logging - only log every 10th closure
-      if (Math.random() < 0.1) {
-        logger.debug("MongoDB connections closed");
-      }
-    });
-
     client.on("error", (error) => {
       logger.error("MongoDB client error:", error);
     });
@@ -93,14 +74,18 @@ async function connectToDatabase() {
     // Connect to the server
     await client.connect();
 
+    // Get the single database instance
+    database = client.db(config.dbName);
+
     // Verify connection
-    await client.db("admin").command({ ping: 1 });
+    await database.command({ ping: 1 });
 
     isConnected = true;
-    usingMockDatabase = false;
-    logger.info("✅ Successfully connected to MongoDB Atlas");
+    logger.info(
+      `✅ Successfully connected to MongoDB database: ${config.dbName}`,
+    );
 
-    // Log connection details (without sensitive info)
+    // Log connection details
     const admin = client.db().admin();
     const serverStatus = await admin.serverStatus();
     logger.info(`MongoDB version: ${serverStatus.version}`);
@@ -108,25 +93,19 @@ async function connectToDatabase() {
 
     return client;
   } catch (error) {
-    logger.error("❌ MongoDB Atlas connection failed:", error.message);
-    logger.warn("🔧 Falling back to mock database for testing...");
-
-    // Fall back to mock database
-    client = await connectToMockDatabase();
-    isConnected = true;
-    usingMockDatabase = true;
-
-    return client;
+    logger.error("❌ MongoDB connection failed:", error.message);
+    throw error;
   }
 }
 
 /**
- * Get database instance for a specific shop (multi-tenant)
+ * Get database instance for a specific shop
+ * Returns the same database but with shop-prefixed collection names
  * @param {string} shopId - Unique shop identifier
- * @returns {Db} MongoDB database instance
+ * @returns {Object} Database wrapper with shop-specific collection access
  */
 function getShopDatabase(shopId) {
-  if (!isConnected || !client) {
+  if (!isConnected || !database) {
     throw new Error("Database not connected. Call connectToDatabase() first.");
   }
 
@@ -134,37 +113,38 @@ function getShopDatabase(shopId) {
     throw new Error("Invalid shopId provided");
   }
 
-  // Use mock database if we're in mock mode
-  if (usingMockDatabase) {
-    return getMockShopDatabase(shopId);
-  }
-
-  // Use shopId directly as database name (no prefix)
-  const dbName = shopId;
-  return client.db(dbName);
+  // Return a wrapper that prefixes collection names with shopId
+  return {
+    collection: (collectionName) => {
+      // Prefix collection name with shopId (e.g., "shop1_products")
+      const prefixedName = `${shopId}_${collectionName}`;
+      return database.collection(prefixedName);
+    },
+    // Expose shopId for use in aggregation pipelines
+    shopId: shopId,
+    // Helper to get prefixed collection name
+    getCollectionName: (collectionName) => `${shopId}_${collectionName}`,
+    // Pass through other database methods
+    command: (...args) => database.command(...args),
+    admin: () => database.admin(),
+    listCollections: () => database.listCollections(),
+    stats: () => database.stats(),
+  };
 }
 
 /**
  * Get the system database (for super admin operations)
+ * Uses collections without shop prefix for system-wide data
  * @returns {Db} MongoDB database instance
  */
 function getSystemDatabase() {
-  if (!isConnected || !client) {
+  if (!isConnected || !database) {
     throw new Error("Database not connected. Call connectToDatabase() first.");
   }
 
-  // Use mock database if we're in mock mode
-  if (usingMockDatabase) {
-    return getMockSystemDatabase();
-  }
-
-  // Use test database in test environment
-  const dbName =
-    process.env.NODE_ENV === "test"
-      ? "medical_store_system_test"
-      : "medical_store_system";
-
-  return client.db(dbName);
+  // Return the database directly for system collections
+  // System collections: shops, system_users, system_settings, etc.
+  return database;
 }
 
 /**
@@ -178,7 +158,7 @@ async function closeDatabaseConnection() {
   try {
     await client.close();
     isConnected = false;
-    usingMockDatabase = false;
+    database = null;
     client = null;
     logger.info("Database connection closed gracefully");
   } catch (error) {
@@ -192,35 +172,26 @@ async function closeDatabaseConnection() {
  * @returns {Object} Connection status and stats
  */
 async function getDatabaseStats() {
-  if (!isConnected || !client) {
+  if (!isConnected || !client || !database) {
     return { connected: false };
   }
 
   try {
-    if (usingMockDatabase) {
-      return {
-        connected: true,
-        usingMockDatabase: true,
-        serverVersion: "Mock Database v1.0",
-        uptime: Date.now(),
-        connections: { current: 1, available: 1 },
-        databases: 1,
-        totalSize: "N/A",
-      };
-    }
-
     const admin = client.db().admin();
     const serverStatus = await admin.serverStatus();
-    const listDatabases = await admin.listDatabases();
+    const dbStats = await database.stats();
 
     return {
       connected: true,
-      usingMockDatabase: false,
+      databaseName: config.dbName,
       serverVersion: serverStatus.version,
       uptime: serverStatus.uptime,
       connections: serverStatus.connections,
-      databases: listDatabases.databases.length,
-      totalSize: listDatabases.totalSize,
+      collections: dbStats.collections,
+      dataSize: dbStats.dataSize,
+      storageSize: dbStats.storageSize,
+      indexes: dbStats.indexes,
+      indexSize: dbStats.indexSize,
     };
   } catch (error) {
     logger.error("Error getting database stats:", error);
@@ -229,33 +200,34 @@ async function getDatabaseStats() {
 }
 
 /**
- * List all shop databases
- * @returns {Promise<Array>} List of shop database information
+ * List all shops from the system database
+ * @returns {Promise<Array>} List of shop information
  */
 async function listAllShops() {
-  if (!isConnected || !client) {
+  if (!isConnected || !database) {
     throw new Error("Database not connected");
   }
 
   try {
-    // Get list of shops from system database
-    const systemDb = getSystemDatabase();
-    const shops = await systemDb.collection("shops").find({}).toArray();
+    // Get list of shops from system collection
+    const shops = await database.collection("shops").find({}).toArray();
 
-    const admin = client.db().admin();
-    const { databases } = await admin.listDatabases();
+    // Get all collections to count shop-specific collections
+    const collections = await database.listCollections().toArray();
 
-    // Match shops with their databases
     return shops
       .map((shop) => {
-        const dbInfo = databases.find((db) => db.name === shop.shopId);
+        // Count collections for this shop
+        const shopCollections = collections.filter((col) =>
+          col.name.startsWith(`${shop.shopId}_`),
+        );
+
         return {
           shopId: shop.shopId,
-          dbName: shop.shopId,
-          sizeOnDisk: dbInfo?.sizeOnDisk || 0,
-          empty: dbInfo?.empty || true,
           shopName: shop.name,
           status: shop.status,
+          collectionsCount: shopCollections.length,
+          collections: shopCollections.map((c) => c.name),
         };
       })
       .sort((a, b) => a.shopId.localeCompare(b.shopId));
@@ -304,9 +276,44 @@ async function createShopIndexes(shopId) {
       { key: { type: 1 }, name: "customer_type_index" },
     ]);
 
+    // User indexes
+    await shopDb.collection("users").createIndexes([
+      { key: { email: 1 }, unique: true, name: "email_unique" },
+      { key: { role: 1 }, name: "role_index" },
+      { key: { isActive: 1 }, name: "active_status_index" },
+    ]);
+
+    // Expense indexes
+    await shopDb.collection("expenses").createIndexes([
+      { key: { expenseDate: -1 }, name: "expense_date_desc" },
+      { key: { categoryId: 1 }, name: "category_index" },
+      { key: { createdBy: 1 }, name: "created_by_index" },
+    ]);
+
     logger.info(`Database indexes created for shop: ${shopId}`);
   } catch (error) {
     logger.error(`Error creating indexes for shop ${shopId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Create system-level indexes
+ */
+async function createSystemIndexes() {
+  try {
+    const systemDb = getSystemDatabase();
+
+    // Shops collection indexes
+    await systemDb.collection("shops").createIndexes([
+      { key: { shopId: 1 }, unique: true, name: "shopId_unique" },
+      { key: { email: 1 }, unique: true, name: "email_unique" },
+      { key: { status: 1 }, name: "status_index" },
+    ]);
+
+    logger.info("System database indexes created");
+  } catch (error) {
+    logger.error("Error creating system indexes:", error);
     throw error;
   }
 }
@@ -317,15 +324,76 @@ async function createShopIndexes(shopId) {
  */
 async function healthCheck() {
   try {
-    if (!isConnected || !client) {
+    if (!isConnected || !database) {
       return false;
     }
 
-    await client.db("admin").command({ ping: 1 });
+    await database.command({ ping: 1 });
     return true;
   } catch (error) {
     logger.error("Database health check failed:", error);
     return false;
+  }
+}
+
+/**
+ * Migrate data from multiple databases to single database
+ * This is a utility function for one-time migration
+ */
+async function migrateToSingleDatabase() {
+  logger.info("Starting migration to single database...");
+
+  try {
+    const admin = client.db().admin();
+    const { databases } = await admin.listDatabases();
+
+    // Find all shop databases (exclude system databases)
+    const shopDatabases = databases.filter(
+      (db) =>
+        ![
+          "admin",
+          "local",
+          "config",
+          "Health_Care_DB",
+          "medical_store_system",
+        ].includes(db.name),
+    );
+
+    logger.info(`Found ${shopDatabases.length} shop databases to migrate`);
+
+    for (const dbInfo of shopDatabases) {
+      const sourceDb = client.db(dbInfo.name);
+      const shopId = dbInfo.name; // Use database name as shopId
+
+      logger.info(`Migrating database: ${dbInfo.name}`);
+
+      // Get all collections from source database
+      const collections = await sourceDb.listCollections().toArray();
+
+      for (const collInfo of collections) {
+        const collectionName = collInfo.name;
+        const sourceCollection = sourceDb.collection(collectionName);
+        const targetCollectionName = `${shopId}_${collectionName}`;
+        const targetCollection = database.collection(targetCollectionName);
+
+        // Get all documents
+        const documents = await sourceCollection.find({}).toArray();
+
+        if (documents.length > 0) {
+          // Insert into target collection
+          await targetCollection.insertMany(documents);
+          logger.info(
+            `Migrated ${documents.length} documents from ${dbInfo.name}.${collectionName} to ${targetCollectionName}`,
+          );
+        }
+      }
+    }
+
+    logger.info("✅ Migration completed successfully!");
+    return { success: true, migratedDatabases: shopDatabases.length };
+  } catch (error) {
+    logger.error("❌ Migration failed:", error);
+    throw error;
   }
 }
 
@@ -337,10 +405,13 @@ module.exports = {
   getDatabaseStats,
   listAllShops,
   createShopIndexes,
+  createSystemIndexes,
   healthCheck,
+  migrateToSingleDatabase,
 
   // Legacy compatibility
   connectToMongoDB: connectToDatabase,
   closeConnection: closeDatabaseConnection,
   client: () => client,
+  database: () => database,
 };

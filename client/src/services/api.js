@@ -21,25 +21,11 @@ class ApiService {
       config.headers["Content-Type"] = "application/json";
     }
 
-    console.log(`API Call: ${endpoint}`, {
-      hasToken: !!token,
-      tokenValue: token ? token.substring(0, 20) + "..." : "none",
-      config,
-      authHeader: config.headers.Authorization,
-      allHeaders: config.headers,
-    });
-
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, config);
 
-      console.log(`API Response: ${endpoint}`, {
-        status: response.status,
-        contentType: response.headers.get("content-type"),
-      });
-
       // Handle authentication errors
       if (response.status === 401) {
-        console.log("Authentication failed - 401 response");
         // Don't automatically redirect, let the calling component handle it
         const errorData = await response.text();
         throw new Error(

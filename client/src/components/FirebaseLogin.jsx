@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useFirebaseAuth } from "../hooks/useFirebaseAuth";
+import { useAuth } from "../hooks/useAuth";
 
 /**
  * Firebase Login Component
@@ -13,7 +13,7 @@ const FirebaseLogin = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  const { signIn, signUp, forgotPassword, loading } = useFirebaseAuth();
+  const { signIn, signUp, forgotPassword, loading } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();

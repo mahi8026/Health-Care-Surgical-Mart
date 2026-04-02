@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { logger } = require('../config/logging');
 const multer = require("multer");
 const csv = require("csv-parser");
 const XLSX = require("xlsx");
@@ -68,9 +69,6 @@ const parseExcel = (filePath) => {
 
 // Column mapping function to handle different Excel formats
 const mapProductColumns = (rawProduct) => {
-  console.log("=== COLUMN MAPPING DEBUG ===");
-  console.log("Raw product data:", rawProduct);
-  console.log("Available columns:", Object.keys(rawProduct));
 
   const columnMappings = {
     // Standard mappings
@@ -172,7 +170,6 @@ const mapProductColumns = (rawProduct) => {
     key.toLowerCase().trim(),
   );
 
-  console.log("Available keys (lowercase):", availableKeys);
 
   // Map each field
   for (const [standardField, possibleNames] of Object.entries(columnMappings)) {
@@ -189,15 +186,11 @@ const mapProductColumns = (rawProduct) => {
           (k) => k.toLowerCase().trim() === matchingKey,
         );
         value = rawProduct[originalKey];
-        console.log(
-          `✅ Mapped ${standardField}: "${possibleName}" -> "${value}"`,
-        );
         break;
       }
     }
 
     if (!value) {
-      console.log(`❌ No mapping found for ${standardField}`);
     }
 
     mapped[standardField] = value;
@@ -214,8 +207,6 @@ const mapProductColumns = (rawProduct) => {
     mapped.sku = `BIO-${String(mapped.sku).padStart(3, "0")}`;
   }
 
-  console.log("Final mapped product:", mapped);
-  console.log("=== END COLUMN MAPPING DEBUG ===");
   return mapped;
 };
 
@@ -260,13 +251,6 @@ const validateProductData = (product, rowIndex) => {
 router.post(
   "/bulk-import",
   (req, res, next) => {
-    console.log("Bulk import request received:", {
-      method: req.method,
-      url: req.url,
-      contentType: req.headers["content-type"],
-      hasBody: !!req.body,
-      bodyKeys: Object.keys(req.body || {}),
-    });
     next();
   },
   authenticate,
@@ -275,19 +259,10 @@ router.post(
     let filePath = null;
 
     try {
-      console.log("Bulk import middleware passed:", {
-        hasFile: !!req.file,
-        hasUser: !!req.user,
-        shopId: req.user?.shopId,
-        fileName: req.file?.originalname,
-        fileSize: req.file?.size,
-        filePath: req.file?.path,
-        multerError: req.multerError || "none",
-      });
 
       // Validate authentication
       if (!req.user || !req.user.shopId) {
-        console.error("Bulk import - Missing user or shopId:", {
+        logger.error("Bulk import - Missing user or shopId:", {
           hasUser: !!req.user,
           shopId: req.user?.shopId,
         });
@@ -298,7 +273,7 @@ router.post(
       }
 
       if (!req.file) {
-        console.error("Bulk import - No file in request:", {
+        logger.error("Bulk import - No file in request:", {
           hasFile: !!req.file,
           files: req.files,
           body: req.body,
@@ -312,10 +287,6 @@ router.post(
       filePath = req.file.path;
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
 
-      console.log("Parsing file:", {
-        extension: fileExtension,
-        path: filePath,
-      });
 
       // Parse file based on type
       let products = [];
@@ -328,20 +299,10 @@ router.post(
           throw new Error("Unsupported file format");
         }
       } catch (parseError) {
-        console.error("File parsing error:", parseError);
+        logger.error("File parsing error:", parseError);
         throw new Error(`Failed to parse file: ${parseError.message}`);
       }
 
-      console.log("File parsed successfully:", {
-        productCount: products.length,
-        firstProduct: products[0],
-        availableColumns: products[0] ? Object.keys(products[0]) : [],
-        sampleData: products.slice(0, 2),
-        allColumnNames:
-          products.length > 0
-            ? Object.keys(products[0]).map((k) => `"${k}"`)
-            : [],
-      });
 
       if (products.length === 0) {
         return res.status(400).json({
@@ -366,10 +327,6 @@ router.post(
         // Map columns to standard format
         const productData = mapProductColumns(rawProductData);
 
-        console.log(`Row ${rowIndex} mapping:`, {
-          raw: rawProductData,
-          mapped: productData,
-        });
 
         // Validate product data
         const validationErrors = validateProductData(productData, rowIndex);
@@ -409,9 +366,6 @@ router.post(
           });
 
           await newProduct.save();
-          console.log(
-            `Product created: ${newProduct.name} (${newProduct.sku})`,
-          );
 
           // Create initial stock entry
           const stock = new Stock({
@@ -422,7 +376,6 @@ router.post(
           });
 
           await stock.save();
-          console.log(`Stock entry created for product: ${newProduct.sku}`);
 
           results.imported.push({
             name: newProduct.name,
@@ -430,7 +383,7 @@ router.post(
           });
           results.successCount++;
         } catch (error) {
-          console.error(`Row ${rowIndex} import error:`, error);
+          logger.error(`Row ${rowIndex} import error:`, error);
           results.errors.push(
             `Row ${rowIndex}: ${error.message || "Failed to import product"}`,
           );
@@ -438,11 +391,6 @@ router.post(
         }
       }
 
-      console.log("Bulk import completed:", {
-        total: results.totalRows,
-        success: results.successCount,
-        errors: results.errorCount,
-      });
 
       // Clean up uploaded file
       if (fs.existsSync(filePath)) {
@@ -455,7 +403,7 @@ router.post(
         data: results,
       });
     } catch (error) {
-      console.error("Bulk import error:", {
+      logger.error("Bulk import error:", {
         message: error.message,
         stack: error.stack,
         name: error.name,
@@ -466,7 +414,7 @@ router.post(
         try {
           fs.unlinkSync(filePath);
         } catch (cleanupError) {
-          console.error("Failed to cleanup file:", cleanupError);
+          logger.error("Failed to cleanup file:", cleanupError);
         }
       }
 
@@ -509,7 +457,7 @@ router.get("/bulk-export", authenticate, async (req, res) => {
     );
     res.send(csv);
   } catch (error) {
-    console.error("Export error:", error);
+    logger.error("Export error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to export products",
@@ -586,7 +534,7 @@ router.put("/bulk-update", authenticate, async (req, res) => {
       data: results,
     });
   } catch (error) {
-    console.error("Bulk update error:", error);
+    logger.error("Bulk update error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update products",
@@ -644,7 +592,7 @@ router.post("/bulk-delete", authenticate, async (req, res) => {
       data: results,
     });
   } catch (error) {
-    console.error("Bulk delete error:", error);
+    logger.error("Bulk delete error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to delete products",

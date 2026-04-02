@@ -1,5 +1,6 @@
 /**
  * Customers Routes
+const { logger } = require('../config/logging');
  * CRUD operations for customer management
  */
 

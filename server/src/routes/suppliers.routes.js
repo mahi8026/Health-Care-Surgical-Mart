@@ -1,5 +1,6 @@
 /**
  * Suppliers Routes
+const { logger } = require('../config/logging');
  * CRUD operations for supplier management
  */
 

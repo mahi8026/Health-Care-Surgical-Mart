@@ -1,5 +1,6 @@
 /**
  * Expense Categories Routes
+const { logger } = require('../config/logging');
  * CRUD operations for expense category management
  */
 

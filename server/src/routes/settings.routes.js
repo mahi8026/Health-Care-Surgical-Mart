@@ -1,5 +1,6 @@
 /**
  * Settings Routes
+const { logger } = require('../config/logging');
  * Handles system settings, shop configuration, and preferences
  */
 

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useFirebaseAuth } from "../hooks/useFirebaseAuth";
+import { useAuth } from "../hooks/useFirebaseAuth";
 
 /**
  * Firebase Authentication Test Page
@@ -17,7 +17,7 @@ const FirebaseAuthTest = () => {
     verifyEmail,
     isAuthenticated,
     isEmailVerified,
-  } = useFirebaseAuth();
+  } = useAuth();
 
   const [testEmail, setTestEmail] = useState("test@example.com");
   const [testPassword, setTestPassword] = useState("Test@123");

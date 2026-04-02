@@ -48,9 +48,10 @@ const Sales = () => {
       const response = await apiService.get("/products");
 
       if (response.success) {
-        // Filter to only show products with stock > 0 for POS
+        // Show all active products in POS (including those with 0 stock)
+        // Users can still sell products even if stock shows 0 (for services, custom items, etc.)
         const availableProducts = response.data.filter(
-          (p) => p.stockQuantity > 0,
+          (p) => p.isActive !== false, // Only filter out explicitly inactive products
         );
         setProducts(availableProducts);
       } else {
@@ -131,12 +132,17 @@ const Sales = () => {
     const rate = parseFloat(posData.saleRate);
 
     // Check stock only if a product from inventory is selected
+    // Show warning but allow sale (useful for services, pre-orders, etc.)
     if (posData.selectedProduct) {
       const product = products.find((p) => p._id === posData.selectedProduct);
       if (product && quantity > product.stockQuantity) {
-        setError(`Only ${product.stockQuantity} units available in stock`);
-        setTimeout(() => setError(""), 3000);
-        return;
+        // Show warning but don't block the sale
+        console.warn(
+          `Warning: Selling ${quantity} units but only ${product.stockQuantity} in stock`,
+        );
+        // Optional: You can show a warning message instead of error
+        // setError(`Warning: Only ${product.stockQuantity} units in stock. Proceeding anyway.`);
+        // setTimeout(() => setError(""), 3000);
       }
     }
 
@@ -151,15 +157,16 @@ const Sales = () => {
     if (existingItemIndex >= 0) {
       const newQuantity = cart[existingItemIndex].quantity + quantity;
 
-      // Check stock for inventory items
+      // Check stock for inventory items - show warning but allow
       if (posData.selectedProduct) {
         const product = products.find((p) => p._id === posData.selectedProduct);
         if (product && newQuantity > product.stockQuantity) {
-          setError(
-            `Total quantity cannot exceed ${product.stockQuantity} units`,
+          console.warn(
+            `Warning: Total quantity ${newQuantity} exceeds stock ${product.stockQuantity}`,
           );
-          setTimeout(() => setError(""), 3000);
-          return;
+          // Optional: Show warning
+          // setError(`Warning: Total quantity exceeds ${product.stockQuantity} units in stock`);
+          // setTimeout(() => setError(""), 3000);
         }
       }
 
@@ -215,11 +222,16 @@ const Sales = () => {
       return;
     }
 
+    // Allow updating quantity even if exceeds stock
+    // Show warning in console but don't block
     const product = products.find((p) => p._id === productId);
     if (product && newQuantity > product.stockQuantity) {
-      setError(`Only ${product.stockQuantity} units available`);
-      setTimeout(() => setError(""), 3000);
-      return;
+      console.warn(
+        `Warning: Quantity ${newQuantity} exceeds stock ${product.stockQuantity}`,
+      );
+      // Optional: Show warning message
+      // setError(`Warning: Only ${product.stockQuantity} units in stock`);
+      // setTimeout(() => setError(""), 2000);
     }
 
     setCart(
@@ -271,15 +283,6 @@ const Sales = () => {
       setError("Please add items to cart");
       return;
     }
-
-    console.log("Payment validation:", {
-      totalPaid,
-      grandTotal,
-      cashPaid: posData.cashPaid,
-      bankPaid: posData.bankPaid,
-      cashPaidParsed: parseFloat(posData.cashPaid) || 0,
-      bankPaidParsed: parseFloat(posData.bankPaid) || 0,
-    });
 
     // Allow partial payment (due sales) - no minimum payment required
     // if (totalPaid < grandTotal) {
@@ -657,7 +660,7 @@ const Sales = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+              <label className="flex items-center justify-between text-sm font-medium text-gray-700 mb-1">
                 <span>Product Name</span>
                 <span className="text-xs text-gray-500 italic">
                   (Editable for custom items)

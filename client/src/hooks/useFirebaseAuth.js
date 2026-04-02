@@ -14,7 +14,7 @@ import {
  * Custom hook for Firebase Authentication
  * Provides authentication state and methods
  */
-export const useFirebaseAuth = () => {
+export const useAuth = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -165,4 +165,4 @@ export const useFirebaseAuth = () => {
   };
 };
 
-export default useFirebaseAuth;
+export default useAuth;

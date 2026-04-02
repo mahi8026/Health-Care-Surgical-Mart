@@ -1,5 +1,6 @@
 /**
  * Returns Routes - Multi-Tenant
+const { logger } = require('../config/logging');
  * Handles sale returns and refunds for medical stores
  */
 
@@ -372,7 +373,7 @@ router.post(
     } catch (error) {
       // If any operation fails, we should ideally rollback
       // For now, log the error and throw
-      console.error("Return processing error:", error);
+      logger.error("Return processing error:", error);
       throw createError.internalServerError("Failed to process return");
     }
   }),

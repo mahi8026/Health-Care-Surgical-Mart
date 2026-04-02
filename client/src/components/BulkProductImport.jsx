@@ -10,11 +10,6 @@ const BulkProductImport = ({ onClose, onSuccess }) => {
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
-    console.log("File selected:", {
-      name: selectedFile?.name,
-      type: selectedFile?.type,
-      size: selectedFile?.size,
-    });
 
     if (selectedFile) {
       const validTypes = [
@@ -33,9 +28,7 @@ const BulkProductImport = ({ onClose, onSuccess }) => {
       if (validTypes.includes(selectedFile.type) || hasValidExtension) {
         setFile(selectedFile);
         setErrors([]);
-        console.log("File accepted:", selectedFile.name);
       } else {
-        console.log("Invalid file type:", selectedFile.type);
         setErrors([
           `Please upload a valid CSV or Excel file. Current type: ${selectedFile.type}`,
         ]);
@@ -76,17 +69,8 @@ Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
     formData.append("file", file);
 
     // Debug FormData
-    console.log("FormData created:", {
-      hasFile: formData.has("file"),
-      fileFromFormData: formData.get("file"),
-    });
 
     try {
-      console.log("Starting bulk import:", {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-      });
 
       const response = await apiService.post(
         "/bulk-products/bulk-import",
@@ -97,12 +81,10 @@ Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
               (progressEvent.loaded * 100) / progressEvent.total,
             );
             setProgress(percentCompleted);
-            console.log("Upload progress:", percentCompleted + "%");
           },
         },
       );
 
-      console.log("Import response:", response);
 
       if (response.success) {
         setResults(response.data);

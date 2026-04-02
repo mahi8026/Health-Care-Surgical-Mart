@@ -1,5 +1,6 @@
 /**
  * Shop Manager
+const { logger } = require('../config/logging');
  * Handles shop creation, deletion, and management
  */
 
@@ -103,7 +104,7 @@ async function createShop(shopData, adminData, createdBy) {
       initialization: initResult,
     };
   } catch (error) {
-    console.error("Error creating shop:", error);
+    logger.error("Error creating shop:", error);
     throw error;
   }
 }
@@ -200,7 +201,7 @@ async function deleteShop(shopId) {
       deletedCount: result.deletedCount,
     };
   } catch (error) {
-    console.error("Error deleting shop:", error);
+    logger.error("Error deleting shop:", error);
     throw error;
   }
 }

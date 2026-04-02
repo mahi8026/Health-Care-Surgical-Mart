@@ -1,5 +1,6 @@
 /**
  * Stock Routes
+const { logger } = require('../config/logging');
  * Stock management and inventory operations
  */
 
@@ -38,12 +39,15 @@ router.get(
       matchQuery.isLowStock = true;
     }
 
+    // Get prefixed collection name for $lookup
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     // Build aggregation pipeline
     const pipeline = [
       { $match: matchQuery },
       {
         $lookup: {
-          from: "products",
+          from: productsCollectionName,
           localField: "productId",
           foreignField: "_id",
           as: "product",
@@ -82,7 +86,7 @@ router.get(
       { $match: matchQuery },
       {
         $lookup: {
-          from: "products",
+          from: productsCollectionName,
           localField: "productId",
           foreignField: "_id",
           as: "product",
@@ -135,13 +139,15 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     const lowStockItems = await shopDb
       .collection("stock")
       .aggregate([
         { $match: { isLowStock: true } },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "productId",
             foreignField: "_id",
             as: "product",
@@ -170,13 +176,15 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     const stockItem = await shopDb
       .collection("stock")
       .aggregate([
         { $match: { productId: new ObjectId(req.params.productId) } },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "productId",
             foreignField: "_id",
             as: "product",
@@ -305,13 +313,16 @@ router.get(
       matchQuery.productId = new ObjectId(productId);
     }
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+    const usersCollectionName = shopDb.getCollectionName("users");
+
     const adjustments = await shopDb
       .collection("stock_adjustments")
       .aggregate([
         { $match: matchQuery },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "productId",
             foreignField: "_id",
             as: "product",
@@ -320,7 +331,7 @@ router.get(
         { $unwind: "$product" },
         {
           $lookup: {
-            from: "users",
+            from: usersCollectionName,
             localField: "adjustedBy",
             foreignField: "_id",
             as: "adjustedByUser",

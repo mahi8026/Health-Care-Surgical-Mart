@@ -1,5 +1,6 @@
 /**
  * Financial Reports Routes
+const { logger } = require('../config/logging');
  * Handles P&L, financial analytics, and business intelligence
  */
 
@@ -82,6 +83,7 @@ router.get(
         },
       ])
       .toArray();
+    const productsCollectionName = shopDb.getCollectionName("products");
 
     // Cost of Goods Sold (COGS)
     const cogs = await shopDb
@@ -96,7 +98,7 @@ router.get(
         { $unwind: "$items" },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "items.productId",
             foreignField: "_id",
             as: "product",
@@ -129,7 +131,7 @@ router.get(
         { $unwind: "$items" },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "items.productId",
             foreignField: "_id",
             as: "product",
@@ -184,6 +186,9 @@ router.get(
       ])
       .toArray();
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+
     // Expense breakdown by category
     const expensesByCategory = await shopDb
       .collection("expenses")
@@ -195,7 +200,7 @@ router.get(
         },
         {
           $lookup: {
-            from: "expenseCategories",
+            from: expenseCategoriesCollectionName,
             localField: "categoryId",
             foreignField: "_id",
             as: "category",
@@ -380,6 +385,9 @@ router.get(
       ])
       .toArray();
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+
     // Top expense categories today
     const topExpenseCategories = await shopDb
       .collection("expenses")
@@ -391,7 +399,7 @@ router.get(
         },
         {
           $lookup: {
-            from: "expenseCategories",
+            from: expenseCategoriesCollectionName,
             localField: "categoryId",
             foreignField: "_id",
             as: "category",
@@ -530,6 +538,8 @@ router.get(
       ? new Date(endDate)
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     // Product profitability analysis
     const productProfitability = await shopDb
       .collection("sales")
@@ -543,7 +553,7 @@ router.get(
         { $unwind: "$items" },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "items.productId",
             foreignField: "_id",
             as: "product",
@@ -619,7 +629,7 @@ router.get(
         { $unwind: "$items" },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "items.productId",
             foreignField: "_id",
             as: "product",

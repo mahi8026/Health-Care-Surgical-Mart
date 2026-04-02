@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { apiService } from "../services/api";
-import { useFirebaseAuth as useAuth } from "../contexts/FirebaseAuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "./LoadingSpinner";
 
 const UserManagement = () => {

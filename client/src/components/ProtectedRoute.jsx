@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useFirebaseAuth as useAuth } from "../contexts/FirebaseAuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "./LoadingSpinner";
 import {
   hasPermission,

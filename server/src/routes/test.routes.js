@@ -1,5 +1,6 @@
 /**
  * Test Routes - Simple endpoints without authentication for testing
+const { logger } = require('../config/logging');
  */
 
 const express = require("express");
@@ -546,12 +547,6 @@ router.post("/sales", async (req, res) => {
       notes,
     } = req.body;
 
-    console.log("Test sale request:", {
-      invoiceNumber,
-      itemsCount: items?.length,
-      grandTotal,
-      customer: customer?.name,
-    });
 
     // Basic validation
     if (!items || items.length === 0) {
@@ -604,11 +599,6 @@ router.post("/sales", async (req, res) => {
       createdAt: new Date(),
     };
 
-    console.log("Mock sale created:", {
-      invoiceNo: sale.invoiceNo,
-      grandTotal: sale.grandTotal,
-      itemsCount: sale.items.length,
-    });
 
     // Simulate successful sale creation
     res.status(201).json({
@@ -632,7 +622,7 @@ router.post("/sales", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Test sale error:", error);
+    logger.error("Test sale error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to create sale",
@@ -670,11 +660,6 @@ router.post("/customers", async (req, res) => {
       updatedAt: new Date(),
     };
 
-    console.log("Mock customer created:", {
-      name: customer.name,
-      phone: customer.phone,
-      type: customer.type,
-    });
 
     res.status(201).json({
       success: true,
@@ -682,7 +667,7 @@ router.post("/customers", async (req, res) => {
       data: customer,
     });
   } catch (error) {
-    console.error("Test customer creation error:", error);
+    logger.error("Test customer creation error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to create customer",

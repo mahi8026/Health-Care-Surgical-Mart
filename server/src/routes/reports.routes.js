@@ -1,5 +1,6 @@
 /**
  * Reports Routes - Multi-Tenant
+const { logger } = require('../config/logging');
  * Handles dashboard and reporting functionality
  */
 
@@ -104,6 +105,8 @@ router.get(
       .collection("products")
       .countDocuments({ isActive: true });
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     // Get low stock products
     const lowStockProducts = await shopDb
       .collection("stock")
@@ -115,7 +118,7 @@ router.get(
         },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "productId",
             foreignField: "_id",
             as: "product",
@@ -241,6 +244,9 @@ router.get(
       ])
       .toArray();
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+
     // Get top expense categories (current month)
     const topExpenseCategories = await shopDb
       .collection("expenses")
@@ -252,7 +258,7 @@ router.get(
         },
         {
           $lookup: {
-            from: "expenseCategories",
+            from: expenseCategoriesCollectionName,
             localField: "categoryId",
             foreignField: "_id",
             as: "category",
@@ -340,12 +346,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     const stockValuation = await shopDb
       .collection("stock")
       .aggregate([
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "productId",
             foreignField: "_id",
             as: "product",
@@ -427,10 +435,12 @@ router.get(
       matchStage.isLowStock = true;
     }
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     const pipeline = [
       {
         $lookup: {
-          from: "products",
+          from: productsCollectionName,
           localField: "productId",
           foreignField: "_id",
           as: "product",
@@ -501,10 +511,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     const pipeline = [
       {
         $lookup: {
-          from: "products",
+          from: productsCollectionName,
           localField: "productId",
           foreignField: "_id",
           as: "product",
@@ -697,6 +709,8 @@ router.get(
       ])
       .toArray();
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     // Get COGS (Cost of Goods Sold)
     const cogsData = await shopDb
       .collection("sales")
@@ -712,7 +726,7 @@ router.get(
         { $unwind: "$items" },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "items.productId",
             foreignField: "_id",
             as: "product",
@@ -938,6 +952,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const productsCollectionName = shopDb.getCollectionName("products");
+
     // Get product profitability
     const products = await shopDb
       .collection("sales")
@@ -946,7 +962,7 @@ router.get(
         { $unwind: "$items" },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "items.productId",
             foreignField: "_id",
             as: "product",
@@ -1009,7 +1025,7 @@ router.get(
         { $unwind: "$items" },
         {
           $lookup: {
-            from: "products",
+            from: productsCollectionName,
             localField: "items.productId",
             foreignField: "_id",
             as: "product",

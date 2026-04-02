@@ -1,5 +1,6 @@
 /**
  * Categories Routes - Multi-Tenant
+const { logger } = require('../config/logging');
  * Handles product categories
  */
 
@@ -53,7 +54,7 @@ router.get(
         data: categories,
       });
     } catch (error) {
-      console.error("Get categories error:", error);
+      logger.error("Get categories error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to fetch categories",

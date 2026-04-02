@@ -1,5 +1,6 @@
 /**
  * Super Admin Routes
+const { logger } = require('../config/logging');
  * Routes for system-wide shop management
  */
 
@@ -49,7 +50,7 @@ router.post("/shops", async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error("Create shop error:", error);
+    logger.error("Create shop error:", error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to create shop",
@@ -77,7 +78,7 @@ router.get("/shops", async (req, res) => {
       data: shops,
     });
   } catch (error) {
-    console.error("List shops error:", error);
+    logger.error("List shops error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to list shops",
@@ -105,7 +106,7 @@ router.get("/shops/:shopId", async (req, res) => {
       data: shop,
     });
   } catch (error) {
-    console.error("Get shop error:", error);
+    logger.error("Get shop error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to get shop details",
@@ -142,7 +143,7 @@ router.patch("/shops/:shopId/status", async (req, res) => {
       message: `Shop status updated to ${status}`,
     });
   } catch (error) {
-    console.error("Update shop status error:", error);
+    logger.error("Update shop status error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update shop status",
@@ -163,7 +164,7 @@ router.delete("/shops/:shopId", async (req, res) => {
       message: result.message,
     });
   } catch (error) {
-    console.error("Delete shop error:", error);
+    logger.error("Delete shop error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to delete shop",
@@ -184,7 +185,7 @@ router.get("/shops/:shopId/stats", async (req, res) => {
       data: stats,
     });
   } catch (error) {
-    console.error("Get shop stats error:", error);
+    logger.error("Get shop stats error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to get shop statistics",
@@ -206,7 +207,7 @@ router.get("/database-list", async (req, res) => {
       data: databases,
     });
   } catch (error) {
-    console.error("List databases error:", error);
+    logger.error("List databases error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to list databases",

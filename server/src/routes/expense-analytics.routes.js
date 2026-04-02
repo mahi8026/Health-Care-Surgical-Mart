@@ -1,5 +1,6 @@
 /**
  * Expense Analytics Routes
+const { logger } = require('../config/logging');
  * Handles expense analytics, insights, and forecasting
  */
 
@@ -173,6 +174,9 @@ router.get(
       ? new Date(endDate)
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+
     // Category distribution aggregation
     const distribution = await shopDb
       .collection("expenses")
@@ -184,7 +188,7 @@ router.get(
         },
         {
           $lookup: {
-            from: "expenseCategories",
+            from: expenseCategoriesCollectionName,
             localField: "categoryId",
             foreignField: "_id",
             as: "category",
@@ -453,6 +457,9 @@ router.get(
       ])
       .toArray();
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+
     // Get expense breakdown by category
     const expensesByCategory = await shopDb
       .collection("expenses")
@@ -464,7 +471,7 @@ router.get(
         },
         {
           $lookup: {
-            from: "expenseCategories",
+            from: expenseCategoriesCollectionName,
             localField: "categoryId",
             foreignField: "_id",
             as: "category",
@@ -824,6 +831,9 @@ router.get(
       ? new Date(endDate)
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+
     // Get top categories with detailed analytics
     const topCategories = await shopDb
       .collection("expenses")
@@ -835,7 +845,7 @@ router.get(
         },
         {
           $lookup: {
-            from: "expenseCategories",
+            from: expenseCategoriesCollectionName,
             localField: "categoryId",
             foreignField: "_id",
             as: "category",

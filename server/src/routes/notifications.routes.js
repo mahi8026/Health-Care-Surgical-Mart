@@ -1,5 +1,6 @@
 /**
  * Notifications Routes
+const { logger } = require('../config/logging');
  * API endpoints for sending notifications
  */
 
@@ -169,13 +170,15 @@ router.post(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const stockCollectionName = shopDb.getCollectionName("stock");
+
     // Get low stock products
     const products = await shopDb
       .collection("products")
       .aggregate([
         {
           $lookup: {
-            from: "stock",
+            from: stockCollectionName,
             localField: "_id",
             foreignField: "productId",
             as: "stockInfo",

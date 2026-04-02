@@ -1,5 +1,6 @@
 /**
  * Users Routes - Multi-Tenant
+const { logger } = require('../config/logging');
  * Handles user management within shops
  */
 

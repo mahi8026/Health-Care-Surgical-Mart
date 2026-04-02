@@ -1,5 +1,6 @@
 /**
  * Sales Routes - Multi-Tenant
+const { logger } = require('../config/logging');
  * Handles sales/POS operations for shops
  */
 
@@ -41,14 +42,6 @@ router.post(
         notes,
       } = req.body;
 
-      console.log("Sale request data:", {
-        invoiceNumber,
-        itemsCount: items?.length,
-        grandTotal,
-        userId: req.user?._id,
-        fullRequestBody: JSON.stringify(req.body, null, 2),
-      });
-
       // Validate required fields
       if (!items || items.length === 0) {
         return res.status(400).json({
@@ -89,16 +82,17 @@ router.post(
           });
         }
 
-        // Check stock availability
+        // Check stock availability - WARNING ONLY, don't block sale
         const stock = await req.shopDb.collection("stock").findOne({
           productId: new ObjectId(item.productId),
         });
 
+        // Log warning if insufficient stock but allow sale
         if (!stock || stock.currentQty < item.quantity) {
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for ${product.name}. Available: ${stock?.currentQty || 0}`,
-          });
+          logger.warn(
+            `Warning: Insufficient stock for ${product.name}. Available: ${stock?.currentQty || 0}, Requested: ${item.quantity}`,
+          );
+          // Don't block the sale - useful for services, pre-orders, etc.
         }
 
         enrichedItems.push({
@@ -140,13 +134,6 @@ router.post(
         createdAt: new Date(),
       };
 
-      console.log("Processed sale data:", {
-        invoiceNo: sale.invoiceNo,
-        itemsCount: sale.items.length,
-        grandTotal: sale.grandTotal,
-        createdBy: sale.createdBy,
-      });
-
       // Insert sale (temporarily bypass validation for debugging)
       const result = await req.shopDb.collection("sales").insertOne(sale, {
         bypassDocumentValidation: true,
@@ -154,19 +141,49 @@ router.post(
 
       // Update stock quantities
       for (const item of enrichedItems) {
-        await req.shopDb.collection("stock").updateOne(
-          { productId: item.productId },
-          {
-            $inc: {
-              currentQty: -item.qty,
-              availableQty: -item.qty,
+        // Check if stock record exists
+        const existingStock = await req.shopDb.collection("stock").findOne({
+          productId: item.productId,
+        });
+
+        if (existingStock) {
+          // Update existing stock
+          await req.shopDb.collection("stock").updateOne(
+            { productId: item.productId },
+            {
+              $inc: {
+                currentQty: -item.qty,
+                availableQty: -item.qty,
+              },
+              $set: {
+                lastUpdated: new Date(),
+                lastSaleDate: new Date(),
+              },
             },
-            $set: {
-              lastUpdated: new Date(),
-              lastSaleDate: new Date(),
-            },
-          },
-        );
+          );
+        } else {
+          // Create stock record with negative quantity (indicates sold before stock was added)
+          const product = await req.shopDb.collection("products").findOne({
+            _id: item.productId,
+          });
+
+          await req.shopDb.collection("stock").insertOne({
+            productId: item.productId,
+            productName: product?.name || item.name,
+            currentQty: -item.qty, // Negative indicates oversold
+            reservedQty: 0,
+            availableQty: -item.qty,
+            minStockLevel: product?.minStockLevel || 0,
+            isLowStock: true,
+            lastUpdated: new Date(),
+            lastSaleDate: new Date(),
+            createdAt: new Date(),
+          });
+
+          logger.warn(
+            `Created stock record for ${item.name} with negative quantity: -${item.qty}`,
+          );
+        }
 
         // Check if stock is now low
         const updatedStock = await req.shopDb.collection("stock").findOne({
@@ -195,12 +212,12 @@ router.post(
           if (customerData) {
             notificationService
               .sendSaleConfirmation(sale, customerData, settings || {})
-              .catch((err) => console.error("Notification error:", err));
+              .catch((err) => logger.error("Notification error:", err));
           }
         }
       } catch (notifError) {
         // Don't fail the sale if notification fails
-        console.error("Failed to send notification:", notifError);
+        logger.error("Failed to send notification:", notifError);
       }
 
       res.status(201).json({
@@ -214,16 +231,16 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Create sale error:", error);
+      logger.error("Create sale error:", error);
 
       // Log the sale data that failed for debugging
       if (typeof sale !== "undefined") {
-        console.error("Sale data that failed:", JSON.stringify(sale, null, 2));
+        logger.error("Sale data that failed:", JSON.stringify(sale, null, 2));
       }
 
       // Log specific validation errors
       if (error.code === 121) {
-        console.error(
+        logger.error(
           "Schema validation failed. Error details:",
           error.errInfo?.details,
         );
@@ -269,7 +286,7 @@ router.get("/", requirePermission(PERMISSIONS.VIEW_SALES), async (req, res) => {
       data: sales,
     });
   } catch (error) {
-    console.error("Get sales error:", error);
+    logger.error("Get sales error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch sales",
@@ -302,7 +319,7 @@ router.get(
         data: sale,
       });
     } catch (error) {
-      console.error("Get sale error:", error);
+      logger.error("Get sale error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to fetch sale",

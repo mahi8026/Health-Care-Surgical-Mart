@@ -1,5 +1,6 @@
 /**
  * Recurring Expenses Routes
+const { logger } = require('../config/logging');
  * Management of recurring expense templates and processing
  */
 

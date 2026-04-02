@@ -1,5 +1,6 @@
 /**
  * Expenses Routes
+const { logger } = require('../config/logging');
  * CRUD operations for expense management
  */
 
@@ -107,11 +108,15 @@ router.get(
       matchQuery.isRecurring = isRecurring === "true";
     }
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+    const usersCollectionName = shopDb.getCollectionName("users");
+
     const pipeline = [
       { $match: matchQuery },
       {
         $lookup: {
-          from: "expenseCategories",
+          from: expenseCategoriesCollectionName,
           localField: "categoryId",
           foreignField: "_id",
           as: "category",
@@ -120,7 +125,7 @@ router.get(
       { $unwind: "$category" },
       {
         $lookup: {
-          from: "users",
+          from: usersCollectionName,
           localField: "createdBy",
           foreignField: "_id",
           as: "createdByUser",
@@ -347,13 +352,17 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    const expenseCategoriesCollectionName =
+      shopDb.getCollectionName("expenseCategories");
+    const usersCollectionName = shopDb.getCollectionName("users");
+
     const expense = await shopDb
       .collection("expenses")
       .aggregate([
         { $match: { _id: new ObjectId(req.params.id) } },
         {
           $lookup: {
-            from: "expenseCategories",
+            from: expenseCategoriesCollectionName,
             localField: "categoryId",
             foreignField: "_id",
             as: "category",
@@ -362,7 +371,7 @@ router.get(
         { $unwind: "$category" },
         {
           $lookup: {
-            from: "users",
+            from: usersCollectionName,
             localField: "createdBy",
             foreignField: "_id",
             as: "createdByUser",
