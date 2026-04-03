@@ -7,13 +7,7 @@
 // TEMPORARY: Hardcode for debugging - will revert after confirming it works
 const API_BASE_URL_TEMP = 'https://health-care-surgical-mart.onrender.com/api';
 
-console.log('=== CONSTANTS DEBUG ===');
-console.log('Using hardcoded URL:', API_BASE_URL_TEMP);
-console.log('=======================');
-
 export const API_CONFIG = {
-  // In development: use Vite proxy (/api)
-  // In production: use environment variable (full backend URL)
   BASE_URL: API_BASE_URL_TEMP,
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
