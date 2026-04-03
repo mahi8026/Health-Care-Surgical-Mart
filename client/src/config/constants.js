@@ -4,12 +4,19 @@
  */
 
 // API Configuration
+// TEMPORARY: Hardcode for debugging
+const API_BASE_URL_TEMP = 'https://health-care-surgical-mart.onrender.com/api';
+
+console.log('=== CONSTANTS DEBUG ===');
+console.log('Environment Mode:', import.meta.env.MODE);
+console.log('VITE_API_URL from env:', import.meta.env.VITE_API_URL);
+console.log('Using hardcoded URL:', API_BASE_URL_TEMP);
+console.log('=======================');
+
 export const API_CONFIG = {
   // In development: use Vite proxy (/api)
   // In production: use environment variable (full backend URL)
-  BASE_URL: import.meta.env.VITE_API_URL 
-    ? `${import.meta.env.VITE_API_URL}/api`
-    : "/api",
+  BASE_URL: API_BASE_URL_TEMP,
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
 };

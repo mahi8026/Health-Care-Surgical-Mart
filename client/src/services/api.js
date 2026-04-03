@@ -1,7 +1,12 @@
-// Use environment variable for API URL, fallback to /api for development
-const API_BASE_URL = import.meta.env.VITE_API_URL 
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : "/api";
+// TEMPORARY: Hardcode for debugging
+const API_BASE_URL = 'https://health-care-surgical-mart.onrender.com/api';
+
+// Debug logging
+console.log('=== API SERVICE DEBUG ===');
+console.log('Environment Mode:', import.meta.env.MODE);
+console.log('VITE_API_URL from env:', import.meta.env.VITE_API_URL);
+console.log('Using API_BASE_URL:', API_BASE_URL);
+console.log('========================');
 
 class ApiService {
   constructor() {
