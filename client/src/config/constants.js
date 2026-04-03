@@ -7,7 +7,9 @@
 export const API_CONFIG = {
   // In development: use Vite proxy (/api)
   // In production: use environment variable (full backend URL)
-  BASE_URL: import.meta.env.VITE_API_URL || "/api",
+  BASE_URL: import.meta.env.VITE_API_URL 
+    ? `${import.meta.env.VITE_API_URL}/api`
+    : "/api",
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
 };
