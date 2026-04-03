@@ -6,9 +6,21 @@ class MSG91Adapter {
     this.apiKey = process.env.MSG91_API_KEY;
     this.senderId = process.env.MSG91_SENDER_ID;
     this.baseURL = "https://api.msg91.com/api";
+    
+    if (!this.apiKey || !this.senderId) {
+      console.warn('MSG91 SMS provider not configured. Please set MSG91_API_KEY and MSG91_SENDER_ID in .env');
+    }
   }
 
   async sendSMS(to, message, options = {}) {
+    if (!this.apiKey || !this.senderId) {
+      return {
+        success: false,
+        error: "MSG91 SMS provider is not configured. Please set MSG91_API_KEY and MSG91_SENDER_ID in your environment variables.",
+        provider: "msg91",
+      };
+    }
+
     try {
       const response = await axios.post(`${this.baseURL}/sendhttp.php`, {
         authkey: this.apiKey,

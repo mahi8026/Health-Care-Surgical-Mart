@@ -3,14 +3,27 @@ const twilio = require("twilio");
 
 class TwilioAdapter {
   constructor() {
-    this.client = twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN,
-    );
+    this.accountSid = process.env.TWILIO_ACCOUNT_SID;
+    this.authToken = process.env.TWILIO_AUTH_TOKEN;
     this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    
+    if (!this.accountSid || !this.authToken || !this.fromNumber) {
+      console.warn('Twilio SMS provider not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in .env');
+      this.client = null;
+    } else {
+      this.client = twilio(this.accountSid, this.authToken);
+    }
   }
 
   async sendSMS(to, message, options = {}) {
+    if (!this.client) {
+      return {
+        success: false,
+        error: "Twilio SMS provider is not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in your environment variables.",
+        provider: "twilio",
+      };
+    }
+
     try {
       const result = await this.client.messages.create({
         body: message,

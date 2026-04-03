@@ -28,13 +28,21 @@ router.post(
       });
     }
 
-    const result = await SMSService.sendTransactionalSMS(
-      to,
-      templateName,
-      variables || {},
-    );
+    try {
+      const result = await SMSService.sendTransactionalSMS(
+        to,
+        templateName,
+        variables || {},
+      );
 
-    res.json({ success: true, data: result });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      // Return a user-friendly error message
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send SMS",
+      });
+    }
   }),
 );
 

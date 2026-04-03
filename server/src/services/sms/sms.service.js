@@ -110,6 +110,11 @@ class SMSService {
 
     const result = await adapter.sendSMS(to, message, options);
 
+    // If SMS failed, throw an error with the provider's error message
+    if (!result.success) {
+      throw new Error(result.error || 'SMS sending failed');
+    }
+
     await this.logSMS({
       recipient: to,
       message,

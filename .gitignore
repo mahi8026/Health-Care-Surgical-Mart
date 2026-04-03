@@ -300,6 +300,9 @@ QUICK_*.md
 .vercel
 .netlify
 .firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
 .serverless/
 .fusebox/
 .dynamodb/
