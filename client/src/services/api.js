@@ -1,8 +1,12 @@
-const API_BASE_URL = "/api";
+// Use environment variable for API URL, fallback to /api for development
+const API_BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : "/api";
 
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
+    console.log('API Service initialized with base URL:', this.baseURL);
   }
 
   async request(endpoint, options = {}) {
