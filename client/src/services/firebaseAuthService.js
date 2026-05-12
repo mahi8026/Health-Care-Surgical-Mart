@@ -47,7 +47,9 @@ export const signUpWithEmail = async (email, password, displayName = null) => {
       message: "Account created successfully. Please verify your email.",
     };
   } catch (error) {
-    console.error("Sign up error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Sign up error:", error);
+    }
     return {
       success: false,
       error: error.code,
@@ -76,7 +78,9 @@ export const signInWithEmail = async (email, password) => {
       message: "Signed in successfully",
     };
   } catch (error) {
-    console.error("Sign in error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Sign in error:", error);
+    }
     return {
       success: false,
       error: error.code,
@@ -97,7 +101,9 @@ export const signOutUser = async () => {
       message: "Signed out successfully",
     };
   } catch (error) {
-    console.error("Sign out error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Sign out error:", error);
+    }
     return {
       success: false,
       error: error.code,
@@ -119,7 +125,9 @@ export const resetPassword = async (email) => {
       message: "Password reset email sent. Please check your inbox.",
     };
   } catch (error) {
-    console.error("Password reset error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Password reset error:", error);
+    }
     return {
       success: false,
       error: error.code,
@@ -156,7 +164,9 @@ export const changePassword = async (currentPassword, newPassword) => {
       message: "Password updated successfully",
     };
   } catch (error) {
-    console.error("Change password error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Change password error:", error);
+    }
     return {
       success: false,
       error: error.code,
@@ -184,7 +194,9 @@ export const updateUserProfile = async (profileData) => {
       message: "Profile updated successfully",
     };
   } catch (error) {
-    console.error("Update profile error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Update profile error:", error);
+    }
     return {
       success: false,
       error: error.code,
@@ -211,7 +223,9 @@ export const sendVerificationEmail = async () => {
       message: "Verification email sent. Please check your inbox.",
     };
   } catch (error) {
-    console.error("Send verification email error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Send verification email error:", error);
+    }
     return {
       success: false,
       error: error.code,
@@ -248,7 +262,9 @@ export const getUserToken = async () => {
     const token = await user.getIdToken();
     return token;
   } catch (error) {
-    console.error("Get token error:", error);
+    if (import.meta.env.DEV) {
+      console.error("Get token error:", error);
+    }
     return null;
   }
 };

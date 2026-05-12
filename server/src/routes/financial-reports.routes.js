@@ -1,6 +1,5 @@
 /**
  * Financial Reports Routes
-const { logger } = require('../config/logging');
  * Handles P&L, financial analytics, and business intelligence
  */
 
@@ -15,10 +14,206 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
+const { cacheResponse, queryHash } = require("../middleware/cache.middleware");
+const { TTL } = require("../services/cache.service");
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/financial-reports/profit-loss:
+ *   get:
+ *     summary: Get Profit & Loss statement
+ *     description: Retrieve P&L report with revenue, cost of goods, gross profit, expenses, and net profit for a date range. Requires reports.profit permission.
+ *     tags: [Financial Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *         example: "2026-05-01"
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *         example: "2026-05-31"
+ *       - in: query
+ *         name: period
+ *         schema: { type: string, enum: [daily, weekly, monthly], default: daily }
+ *     responses:
+ *       200:
+ *         description: P&L report retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     revenue: { type: number, example: 500000.00 }
+ *                     costOfGoods: { type: number, example: 300000.00 }
+ *                     grossProfit: { type: number, example: 200000.00 }
+ *                     expenses: { type: number, example: 50000.00 }
+ *                     netProfit: { type: number, example: 150000.00 }
+ *                     grossMargin: { type: number, example: 40.0 }
+ *                     netMargin: { type: number, example: 30.0 }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/financial-reports/daily-summary:
+ *   get:
+ *     summary: Get daily financial summary
+ *     description: Retrieve daily sales, purchases, expenses, and profit summary. Requires reports.view permission.
+ *     tags: [Financial Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         schema: { type: string, format: date }
+ *         example: "2026-05-10"
+ *     responses:
+ *       200:
+ *         description: Daily summary retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     date: { type: string, format: date }
+ *                     totalSales: { type: number }
+ *                     totalPurchases: { type: number }
+ *                     totalExpenses: { type: number }
+ *                     netProfit: { type: number }
+ *                     transactionCount: { type: integer }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/financial-reports/product-profitability:
+ *   get:
+ *     summary: Get product profitability report
+ *     description: Retrieve profitability analysis per product including revenue, cost, and margin. Requires reports.profit permission.
+ *     tags: [Financial Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *         description: Number of top products to return
+ *     responses:
+ *       200:
+ *         description: Product profitability retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       productId: { type: string }
+ *                       productName: { type: string }
+ *                       revenue: { type: number }
+ *                       cost: { type: number }
+ *                       profit: { type: number }
+ *                       margin: { type: number }
+ *                       unitsSold: { type: integer }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/financial-reports/return-analysis:
+ *   get:
+ *     summary: Get return analysis report
+ *     description: Retrieve analysis of product returns including return rates and refund amounts. Requires reports.view permission.
+ *     tags: [Financial Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Return analysis retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalReturns: { type: integer }
+ *                     totalRefundAmount: { type: number }
+ *                     returnRate: { type: number }
+ *                     byReason: { type: array, items: { type: object } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/financial-reports/cash-flow:
+ *   get:
+ *     summary: Get cash flow report
+ *     description: Retrieve cash inflows (sales) and outflows (purchases, expenses) for a period. Requires reports.profit permission.
+ *     tags: [Financial Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: period
+ *         schema: { type: string, enum: [daily, weekly, monthly], default: daily }
+ *     responses:
+ *       200:
+ *         description: Cash flow report retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     inflows: { type: number }
+ *                     outflows: { type: number }
+ *                     netCashFlow: { type: number }
+ *                     timeline: { type: array, items: { type: object } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/financial-reports/profit-loss
@@ -27,6 +222,7 @@ router.use(checkShopStatus);
 router.get(
   "/profit-loss",
   requirePermission(PERMISSIONS.VIEW_PROFIT_REPORT),
+  cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:profit-loss:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { startDate, endDate, period = "daily" } = req.query;
@@ -286,6 +482,7 @@ router.get(
 router.get(
   "/daily-summary",
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
+  cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:daily-summary:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { date } = req.query;
@@ -526,6 +723,7 @@ router.get(
 router.get(
   "/product-profitability",
   requirePermission(PERMISSIONS.VIEW_PROFIT_REPORT),
+  cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:product-profitability:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { startDate, endDate, limit = 20 } = req.query;
@@ -703,6 +901,7 @@ router.get(
 router.get(
   "/return-analysis",
   requirePermission(PERMISSIONS.VIEW_RETURNS),
+  cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:return-analysis:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { startDate, endDate } = req.query;
@@ -865,6 +1064,7 @@ router.get(
 router.get(
   "/cash-flow",
   requirePermission(PERMISSIONS.VIEW_PROFIT_REPORT),
+  cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:cash-flow:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { startDate, endDate } = req.query;

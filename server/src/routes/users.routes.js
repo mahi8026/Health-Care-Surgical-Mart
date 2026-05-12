@@ -1,6 +1,5 @@
 /**
  * Users Routes - Multi-Tenant
-const { logger } = require('../config/logging');
  * Handles user management within shops
  */
 
@@ -16,10 +15,251 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
+const auditLog = require("../services/audit-log.service");
+const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+const { cacheService } = require("../services/cache.service");
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get all users in the shop
+ *     description: Retrieve all user accounts for the authenticated shop. Passwords are excluded. Requires users.view permission.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/User' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   post:
+ *     summary: Create new user
+ *     description: Create a new user account in the shop. Requires users.create permission.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, email, password, role]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Ahmed Rahman"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "ahmed@shop.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *                 example: "SecurePass123"
+ *               role:
+ *                 type: string
+ *                 enum: [ADMIN, MANAGER, CASHIER]
+ *                 example: "CASHIER"
+ *               permissions:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Additional permissions beyond role defaults
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "User created successfully" }
+ *                 data: { $ref: '#/components/schemas/User' }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       409:
+ *         description: Email already in use
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get user by ID
+ *     description: Retrieve a specific user's details. Requires users.view permission.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: User retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/User' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update user
+ *     description: Update a user's profile, role, or permissions. Requires users.edit permission.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               role: { type: string, enum: [ADMIN, MANAGER, CASHIER] }
+ *               permissions: { type: array, items: { type: string } }
+ *               isActive: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "User updated successfully" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   delete:
+ *     summary: Delete user
+ *     description: Delete a user account from the shop. Requires users.delete permission.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "User deleted successfully" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/users/{id}/reset-password:
+ *   put:
+ *     summary: Reset user password
+ *     description: Reset a user's password (admin action). Requires users.edit permission.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newPassword]
+ *             properties:
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *                 example: "NewSecurePass456"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Password reset successfully" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/users/permissions/list:
+ *   get:
+ *     summary: Get all available permissions
+ *     description: Retrieve the full list of RBAC permissions available in the system. Requires users.view permission.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Permissions list retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items: { type: string }
+ *                   example: ["sales.create", "products.read", "customers.manage"]
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/users
@@ -141,6 +381,12 @@ router.post(
     const { password: _, ...userResponse } = userData;
     userResponse._id = result.insertedId;
 
+    // Audit: user created
+    auditLog.log(req, AUDIT_ACTIONS.USER_CREATED, "user", result.insertedId.toString(),
+      `Created user ${email} with role ${role}`,
+      { after: { name, email, role, shopId: req.user.shopId } }
+    );
+
     res.status(201).json({
       success: true,
       message: "User created successfully",
@@ -217,6 +463,23 @@ router.put(
       .collection("users")
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
+    // Audit: user updated (role change gets its own action)
+    const action = role && role !== existingUser.role
+      ? AUDIT_ACTIONS.ROLE_CHANGED
+      : AUDIT_ACTIONS.USER_UPDATED;
+    auditLog.log(req, action, "user", req.params.id,
+      action === AUDIT_ACTIONS.ROLE_CHANGED
+        ? `Changed role of ${existingUser.email} from ${existingUser.role} to ${role}`
+        : `Updated user ${existingUser.email}`,
+      {
+        before: { name: existingUser.name, email: existingUser.email, role: existingUser.role, isActive: existingUser.isActive },
+        after: updateData,
+      }
+    );
+
+    // Invalidate this user's permissions cache (role/permissions may have changed)
+    cacheService.invalidateShopCache(req.user.shopId, "permissions", req.params.id);
+
     res.json({
       success: true,
       message: "User updated successfully",
@@ -262,6 +525,15 @@ router.delete(
     await shopDb
       .collection("users")
       .deleteOne({ _id: new ObjectId(req.params.id) });
+
+    // Audit: user deleted
+    auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, "user", req.params.id,
+      `Deleted user ${user.email}`,
+      { before: { name: user.name, email: user.email, role: user.role } }
+    );
+
+    // Invalidate this user's permissions cache
+    cacheService.invalidateShopCache(req.user.shopId, "permissions", req.params.id);
 
     res.json({
       success: true,

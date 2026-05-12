@@ -1,6 +1,5 @@
 /**
  * Purchases Routes
-const { logger } = require('../config/logging');
  * Purchase order management and inventory receiving
  */
 
@@ -15,6 +14,210 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
+const { cacheService } = require("../services/cache.service");
+
+/**
+ * @swagger
+ * /api/purchases:
+ *   get:
+ *     summary: Get all purchase orders
+ *     description: Retrieve paginated list of purchase orders with supplier details. Requires purchases.view permission.
+ *     tags: [Purchases]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: supplierId
+ *         schema: { type: string }
+ *         description: Filter by supplier ID
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [pending, received, cancelled] }
+ *     responses:
+ *       200:
+ *         description: Purchases retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Purchase' }
+ *                 pagination: { $ref: '#/components/schemas/PaginationMeta' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   post:
+ *     summary: Create new purchase order
+ *     description: Create a purchase order from a supplier. Requires purchases.create permission.
+ *     tags: [Purchases]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [supplierId, items]
+ *             properties:
+ *               supplierId:
+ *                 type: string
+ *                 example: "507f1f77bcf86cd799439011"
+ *               items:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required: [productId, quantity, costPrice]
+ *                   properties:
+ *                     productId: { type: string }
+ *                     quantity: { type: integer, minimum: 1 }
+ *                     costPrice: { type: number, minimum: 0 }
+ *               notes:
+ *                 type: string
+ *           example:
+ *             supplierId: "507f1f77bcf86cd799439011"
+ *             items:
+ *               - productId: "507f1f77bcf86cd799439012"
+ *                 quantity: 100
+ *                 costPrice: 10.50
+ *             notes: "Urgent order"
+ *     responses:
+ *       201:
+ *         description: Purchase order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Purchase order created successfully" }
+ *                 data: { $ref: '#/components/schemas/Purchase' }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/purchases/{id}:
+ *   get:
+ *     summary: Get purchase order by ID
+ *     description: Retrieve a specific purchase order with full item details. Requires purchases.view permission.
+ *     tags: [Purchases]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Purchase retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Purchase' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update purchase order
+ *     description: Update purchase order details. Requires purchases.edit permission.
+ *     tags: [Purchases]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               items: { type: array }
+ *               notes: { type: string }
+ *     responses:
+ *       200:
+ *         description: Purchase updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Purchase updated successfully" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/purchases/{id}/receive:
+ *   put:
+ *     summary: Mark purchase as received
+ *     description: Mark a purchase order as received and automatically update stock levels. Requires purchases.receive permission.
+ *     tags: [Purchases]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               receivedDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-05-10"
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Purchase marked as received, stock updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Purchase received and stock updated" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 // Helper function to handle ObjectId conversion for both MongoDB and mock database
 function toObjectId(id) {
@@ -302,6 +505,9 @@ router.post(
 
     const result = await shopDb.collection("purchases").insertOne(purchaseData);
 
+    // Invalidate financial reports cache (purchase affects cash-flow, P&L)
+    cacheService.invalidateShopCache(req.user.shopId, "reports");
+
     res.status(201).json({
       success: true,
       message: "Purchase order created successfully",
@@ -420,6 +626,11 @@ router.put(
       },
     );
 
+    // Invalidate financial reports cache (received stock affects cash-flow)
+    cacheService.invalidateShopCache(req.user.shopId, "reports");
+    // Also invalidate products cache (purchase price may have changed)
+    cacheService.invalidateShopCache(req.user.shopId, "products");
+
     res.json({
       success: true,
       message: "Purchase order received and stock updated successfully",
@@ -468,6 +679,9 @@ router.put(
         },
       },
     );
+
+    // Invalidate financial reports cache
+    cacheService.invalidateShopCache(req.user.shopId, "reports");
 
     res.json({
       success: true,

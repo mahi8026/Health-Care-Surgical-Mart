@@ -1,10 +1,19 @@
-// TEMPORARY: Hardcode for debugging - will revert after confirming it works
-const API_BASE_URL = 'https://health-care-surgical-mart.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
-    console.log('API Service initialized with base URL:', this.baseURL);
+    
+    if (!this.baseURL) {
+      if (import.meta.env.DEV) {
+        console.error('VITE_API_URL is not configured. Using default: http://localhost:5000/api');
+      }
+      this.baseURL = 'http://localhost:5000/api';
+    }
+    
+    if (import.meta.env.DEV) {
+      console.log('API Service initialized with base URL:', this.baseURL);
+    }
   }
 
   async request(endpoint, options = {}) {
@@ -43,7 +52,9 @@ class ApiService {
 
       return data;
     } catch (error) {
-      console.error(`API Error for ${endpoint}:`, error);
+      if (import.meta.env.DEV) {
+        console.error(`API Error for ${endpoint}:`, error);
+      }
 
       // Handle JSON parsing errors
       if (error.message.includes("Unexpected end of JSON input")) {

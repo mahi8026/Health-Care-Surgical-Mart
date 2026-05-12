@@ -3,19 +3,35 @@
 // Usage: node server/src/queues/sms.worker.js
 
 const SMSQueue = require("../services/sms/sms.queue");
+const { logger } = require("../config/logging");
 
 const worker = new SMSQueue();
 
-console.log("SMS worker started, waiting for jobs...");
+logger.info("SMS worker started, waiting for jobs...", {
+  file: "sms.worker.js",
+  function: "startup",
+});
 
 async function shutdown(signal) {
-  console.log(`Received ${signal}, shutting down SMS worker gracefully...`);
+  logger.info(`Received ${signal}, shutting down SMS worker gracefully...`, {
+    file: "sms.worker.js",
+    function: "shutdown",
+    signal,
+  });
   try {
     await worker.queue.close();
-    console.log("SMS worker shut down cleanly.");
+    logger.info("SMS worker shut down cleanly.", {
+      file: "sms.worker.js",
+      function: "shutdown",
+    });
     process.exit(0);
   } catch (err) {
-    console.error("Error during shutdown:", err.message);
+    logger.error("Error during shutdown", {
+      file: "sms.worker.js",
+      function: "shutdown",
+      error: err.message,
+      stack: err.stack,
+    });
     process.exit(1);
   }
 }

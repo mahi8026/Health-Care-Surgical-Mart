@@ -1,6 +1,5 @@
 /**
  * Stock Routes
-const { logger } = require('../config/logging');
  * Stock management and inventory operations
  */
 
@@ -15,10 +14,280 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/stock:
+ *   get:
+ *     summary: Get stock information with product details
+ *     description: Retrieve paginated stock inventory with product information. Supports search and low stock filtering. Requires stock.read permission.
+ *     tags: [Stock]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 50
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by product name, SKU, or brand
+ *       - in: query
+ *         name: lowStock
+ *         schema:
+ *           type: boolean
+ *         description: Filter for low stock items only
+ *     responses:
+ *       200:
+ *         description: Stock retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Stock'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/stock/low-stock:
+ *   get:
+ *     summary: Get items with low stock
+ *     description: Retrieve all products with stock levels below reorder threshold. Requires stock.read permission.
+ *     tags: [Stock]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Low stock items retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Stock'
+ *                 count:
+ *                   type: integer
+ *                   example: 15
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/stock/{productId}:
+ *   get:
+ *     summary: Get stock for specific product
+ *     description: Retrieve stock information for a single product. Requires stock.read permission.
+ *     tags: [Stock]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     responses:
+ *       200:
+ *         description: Stock retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Stock'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/stock/{productId}/adjust:
+ *   put:
+ *     summary: Adjust stock quantity
+ *     description: Manually adjust stock levels with reason tracking. Requires stock.update permission.
+ *     tags: [Stock]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *               - type
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *                 minimum: 1
+ *                 example: 50
+ *               type:
+ *                 type: string
+ *                 enum: [add, subtract]
+ *                 example: "add"
+ *               reason:
+ *                 type: string
+ *                 example: "Received new shipment"
+ *     responses:
+ *       200:
+ *         description: Stock adjusted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Stock adjusted successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     previousQuantity:
+ *                       type: integer
+ *                       example: 100
+ *                     newQuantity:
+ *                       type: integer
+ *                       example: 150
+ *                     adjustment:
+ *                       type: string
+ *                       example: "+50"
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/stock/adjustments/history:
+ *   get:
+ *     summary: Get stock adjustment history
+ *     description: Retrieve paginated history of all stock adjustments. Requires stock.read permission.
+ *     tags: [Stock]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 50
+ *       - in: query
+ *         name: productId
+ *         schema:
+ *           type: string
+ *         description: Filter by product ID
+ *     responses:
+ *       200:
+ *         description: Adjustment history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       productId:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                         enum: [add, subtract]
+ *                       quantity:
+ *                         type: integer
+ *                       previousQuantity:
+ *                         type: integer
+ *                       newQuantity:
+ *                         type: integer
+ *                       reason:
+ *                         type: string
+ *                       adjustedBy:
+ *                         type: string
+ *                       adjustedAt:
+ *                         type: string
+ *                         format: date-time
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 
 /**
  * GET /api/stock

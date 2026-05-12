@@ -1,6 +1,5 @@
 /**
  * Returns Routes - Multi-Tenant
-const { logger } = require('../config/logging');
  * Handles sale returns and refunds for medical stores
  */
 
@@ -15,10 +14,337 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/returns:
+ *   get:
+ *     summary: Get all returns for shop
+ *     description: Retrieve paginated list of product returns. Supports search and status filtering. Requires returns.view permission.
+ *     tags: [Returns]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by return number, invoice number, or customer name
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, completed, cancelled]
+ *         description: Filter by return status
+ *     responses:
+ *       200:
+ *         description: Returns retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Return'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ *   post:
+ *     summary: Create new return
+ *     description: Process a product return with automatic stock restoration and refund calculation. Requires returns.create permission.
+ *     tags: [Returns]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - originalSaleId
+ *               - items
+ *               - returnReason
+ *             properties:
+ *               originalSaleId:
+ *                 type: string
+ *                 example: "507f1f77bcf86cd799439011"
+ *               originalInvoiceNumber:
+ *                 type: string
+ *                 example: "INV-2026-00123"
+ *               customer:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   phone:
+ *                     type: string
+ *               items:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - productId
+ *                     - returnQuantity
+ *                   properties:
+ *                     productId:
+ *                       type: string
+ *                     returnQuantity:
+ *                       type: integer
+ *                       minimum: 1
+ *                     returnReason:
+ *                       type: string
+ *               returnReason:
+ *                 type: string
+ *                 example: "Damaged product"
+ *               returnType:
+ *                 type: string
+ *                 enum: [full, partial]
+ *                 example: "partial"
+ *               refundMethod:
+ *                 type: string
+ *                 enum: [cash, bank, store_credit]
+ *                 example: "cash"
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Return processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Return processed successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/Return'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/returns/{id}:
+ *   get:
+ *     summary: Get return by ID
+ *     description: Retrieve detailed information about a specific return. Requires returns.view permission.
+ *     tags: [Returns]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Return ID
+ *     responses:
+ *       200:
+ *         description: Return retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Return'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/returns/sale/{saleId}:
+ *   get:
+ *     summary: Get original sale details for return processing
+ *     description: Retrieve sale information with returnable quantities for each item. Requires returns.view permission.
+ *     tags: [Returns]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: saleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Original sale ID
+ *     responses:
+ *       200:
+ *         description: Sale details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Sale'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/returns/{id}/status:
+ *   put:
+ *     summary: Update return status
+ *     description: Change return status (cancel, approve, complete). Automatically adjusts stock. Requires returns.edit permission.
+ *     tags: [Returns]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Return ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, completed, cancelled]
+ *                 example: "completed"
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Return status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Return status updated successfully"
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * /api/returns/stats/summary:
+ *   get:
+ *     summary: Get return statistics
+ *     description: Retrieve return statistics including daily, monthly totals and breakdown by reason. Requires returns.view permission.
+ *     tags: [Returns]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     today:
+ *                       type: object
+ *                       properties:
+ *                         returns:
+ *                           type: integer
+ *                         amount:
+ *                           type: number
+ *                     monthly:
+ *                       type: object
+ *                       properties:
+ *                         returns:
+ *                           type: integer
+ *                         amount:
+ *                           type: number
+ *                     total:
+ *                       type: integer
+ *                     byReason:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                           count:
+ *                             type: integer
+ *                           totalAmount:
+ *                             type: number
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 
 /**
  * GET /api/returns

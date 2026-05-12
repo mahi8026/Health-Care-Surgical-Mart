@@ -6,6 +6,7 @@
 const { ObjectId } = require("mongodb");
 const { logger } = require("../config/logging");
 const EmailService = require("../services/email/email.service");
+const { cacheService } = require("../services/cache.service");
 
 class SalesController {
   /**
@@ -88,6 +89,19 @@ class SalesController {
         );
       });
 
+      // Audit: sale created (fire-and-forget)
+      try {
+        const auditLog = require("../services/audit-log.service");
+        const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+        auditLog.log(req, AUDIT_ACTIONS.SALE_CREATED, "sale", result.insertedId.toString(),
+          `Created sale ${sale.invoiceNo} — total ৳${sale.grandTotal}`,
+          { after: { invoiceNo: sale.invoiceNo, grandTotal: sale.grandTotal, itemCount: enrichedItems.length } }
+        );
+      } catch (_) { /* never block the response */ }
+
+      // Invalidate financial reports cache (sale affects P&L, daily-summary, cash-flow)
+      cacheService.invalidateShopCache(req.user.shopId, "reports");
+
       // Send response immediately
       return res.status(201).json({
         success: true,
@@ -99,8 +113,7 @@ class SalesController {
           saleDate: sale.saleDate,
         },
       });
-    } catch (error) {
-      logger.error("Create sale error:", error);
+    } catch (error) {      logger.error("Create sale error:", error);
 
       if (error.code === 121) {
         logger.error(

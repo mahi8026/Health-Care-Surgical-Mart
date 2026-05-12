@@ -8,8 +8,16 @@ const { getShopDatabase, getSystemDatabase } = require("../config/database");
 const { ObjectId } = require("mongodb");
 const { logger } = require("../config/logging");
 
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your_jwt_secret_key_change_in_production";
+// Validate JWT_SECRET at module load time
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error(
+    "FATAL: JWT_SECRET environment variable is missing or too short. " +
+    "JWT_SECRET must be at least 32 characters. " +
+    "Generate a secure secret using: node -e \"require('crypto').randomBytes(32, (err, buf) => { if (err) throw err; process.stdout.write(buf.toString('hex')); })\""
+  );
+}
 
 /**
  * Authenticate user and attach to request
@@ -18,7 +26,6 @@ async function authenticate(req, res, next) {
   try {
     // Get token from header
     const authHeader = req.headers.authorization;
-
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
@@ -29,30 +36,63 @@ async function authenticate(req, res, next) {
 
     const token = authHeader.substring(7);
 
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    // Get user from appropriate database
-    let user;
-    if (decoded.role === "SUPER_ADMIN") {
-      const systemDb = getSystemDatabase();
-      user = await systemDb.collection("system_users").findOne({
-        _id: new ObjectId(decoded.userId),
-      });
-    } else {
-      if (!decoded.shopId) {
+    // Verify token with nested try-catch for JWT-specific errors
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (jwtError) {
+      if (jwtError.name === "JsonWebTokenError") {
         return res.status(401).json({
           success: false,
-          message: "Invalid token: missing shop context",
+          message: "Invalid token",
         });
       }
+      if (jwtError.name === "TokenExpiredError") {
+        return res.status(401).json({
+          success: false,
+          message: "Token expired",
+        });
+      }
+      // Re-throw unexpected JWT errors to outer catch
+      throw jwtError;
+    }
 
-      const shopDb = getShopDatabase(decoded.shopId);
-      user = await shopDb.collection("users").findOne({
-        _id: new ObjectId(decoded.userId),
+    // Validate shopId for non-super-admin users
+    if (decoded.role !== "SUPER_ADMIN" && !decoded.shopId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token: missing shop context",
       });
     }
 
+    // Get user from appropriate database with nested try-catch for database errors
+    let user;
+    try {
+      if (decoded.role === "SUPER_ADMIN") {
+        const systemDb = getSystemDatabase();
+        user = await systemDb.collection("system_users").findOne({
+          _id: new ObjectId(decoded.userId),
+        });
+      } else {
+        const shopDb = getShopDatabase(decoded.shopId);
+        user = await shopDb.collection("users").findOne({
+          _id: new ObjectId(decoded.userId),
+        });
+      }
+    } catch (dbError) {
+      logger.error("Database error in authenticate middleware:", {
+        error: dbError.message,
+        stack: dbError.stack,
+        userId: decoded?.userId,
+        shopId: decoded?.shopId,
+        role: decoded?.role,
+        path: req.path,
+      });
+      return res.status(500).json({
+        success: false,
+        message: "Database connection failed",
+      });
+    }
 
     if (!user) {
       return res.status(401).json({
@@ -78,42 +118,52 @@ async function authenticate(req, res, next) {
       permissions: user.permissions || [],
     };
 
+    // For SUPER_ADMIN with no shopId, auto-assign the first active shop
+    // so all shop-scoped routes work without special-casing
+    if (req.user.role === "SUPER_ADMIN" && !req.user.shopId) {
+      try {
+        const systemDb = getSystemDatabase();
+        const firstShop = await systemDb
+          .collection("shops")
+          .findOne({ status: "Active" }, { sort: { createdAt: 1 } });
+        if (firstShop) {
+          req.user.shopId = firstShop.shopId;
+        }
+      } catch (shopErr) {
+        // Non-fatal — routes that need shopId will handle missing value
+        logger.warn("Could not auto-assign shopId for SUPER_ADMIN", {
+          error: shopErr.message,
+        });
+      }
+    }
 
     // Attach shop database to request for convenience
     if (req.user.shopId) {
       try {
         req.shopDb = getShopDatabase(req.user.shopId);
       } catch (dbError) {
-        logger.error(
-          "Auth middleware - Failed to get shop database:",
-          dbError,
-        );
+        logger.error("Failed to get shop database in authenticate middleware:", {
+          error: dbError.message,
+          stack: dbError.stack,
+          userId: req.user._id,
+          shopId: req.user.shopId,
+          path: req.path,
+        });
         return res.status(500).json({
           success: false,
           message: "Failed to connect to shop database",
         });
       }
-    } else {
     }
 
     next();
   } catch (error) {
-    logger.error("Auth middleware - Error:", error);
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token",
-      });
-    }
-
-    if (error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Token expired",
-      });
-    }
-
-    logger.error("Authentication error:", error);
+    // Catch-all for any unexpected errors
+    logger.error("Unexpected error in authenticate middleware:", {
+      error: error.message,
+      stack: error.stack,
+      path: req.path,
+    });
     return res.status(500).json({
       success: false,
       message: "Authentication failed",

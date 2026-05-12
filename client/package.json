@@ -19,6 +19,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@sentry/react": "^8.47.0",
     "axios": "^1.13.4",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",

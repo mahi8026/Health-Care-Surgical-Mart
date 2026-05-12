@@ -345,3 +345,11 @@ local.config.json
 !docs/README.md
 !scripts/*.sh
 !scripts/*.bat
+
+# Permanent project documentation (override the *_SETUP.md / FINAL_*.md patterns above)
+!CICD_SETUP.md
+!FINAL_PROJECT_REPORT.md
+!GCS_SETUP.md
+!SENTRY_SETUP_GUIDE.md
+!SENTRY_QUICK_REFERENCE.md
+!DEPLOYMENT_CHECKLIST.md

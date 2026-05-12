@@ -6,8 +6,10 @@
 import axios from "axios";
 import { API_CONFIG } from "./constants";
 
-// Log API configuration for debugging
-console.log('Axios API configured with base URL:', API_CONFIG.BASE_URL);
+// Log API configuration for debugging in development only
+if (import.meta.env.DEV) {
+  console.log('Axios API configured with base URL:', API_CONFIG.BASE_URL);
+}
 
 // Create axios instance with default configuration
 const api = axios.create({

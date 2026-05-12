@@ -1,5 +1,6 @@
 // server/src/services/sms/providers/twilio.adapter.js
 const twilio = require("twilio");
+const { logger } = require("../../../config/logging");
 
 class TwilioAdapter {
   constructor() {
@@ -8,7 +9,11 @@ class TwilioAdapter {
     this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
     
     if (!this.accountSid || !this.authToken || !this.fromNumber) {
-      console.warn('Twilio SMS provider not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in .env');
+      logger.warn("Twilio SMS provider not configured", {
+        file: "twilio.adapter.js",
+        function: "constructor",
+        message: "Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in .env",
+      });
       this.client = null;
     } else {
       this.client = twilio(this.accountSid, this.authToken);

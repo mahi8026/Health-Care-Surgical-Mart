@@ -27,19 +27,42 @@ const { setupSecurity } = require("./config/security");
 const { setupMiddleware } = require("./config/middleware");
 const { setupRoutes } = require("./config/routes");
 const { setupErrorHandling } = require("./config/error-handling");
+const { setupSwagger } = require("./config/swagger");
 const { validateEnvironment } = require("./utils/environment-validator");
+const {
+  validateOrExit: validateProductionEnvironment,
+} = require("./utils/production-env-validator");
 const {
   startRecurringExpenseScheduler,
 } = require("./services/recurring-expense-scheduler");
+const {
+  initializeSentry,
+  setupSentryRequestHandler,
+  setupSentryErrorHandler,
+  flush: flushSentry,
+} = require("./config/sentry");
 
 // Validate environment variables
 validateEnvironment();
+
+// Additional production validation (warnings only in development)
+if (process.env.NODE_ENV === "production") {
+  validateProductionEnvironment();
+} else {
+  logger.info("Skipping production environment validation (development mode)");
+}
 
 // Initialize Express application
 const app = express();
 
 // Setup logging
 setupLogging();
+
+// Initialize Sentry (must be first)
+initializeSentry(app);
+
+// Setup Sentry request handler (must be before other middleware)
+setupSentryRequestHandler(app);
 
 // Security middleware
 app.use(
@@ -215,6 +238,12 @@ app.get("/health", (req, res) => {
 // API routes
 setupRoutes(app);
 
+// Setup Swagger API documentation (after routes)
+setupSwagger(app);
+
+// Setup Sentry error handler (must be after routes, before other error handlers)
+setupSentryErrorHandler(app);
+
 // Serve React application (only if client/dist exists)
 if (process.env.NODE_ENV === "production") {
   const clientIndexPath = path.join(__dirname, "../../client/dist/index.html");
@@ -258,6 +287,20 @@ const gracefulShutdown = async (signal) => {
   logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
   try {
+    // Flush Sentry events
+    await flushSentry(2000);
+    
+    // Close email queue
+    try {
+      const emailService = require('./services/email/email.service');
+      if (emailService._queue) {
+        await emailService.queue.close();
+        logger.info('Email queue closed');
+      }
+    } catch (error) {
+      logger.error('Error closing email queue:', error);
+    }
+
     // Close database connections
     await closeDatabaseConnection();
     logger.info("Database connections closed.");
@@ -285,51 +328,62 @@ const gracefulShutdown = async (signal) => {
 let server;
 
 const startServer = async () => {
+  // Start HTTP server first — always, regardless of DB status
+  server = app.listen(PORT, HOST, () => {
+    logger.info(`🚀 Medical Store POS Server running on ${HOST}:${PORT}`);
+    logger.info(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
+    logger.info(`📍 Health check: http://${HOST}:${PORT}/health`);
+    logger.info(`📍 API Base URL: http://${HOST}:${PORT}/api`);
+    logger.info(`📍 Swagger UI:   http://${HOST}:${PORT}/api/docs`);
+
+    if (process.env.NODE_ENV !== "production") {
+      logger.info('💡 Run "npm run seed" to initialize sample data');
+    }
+  });
+
+  // Handle server bind errors
+  server.on("error", (error) => {
+    if (error.syscall !== "listen") throw error;
+    const bind = typeof PORT === "string" ? "Pipe " + PORT : "Port " + PORT;
+    switch (error.code) {
+      case "EACCES":
+        logger.error(`${bind} requires elevated privileges`);
+        process.exit(1);
+        break;
+      case "EADDRINUSE":
+        logger.error(`${bind} is already in use`);
+        process.exit(1);
+        break;
+      default:
+        throw error;
+    }
+  });
+
+  // Connect to database after server is listening
+  // In development, a failed DB connection is non-fatal — server keeps running
   try {
-    // Connect to database
     await connectToDatabase();
     logger.info("Database connected successfully");
 
-    // Start HTTP server
-    server = app.listen(PORT, HOST, () => {
-      logger.info(`🚀 Medical Store POS Server running on ${HOST}:${PORT}`);
-      logger.info(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
-      logger.info(`📍 Health check: http://${HOST}:${PORT}/health`);
-      logger.info(`📍 API Base URL: http://${HOST}:${PORT}/api`);
+    // Initialize audit log indexes (non-blocking, fire-and-forget)
+    const auditLogService = require("./services/audit-log.service");
+    auditLogService.ensureIndexes().catch(() => {});
 
-      if (process.env.NODE_ENV !== "production") {
-        logger.info('💡 Run "npm run seed" to initialize sample data');
-      }
-    });
-
-    // Start recurring expense scheduler
+    // Start recurring expense scheduler only after DB is ready
     startRecurringExpenseScheduler();
     logger.info("Recurring expense scheduler initialized");
-
-    // Handle server errors
-    server.on("error", (error) => {
-      if (error.syscall !== "listen") {
-        throw error;
-      }
-
-      const bind = typeof PORT === "string" ? "Pipe " + PORT : "Port " + PORT;
-
-      switch (error.code) {
-        case "EACCES":
-          logger.error(`${bind} requires elevated privileges`);
-          process.exit(1);
-          break;
-        case "EADDRINUSE":
-          logger.error(`${bind} is already in use`);
-          process.exit(1);
-          break;
-        default:
-          throw error;
-      }
-    });
   } catch (error) {
-    logger.error("Failed to start server:", error);
-    process.exit(1);
+    if (process.env.NODE_ENV === "production") {
+      logger.error("Database connection failed in production — shutting down:", error.message);
+      process.exit(1);
+    } else {
+      logger.warn(
+        "⚠️  Database connection failed — server is running WITHOUT database. " +
+        "API endpoints requiring DB will return 503. Swagger UI is available at " +
+        `http://${HOST}:${PORT}/api/docs`,
+        { error: error.message }
+      );
+    }
   }
 };
 
@@ -338,10 +392,20 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("uncaughtException", (error) => {
   logger.error("Uncaught Exception:", error);
+  
+  // Capture in Sentry
+  const { captureException } = require("./config/sentry");
+  captureException(error, { type: "uncaughtException" });
+  
   gracefulShutdown("uncaughtException");
 });
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+  
+  // Capture in Sentry
+  const { captureException } = require("./config/sentry");
+  captureException(reason, { type: "unhandledRejection", promise: promise.toString() });
+  
   gracefulShutdown("unhandledRejection");
 });
 

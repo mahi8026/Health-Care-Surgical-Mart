@@ -2,6 +2,7 @@
 const TwilioAdapter = require("./providers/twilio.adapter");
 const MSG91Adapter = require("./providers/msg91.adapter");
 const { validatePhoneNumber } = require("./sms.validator");
+const { logger } = require("../../config/logging");
 
 class SMSService {
   constructor() {
@@ -48,7 +49,11 @@ class SMSService {
     }
 
     if (await this.isDND(to)) {
-      console.log(`Number ${to} is on DND list, skipping promotional SMS`);
+      logger.info("Number is on DND list, skipping promotional SMS", {
+        file: "sms.service.js",
+        function: "sendTransactionalSMS",
+        phoneNumber: to.substring(0, 5) + "***", // Partial phone for privacy
+      });
       return { success: false, reason: "DND" };
     }
 

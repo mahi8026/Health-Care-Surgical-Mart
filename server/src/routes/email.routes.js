@@ -12,6 +12,235 @@ const { getShopDatabase } = require("../config/database");
 const { asyncHandler } = require("../config/error-handling");
 
 /**
+ * @swagger
+ * /api/email/send:
+ *   post:
+ *     summary: Send transactional email
+ *     description: Send a transactional email using a named template. Requires authentication.
+ *     tags: [Email]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [to, templateName]
+ *             properties:
+ *               to:
+ *                 type: string
+ *                 format: email
+ *                 example: "customer@example.com"
+ *               templateName:
+ *                 type: string
+ *                 enum: [welcome, invoice, order_confirmation, password_reset]
+ *                 example: "invoice"
+ *               variables:
+ *                 type: object
+ *                 description: Template variables to inject
+ *                 example: { "customerName": "Dr. Ahmed", "invoiceNumber": "INV-001" }
+ *     responses:
+ *       200:
+ *         description: Email sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/email/send-invoice:
+ *   post:
+ *     summary: Send invoice email to customer
+ *     description: Send a sale invoice to a customer's email address. Requires authentication.
+ *     tags: [Email]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [saleId, customerEmail]
+ *             properties:
+ *               saleId:
+ *                 type: string
+ *                 example: "507f1f77bcf86cd799439011"
+ *               customerEmail:
+ *                 type: string
+ *                 format: email
+ *                 example: "customer@example.com"
+ *     responses:
+ *       200:
+ *         description: Invoice email sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Invoice sent to customer@example.com" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/email/campaigns:
+ *   get:
+ *     summary: Get email campaigns
+ *     description: Retrieve list of email marketing campaigns. Requires ADMIN or MANAGER role.
+ *     tags: [Email]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Campaigns retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: array, items: { type: object } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   post:
+ *     summary: Create email campaign
+ *     description: Create a new email marketing campaign. Requires ADMIN or MANAGER role.
+ *     tags: [Email]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, subject, templateName, recipients]
+ *             properties:
+ *               name: { type: string, example: "May Promotion" }
+ *               subject: { type: string, example: "Special Offer for You!" }
+ *               templateName: { type: string }
+ *               recipients:
+ *                 type: string
+ *                 enum: [all_customers, active_customers, custom]
+ *               scheduledAt:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Campaign created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/email/templates:
+ *   get:
+ *     summary: Get available email templates
+ *     description: Retrieve list of available email templates. Requires authentication.
+ *     tags: [Email]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Templates retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: array, items: { type: object } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/email/campaigns/{id}/send:
+ *   post:
+ *     summary: Send email campaign
+ *     description: Trigger sending of a scheduled or draft campaign. Requires ADMIN role.
+ *     tags: [Email]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Campaign sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Campaign sent to 150 recipients" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/email/campaigns/{id}/analytics:
+ *   get:
+ *     summary: Get campaign analytics
+ *     description: Retrieve open rates, click rates, and delivery stats for a campaign. Requires ADMIN or MANAGER role.
+ *     tags: [Email]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Analytics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     sent: { type: integer }
+ *                     delivered: { type: integer }
+ *                     opened: { type: integer }
+ *                     clicked: { type: integer }
+ *                     openRate: { type: number }
+ *                     clickRate: { type: number }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
+
+/**
  * POST /api/email/send
  * Send a transactional email using a named template
  */

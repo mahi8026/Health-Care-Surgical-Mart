@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const { logger } = require('../config/logging');
-const multer = require("multer");
 const csv = require("csv-parser");
 const XLSX = require("xlsx");
 const fs = require("fs");
@@ -9,38 +8,158 @@ const path = require("path");
 const Product = require("../models/product.schema");
 const Stock = require("../models/stock.schema");
 const { authenticate } = require("../middleware/auth-multi-tenant");
+const { importUpload, processUploadedFiles } = require("../services/file-upload.service");
+const { cacheService } = require("../services/cache.service");
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../../uploads/bulk");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, `bulk-${uniqueSuffix}-${file.originalname}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      "text/csv",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Invalid file type. Only CSV and Excel files are allowed."));
-    }
-  },
-});
+/**
+ * @swagger
+ * /api/bulk-products/import:
+ *   post:
+ *     summary: Bulk import products from CSV or Excel
+ *     description: Upload a CSV or Excel file to import multiple products at once. Supports column mapping for different file formats. Requires authentication.
+ *     tags: [Bulk Operations]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CSV or Excel file (.csv, .xlsx, .xls)
+ *     responses:
+ *       200:
+ *         description: Products imported successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     imported: { type: integer, example: 45 }
+ *                     skipped: { type: integer, example: 3 }
+ *                     errors: { type: array, items: { type: object } }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/bulk-products/bulk-export:
+ *   get:
+ *     summary: Export all products to CSV
+ *     description: Download all shop products as a CSV file. Requires authentication.
+ *     tags: [Bulk Operations]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema: { type: string, enum: [csv, xlsx], default: csv }
+ *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *         description: Filter by category
+ *     responses:
+ *       200:
+ *         description: Products exported as file download
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/bulk-products/bulk-update:
+ *   put:
+ *     summary: Bulk update product prices or stock
+ *     description: Update multiple products at once (price, cost, stock levels). Requires authentication.
+ *     tags: [Bulk Operations]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [products]
+ *             properties:
+ *               products:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [_id]
+ *                   properties:
+ *                     _id: { type: string }
+ *                     price: { type: number }
+ *                     costPrice: { type: number }
+ *                     isActive: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Products updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     updated: { type: integer, example: 20 }
+ *                     failed: { type: integer, example: 0 }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/bulk-products/bulk-delete:
+ *   post:
+ *     summary: Bulk delete products
+ *     description: Delete multiple products by ID array. Requires authentication.
+ *     tags: [Bulk Operations]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [productIds]
+ *             properties:
+ *               productIds:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"]
+ *     responses:
+ *       200:
+ *         description: Products deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     deleted: { type: integer, example: 5 }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 // Parse CSV file
 const parseCSV = (filePath) => {
@@ -254,7 +373,7 @@ router.post(
     next();
   },
   authenticate,
-  upload.single("file"),
+  importUpload.single("file"),
   async (req, res) => {
     let filePath = null;
 
@@ -402,6 +521,11 @@ router.post(
         message: `Import completed: ${results.successCount} products imported, ${results.errorCount} failed`,
         data: results,
       });
+
+      // Invalidate products cache after bulk import
+      if (results.successCount > 0) {
+        cacheService.invalidateShopCache(req.user.shopId, "products");
+      }
     } catch (error) {
       logger.error("Bulk import error:", {
         message: error.message,
@@ -533,6 +657,11 @@ router.put("/bulk-update", authenticate, async (req, res) => {
       message: `Bulk update completed: ${results.successCount} products updated, ${results.errorCount} failed`,
       data: results,
     });
+
+    // Invalidate products cache after bulk update
+    if (results.successCount > 0) {
+      cacheService.invalidateShopCache(req.user.shopId, "products");
+    }
   } catch (error) {
     logger.error("Bulk update error:", error);
     res.status(500).json({
@@ -591,6 +720,11 @@ router.post("/bulk-delete", authenticate, async (req, res) => {
       message: `Bulk delete completed: ${results.successCount} products deleted, ${results.errorCount} failed`,
       data: results,
     });
+
+    // Invalidate products cache after bulk delete
+    if (results.successCount > 0) {
+      cacheService.invalidateShopCache(req.user.shopId, "products");
+    }
   } catch (error) {
     logger.error("Bulk delete error:", error);
     res.status(500).json({

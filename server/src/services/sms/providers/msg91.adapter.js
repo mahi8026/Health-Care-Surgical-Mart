@@ -1,5 +1,6 @@
 // server/src/services/sms/providers/msg91.adapter.js
 const axios = require("axios");
+const { logger } = require("../../../config/logging");
 
 class MSG91Adapter {
   constructor() {
@@ -8,7 +9,11 @@ class MSG91Adapter {
     this.baseURL = "https://api.msg91.com/api";
     
     if (!this.apiKey || !this.senderId) {
-      console.warn('MSG91 SMS provider not configured. Please set MSG91_API_KEY and MSG91_SENDER_ID in .env');
+      logger.warn("MSG91 SMS provider not configured", {
+        file: "msg91.adapter.js",
+        function: "constructor",
+        message: "Please set MSG91_API_KEY and MSG91_SENDER_ID in .env",
+      });
     }
   }
 

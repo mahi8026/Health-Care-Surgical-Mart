@@ -1,6 +1,5 @@
 /**
  * Reports Routes - Multi-Tenant
-const { logger } = require('../config/logging');
  * Handles dashboard and reporting functionality
  */
 
@@ -14,10 +13,177 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler } = require("../config/error-handling");
+const { logger } = require('../config/logging');
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/reports/dashboard:
+ *   get:
+ *     summary: Get dashboard statistics
+ *     description: Retrieve key business metrics for the dashboard including today's sales, revenue, low stock count, and recent transactions. Requires sales.report permission.
+ *     tags: [Financial Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard data retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     todaySales: { type: number, example: 25000.00 }
+ *                     todayTransactions: { type: integer, example: 15 }
+ *                     monthlyRevenue: { type: number, example: 450000.00 }
+ *                     lowStockCount: { type: integer, example: 8 }
+ *                     totalProducts: { type: integer, example: 350 }
+ *                     totalCustomers: { type: integer, example: 120 }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/reports/stock:
+ *   get:
+ *     summary: Get stock report
+ *     description: Retrieve comprehensive stock report with valuation. Requires stock.read permission.
+ *     tags: [Stock]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *       - in: query
+ *         name: lowStockOnly
+ *         schema: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Stock report retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalItems: { type: integer }
+ *                     totalValue: { type: number }
+ *                     lowStockItems: { type: integer }
+ *                     items: { type: array, items: { $ref: '#/components/schemas/Stock' } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/reports/stock-valuation:
+ *   get:
+ *     summary: Get stock valuation report
+ *     description: Retrieve total inventory value at cost and selling price. Requires stock.read permission.
+ *     tags: [Stock]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Stock valuation retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalCostValue: { type: number, example: 1500000.00 }
+ *                     totalSellingValue: { type: number, example: 2250000.00 }
+ *                     potentialProfit: { type: number, example: 750000.00 }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/reports/sales:
+ *   get:
+ *     summary: Get sales report
+ *     description: Retrieve sales report with totals, trends, and top products. Requires sales.report permission.
+ *     tags: [Sales]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: groupBy
+ *         schema: { type: string, enum: [day, week, month], default: day }
+ *     responses:
+ *       200:
+ *         description: Sales report retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalRevenue: { type: number }
+ *                     totalTransactions: { type: integer }
+ *                     averageOrderValue: { type: number }
+ *                     timeline: { type: array, items: { type: object } }
+ *                     topProducts: { type: array, items: { type: object } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/reports/customers:
+ *   get:
+ *     summary: Get customer report
+ *     description: Retrieve customer analytics including top customers and purchase frequency. Requires customers.view permission.
+ *     tags: [Customers]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Customer report retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalCustomers: { type: integer }
+ *                     newCustomers: { type: integer }
+ *                     topCustomers: { type: array, items: { $ref: '#/components/schemas/Customer' } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/reports/dashboard

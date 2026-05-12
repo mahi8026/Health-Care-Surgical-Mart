@@ -74,6 +74,10 @@ const setupRoutes = (app) => {
     // Expenses routes
     app.use("/api/expenses", require("../routes/expenses.routes"));
 
+    // File serving routes (for local storage)
+    logger.info("Loading file serving routes...");
+    app.use("/api/files", require("../routes/files.routes"));
+
     // Recurring Expenses routes
     app.use(
       "/api/recurring-expenses",
@@ -102,6 +106,10 @@ const setupRoutes = (app) => {
     logger.info("Loading Email routes...");
     app.use("/api/email", require("../routes/email.routes"));
 
+    // Queue health check routes (no auth required - for monitoring)
+    logger.info("Loading Queue health check routes...");
+    app.use("/api/queues", require("../routes/queue-health.routes"));
+
     // Webhook routes (no JWT auth - validated by provider signatures)
     logger.info("Loading Webhook routes...");
     app.use(
@@ -112,6 +120,9 @@ const setupRoutes = (app) => {
       "/api/webhooks/twilio",
       require("../routes/webhooks/twilio.webhook"),
     );
+
+    // Audit Logs routes (SUPER_ADMIN + SHOP_ADMIN)
+    app.use("/api/audit-logs", require("../routes/audit-logs.routes"));
 
     // Test route (no auth required)
     app.get("/api/test", (req, res) => {

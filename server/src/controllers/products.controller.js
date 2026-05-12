@@ -6,6 +6,9 @@
 const BaseController = require("./base.controller");
 const { ObjectId } = require("mongodb");
 const { logger } = require("../config/logging");
+const auditLog = require("../services/audit-log.service");
+const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+const { cacheService } = require("../services/cache.service");
 
 class ProductsController extends BaseController {
   /**
@@ -105,6 +108,15 @@ class ProductsController extends BaseController {
       // Create initial stock record
       await this._createInitialStock(req.shopDb, result.insertedId, name, minStockLevel);
 
+      // Audit: product created
+      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_CREATED, "product", result.insertedId.toString(),
+        `Created product "${name}" (SKU: ${sku})`,
+        { after: { name, sku, category, sellingPrice, purchasePrice } }
+      );
+
+      // Invalidate products cache
+      cacheService.invalidateShopCache(req.user.shopId, "products");
+
       this.sendSuccess(
         res,
         { _id: result.insertedId, ...product },
@@ -182,6 +194,18 @@ class ProductsController extends BaseController {
       // Update stock record if needed
       await this._updateStockRecord(req.shopDb, req.params.id, name, minStockLevel);
 
+      // Audit: product updated
+      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_UPDATED, "product", req.params.id,
+        `Updated product "${existingProduct.name}"`,
+        {
+          before: { name: existingProduct.name, sku: existingProduct.sku, sellingPrice: existingProduct.sellingPrice, isActive: existingProduct.isActive },
+          after: updateData,
+        }
+      );
+
+      // Invalidate products cache
+      cacheService.invalidateShopCache(req.user.shopId, "products");
+
       this.sendSuccess(res, null, "Product updated successfully");
     } catch (error) {
       logger.error("Update product error:", error);
@@ -207,6 +231,15 @@ class ProductsController extends BaseController {
       if (result.matchedCount === 0) {
         return this.sendError(res, "Product not found", 404);
       }
+
+      // Audit: product deleted (soft delete)
+      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_DELETED, "product", req.params.id,
+        `Deleted (deactivated) product ID ${req.params.id}`,
+        { after: { isActive: false } }
+      );
+
+      // Invalidate products cache
+      cacheService.invalidateShopCache(req.user.shopId, "products");
 
       this.sendSuccess(res, null, "Product deleted successfully");
     } catch (error) {

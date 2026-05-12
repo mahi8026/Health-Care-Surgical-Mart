@@ -31,9 +31,24 @@ const optionalEnvVars = {
 };
 
 /**
+ * Google Cloud Storage variables (optional - falls back to local storage)
+ */
+const gcsEnvVars = [
+  "GCS_BUCKET_NAME",
+  "GCS_PROJECT_ID",
+  "GOOGLE_APPLICATION_CREDENTIALS_JSON",
+];
+
+/**
  * Validate environment variables
  */
 const validateEnvironment = () => {
+  // Skip validation in test environment if basic test variables are set
+  if (process.env.NODE_ENV === 'test' && process.env.MONGODB_URI && process.env.JWT_SECRET) {
+    logger.info('Test environment detected - skipping strict validation');
+    return;
+  }
+
   const errors = [];
   const warnings = [];
 
@@ -51,6 +66,20 @@ const validateEnvironment = () => {
       warnings.push(`Using default value for ${varName}: ${defaultValue}`);
     }
   });
+
+  // Check GCS configuration (optional - warn if incomplete)
+  const gcsConfigured = gcsEnvVars.every((varName) => process.env[varName]);
+  if (!gcsConfigured) {
+    const missingGcsVars = gcsEnvVars.filter((varName) => !process.env[varName]);
+    if (missingGcsVars.length > 0 && missingGcsVars.length < gcsEnvVars.length) {
+      warnings.push(
+        `Partial GCS configuration detected. Missing: ${missingGcsVars.join(", ")}. ` +
+        "File uploads will use local storage (not recommended for production on Render)."
+      );
+    }
+  } else {
+    logger.info("Google Cloud Storage configuration detected");
+  }
 
   // Validate specific formats
   if (
@@ -128,4 +157,5 @@ module.exports = {
   validateEnvironment,
   requiredEnvVars,
   optionalEnvVars,
+  gcsEnvVars,
 };

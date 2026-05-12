@@ -1,6 +1,5 @@
 /**
  * Expenses Routes
-const { logger } = require('../config/logging');
  * CRUD operations for expense management
  */
 
@@ -24,10 +23,327 @@ const {
   deleteUploadedFile,
   getFilePath,
 } = require("../services/file-upload.service");
+const { logger } = require('../config/logging');
+const { cacheService } = require("../services/cache.service");
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/expenses:
+ *   get:
+ *     summary: Get all expenses with advanced filtering
+ *     description: Retrieve paginated expenses with date range, category, payment method, amount range, and vendor filters. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by description or vendor
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *         example: "2026-05-01"
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *         example: "2026-05-31"
+ *       - in: query
+ *         name: categoryId
+ *         schema: { type: string }
+ *         description: Filter by expense category ID
+ *       - in: query
+ *         name: paymentMethod
+ *         schema: { type: string, enum: [cash, bank_transfer, card, mobile] }
+ *       - in: query
+ *         name: minAmount
+ *         schema: { type: number }
+ *       - in: query
+ *         name: maxAmount
+ *         schema: { type: number }
+ *       - in: query
+ *         name: sortBy
+ *         schema: { type: string, default: expenseDate }
+ *       - in: query
+ *         name: sortOrder
+ *         schema: { type: string, enum: [asc, desc], default: desc }
+ *     responses:
+ *       200:
+ *         description: Expenses retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Expense' }
+ *                 pagination: { $ref: '#/components/schemas/PaginationMeta' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   post:
+ *     summary: Create new expense
+ *     description: Record a new business expense with optional receipt upload. Requires expenses.create permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [categoryId, amount, expenseDate, paymentMethod]
+ *             properties:
+ *               categoryId:
+ *                 type: string
+ *                 example: "507f1f77bcf86cd799439011"
+ *               amount:
+ *                 type: number
+ *                 minimum: 0
+ *                 example: 5000.00
+ *               expenseDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-05-10"
+ *               description:
+ *                 type: string
+ *                 example: "Monthly electricity bill"
+ *               paymentMethod:
+ *                 type: string
+ *                 enum: [cash, bank_transfer, card, mobile]
+ *                 example: "bank_transfer"
+ *               vendor:
+ *                 type: string
+ *                 example: "DESCO"
+ *               receipt:
+ *                 type: string
+ *                 format: binary
+ *                 description: Receipt image or PDF (optional)
+ *     responses:
+ *       201:
+ *         description: Expense created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Expense created successfully" }
+ *                 data: { $ref: '#/components/schemas/Expense' }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expenses/summary:
+ *   get:
+ *     summary: Get expense summary statistics
+ *     description: Retrieve aggregated expense totals by category, payment method, and time period. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Summary retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalAmount: { type: number, example: 125000.00 }
+ *                     byCategory: { type: array, items: { type: object } }
+ *                     byPaymentMethod: { type: array, items: { type: object } }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expenses/{id}:
+ *   get:
+ *     summary: Get expense by ID
+ *     description: Retrieve a specific expense record. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Expense ID
+ *     responses:
+ *       200:
+ *         description: Expense retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Expense' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update expense
+ *     description: Update an existing expense record. Requires expenses.edit permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               categoryId: { type: string }
+ *               amount: { type: number }
+ *               expenseDate: { type: string, format: date }
+ *               description: { type: string }
+ *               paymentMethod: { type: string }
+ *               vendor: { type: string }
+ *     responses:
+ *       200:
+ *         description: Expense updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Expense updated successfully" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   delete:
+ *     summary: Delete expense
+ *     description: Delete an expense record and its associated receipt file. Requires expenses.delete permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Expense deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Expense deleted successfully" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expenses/{id}/receipt:
+ *   post:
+ *     summary: Upload receipt for expense
+ *     description: Upload or replace a receipt file for an existing expense. Requires expenses.edit permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [receipt]
+ *             properties:
+ *               receipt:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Receipt uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     receiptUrl: { type: string, example: "https://storage.googleapis.com/..." }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   delete:
+ *     summary: Delete receipt from expense
+ *     description: Remove the receipt file from an expense. Requires expenses.edit permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Receipt deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Receipt deleted successfully" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/expenses
@@ -244,11 +560,12 @@ router.get(
   "/filter-options",
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
-    const shopDb = getShopDatabase(req.user.shopId);
+    try {
+      const shopDb = getShopDatabase(req.user.shopId);
 
-    // Get available categories
-    const categories = await shopDb
-      .collection("expenseCategories")
+      // Get available categories
+      const categories = await shopDb
+      .collection("expense_categories")
       .find({ isActive: true })
       .sort({ name: 1 })
       .toArray();
@@ -343,6 +660,25 @@ router.get(
         ],
       },
     });
+    } catch (error) {
+      logger.error("Error fetching filter options:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch filter options",
+        data: {
+          categories: [],
+          paymentMethods: [],
+          vendors: [],
+          tags: [],
+          amountRange: { min: 0, max: 0 },
+          dateRange: { min: null, max: null },
+          sortOptions: [
+            { value: "expenseDate", label: "Date" },
+            { value: "amount", label: "Amount" },
+          ],
+        },
+      });
+    }
   }),
 );
 
@@ -559,6 +895,9 @@ router.post(
 
     const result = await shopDb.collection("expenses").insertOne(expenseData);
 
+    // Invalidate financial reports cache (expense affects P&L, cash-flow, daily-summary)
+    cacheService.invalidateShopCache(req.user.shopId, "reports");
+
     res.status(201).json({
       success: true,
       message: "Expense created successfully",
@@ -705,6 +1044,9 @@ router.put(
       .collection("expenses")
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
+    // Invalidate financial reports cache
+    cacheService.invalidateShopCache(req.user.shopId, "reports");
+
     res.json({
       success: true,
       message: "Expense updated successfully",
@@ -735,6 +1077,9 @@ router.delete(
     await shopDb
       .collection("expenses")
       .deleteOne({ _id: new ObjectId(req.params.id) });
+
+    // Invalidate financial reports cache
+    cacheService.invalidateShopCache(req.user.shopId, "reports");
 
     res.json({
       success: true,
@@ -801,8 +1146,8 @@ router.post(
       throw createError.badRequest("No files uploaded");
     }
 
-    // Process uploaded files
-    const fileInfo = processUploadedFiles(req.files, req.user.shopId);
+    // Process uploaded files (upload to GCS or local storage)
+    const fileInfo = await processUploadedFiles(req.files, req.user.shopId, "receipts");
 
     res.json({
       success: true,
@@ -814,7 +1159,7 @@ router.post(
 
 /**
  * GET /api/expenses/receipts/:shopId/:filename
- * Serve receipt files
+ * Serve receipt files (local storage only - GCS files use public URLs)
  */
 router.get(
   "/receipts/:shopId/:filename",
@@ -827,7 +1172,7 @@ router.get(
       throw createError.forbidden("Access denied to this shop's files");
     }
 
-    const filePath = getFilePath(shopId, filename);
+    const filePath = getFilePath(shopId, filename, "receipts");
 
     if (!filePath) {
       throw createError.notFound("File not found");

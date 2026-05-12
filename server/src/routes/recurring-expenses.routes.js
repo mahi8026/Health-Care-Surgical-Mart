@@ -1,6 +1,5 @@
 /**
  * Recurring Expenses Routes
-const { logger } = require('../config/logging');
  * Management of recurring expense templates and processing
  */
 
@@ -20,10 +19,159 @@ const {
   stopRecurringExpense,
   processShopRecurringExpenses,
 } = require("../services/recurring-expense.service");
+const { logger } = require('../config/logging');
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/recurring-expenses:
+ *   get:
+ *     summary: Get all recurring expense templates
+ *     description: Retrieve all recurring expense schedules for the shop. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: categoryId
+ *         schema: { type: string }
+ *         description: Filter by category
+ *       - in: query
+ *         name: isActive
+ *         schema: { type: boolean }
+ *         description: Filter by active status
+ *     responses:
+ *       200:
+ *         description: Recurring expenses retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id: { type: string }
+ *                       name: { type: string, example: "Monthly Rent" }
+ *                       amount: { type: number, example: 50000 }
+ *                       frequency: { type: string, enum: [daily, weekly, monthly, yearly] }
+ *                       nextDueDate: { type: string, format: date }
+ *                       isActive: { type: boolean }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   post:
+ *     summary: Create recurring expense template
+ *     description: Set up a new recurring expense schedule. Requires expenses.create permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, categoryId, amount, frequency, startDate]
+ *             properties:
+ *               name: { type: string, example: "Monthly Rent" }
+ *               categoryId: { type: string }
+ *               amount: { type: number, minimum: 0, example: 50000 }
+ *               frequency:
+ *                 type: string
+ *                 enum: [daily, weekly, monthly, yearly]
+ *                 example: "monthly"
+ *               startDate: { type: string, format: date, example: "2026-06-01" }
+ *               endDate: { type: string, format: date }
+ *               paymentMethod: { type: string, enum: [cash, bank_transfer, card, mobile] }
+ *               description: { type: string }
+ *     responses:
+ *       201:
+ *         description: Recurring expense created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/recurring-expenses/{id}:
+ *   put:
+ *     summary: Update recurring expense template
+ *     description: Update a recurring expense schedule. Requires expenses.edit permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               amount: { type: number }
+ *               frequency: { type: string }
+ *               isActive: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Recurring expense updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Recurring expense updated" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/recurring-expenses/{id}/stop:
+ *   post:
+ *     summary: Stop recurring expense
+ *     description: Deactivate a recurring expense schedule. Requires expenses.edit permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Recurring expense stopped
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Recurring expense stopped" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/recurring-expenses

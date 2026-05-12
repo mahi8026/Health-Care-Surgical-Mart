@@ -1,6 +1,5 @@
 /**
  * Expense Categories Routes
-const { logger } = require('../config/logging');
  * CRUD operations for expense category management
  */
 
@@ -15,10 +14,177 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
+const { cacheResponse } = require("../middleware/cache.middleware");
+const { cacheService, TTL } = require("../services/cache.service");
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/expense-categories:
+ *   get:
+ *     summary: Get all expense categories
+ *     description: Retrieve expense categories for the shop. Requires expenses.view_categories permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: includeInactive
+ *         schema: { type: boolean, default: false }
+ *         description: Include inactive categories
+ *     responses:
+ *       200:
+ *         description: Categories retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id: { type: string }
+ *                       name: { type: string, example: "Utilities" }
+ *                       description: { type: string }
+ *                       isActive: { type: boolean }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   post:
+ *     summary: Create expense category
+ *     description: Create a new expense category. Requires expenses.manage_categories permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name: { type: string, example: "Utilities" }
+ *               description: { type: string, example: "Electricity, water, internet bills" }
+ *               color: { type: string, example: "#FF5733" }
+ *     responses:
+ *       201:
+ *         description: Category created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expense-categories/{id}:
+ *   get:
+ *     summary: Get expense category by ID
+ *     description: Retrieve a specific expense category. Requires expenses.view_categories permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Category retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update expense category
+ *     description: Update an expense category. Requires expenses.manage_categories permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               description: { type: string }
+ *               isActive: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Category updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Category updated successfully" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   delete:
+ *     summary: Delete expense category
+ *     description: Delete an expense category. Cannot delete if expenses are linked. Requires expenses.manage_categories permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Category deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Category deleted successfully" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       409:
+ *         description: Cannot delete category with linked expenses
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/expense-categories
@@ -27,6 +193,7 @@ router.use(checkShopStatus);
 router.get(
   "/",
   requirePermission(PERMISSIONS.VIEW_EXPENSE_CATEGORIES),
+  cacheResponse(TTL.EXPENSE_CATS, (req) => `expense-cats:${req.user.shopId}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { includeInactive = false } = req.query;
@@ -129,6 +296,9 @@ router.post(
       .collection("expenseCategories")
       .insertOne(categoryData);
 
+    // Invalidate expense categories cache
+    cacheService.invalidateShopCache(req.user.shopId, "expense-cats");
+
     res.status(201).json({
       success: true,
       message: "Expense category created successfully",
@@ -203,6 +373,9 @@ router.put(
       .collection("expenseCategories")
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
+    // Invalidate expense categories cache
+    cacheService.invalidateShopCache(req.user.shopId, "expense-cats");
+
     res.json({
       success: true,
       message: "Expense category updated successfully",
@@ -247,6 +420,9 @@ router.delete(
         { _id: new ObjectId(req.params.id) },
         { $set: { isActive: false, updatedAt: new Date() } },
       );
+
+    // Invalidate expense categories cache
+    cacheService.invalidateShopCache(req.user.shopId, "expense-cats");
 
     res.json({
       success: true,

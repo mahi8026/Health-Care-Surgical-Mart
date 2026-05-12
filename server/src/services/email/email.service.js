@@ -85,47 +85,87 @@ class EmailService {
   }
 
   /**
-   * Send an invoice email with a PDF attachment.
-   * PDF generation is stubbed — replace with real implementation when ready.
-   * @param {object} sale
-   * @param {object} customer
+   * Send an invoice email with a download link to the generated PDF.
+   * Generates PDF via pdfkit, uploads to GCS (or local fallback),
+   * then sends email with a "Download Invoice" button.
+   * @param {object} sale - Sale document
+   * @param {object} customer - Customer document
+   * @param {object} [options] - Optional overrides
+   * @param {string} [options.shopId] - Shop ID (falls back to sale.shopId)
+   * @returns {Promise<{ invoiceUrl: string, emailSent: boolean, messageId?: string }>}
    */
-  async sendInvoice(sale, customer) {
-    const invoicePDF = await this.generateInvoicePDF(sale);
+  async sendInvoice(sale, customer, options = {}) {
+    const shopId = options.shopId || sale.shopId || "main_store";
 
-    const { subject, html } = this.template.render(
-      await this.template.get("invoice_email"),
-      {
-        customerName: customer.name,
-        invoiceNo: sale.invoiceNo,
-        shopId: sale.shopId,
-      },
+    // 1. Generate PDF buffer
+    const pdfBuffer = await this.generateInvoicePDF(sale);
+
+    // 2. Upload PDF to GCS / local storage
+    const { uploadInvoicePDF } = require("../file-upload.service");
+    const { url: invoiceUrl, storage } = await uploadInvoicePDF(
+      pdfBuffer,
+      shopId,
+      sale._id?.toString() || sale.invoiceNo
     );
 
-    const result = await this.sendgrid.sendEmail(customer.email, subject, html, {
-      shopId: sale.shopId,
-      attachments: [
+    // 3. Fetch shop details for branding
+    let shopName = "Health Care Surgical Mart";
+    let shopPhone = "";
+    let shopAddress = "";
+    try {
+      const { getSystemDatabase } = require("../../config/database");
+      const systemDb = getSystemDatabase();
+      const shop = await systemDb.collection("shops").findOne({ shopId });
+      if (shop) {
+        shopName = shop.shopName || shop.name || shopName;
+        shopPhone = shop.phone || "";
+        shopAddress = shop.address || "";
+      }
+    } catch (_) {
+      // Non-fatal — use defaults
+    }
+
+    // 4. Send email if customer has an email address
+    let emailSent = false;
+    let messageId;
+
+    if (customer?.email) {
+      const { subject, html } = this.template.render(
+        await this.template.get("invoice_email"),
         {
-          content: invoicePDF.toString("base64"),
-          filename: `invoice-${sale.invoiceNo}.pdf`,
-          type: "application/pdf",
-          disposition: "attachment",
-        },
-      ],
-    });
+          customerName: customer.name || "Valued Customer",
+          invoiceNo: sale.invoiceNo,
+          invoiceDate: new Date(sale.saleDate || Date.now()).toLocaleDateString(),
+          totalAmount: `৳${(sale.grandTotal || 0).toFixed(2)}`,
+          invoiceUrl,
+          shopName,
+          shopPhone,
+          shopAddress,
+        }
+      );
 
-    await this.logEmail({
-      recipient: customer.email,
-      subject,
-      templateName: "invoice_email",
-      provider: "sendgrid",
-      type: "transactional",
-      status: result.status,
-      messageId: result.messageId,
-      shopId: sale.shopId,
-    });
+      const result = await this.sendgrid.sendEmail(customer.email, subject, html, {
+        shopId,
+      });
 
-    return result;
+      await this.logEmail({
+        recipient: customer.email,
+        subject,
+        templateName: "invoice_email",
+        provider: "sendgrid",
+        type: "transactional",
+        status: result.status,
+        messageId: result.messageId,
+        shopId,
+        invoiceUrl,
+        storage,
+      });
+
+      emailSent = result.status === "sent" || result.status === "queued";
+      messageId = result.messageId;
+    }
+
+    return { invoiceUrl, emailSent, messageId, storage };
   }
 
   /**
@@ -201,14 +241,112 @@ class EmailService {
   }
 
   /**
-   * Stub: Generate a PDF buffer for an invoice.
-   * Replace with a real PDF library (e.g. pdfkit, puppeteer) when ready.
+   * Generate a PDF buffer for an invoice.
    * @param {object} sale
    * @returns {Promise<Buffer>}
    */
   async generateInvoicePDF(sale) {
-    // TODO: implement real PDF generation
-    return Buffer.from(`Invoice #${sale.invoiceNo}`);
+    const PDFDocument = require('pdfkit');
+    
+    // Get shop details for branding (with fallback for testing)
+    let shop = null;
+    try {
+      const { getSystemDatabase } = require('../../config/database');
+      const systemDb = getSystemDatabase();
+      shop = await systemDb.collection('shops').findOne({ shopId: sale.shopId });
+    } catch (error) {
+      // Database not available (e.g., in tests) - use defaults
+      shop = null;
+    }
+    
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ 
+        margin: 50, 
+        compress: false,
+        info: {
+          Title: `Invoice #${sale.invoiceNo}`,
+          Subject: `Invoice ${sale.invoiceNo}`,
+          Keywords: sale.invoiceNo
+        }
+      });
+      const chunks = [];
+      
+      // Collect PDF data
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      
+      // Header with shop branding
+      doc.fontSize(20).text(shop?.shopName || 'Healthcare Surgical Mart', { align: 'center' });
+      doc.fontSize(10).text(shop?.address || '', { align: 'center' });
+      doc.text(shop?.phone || '', { align: 'center' });
+      doc.moveDown();
+      
+      // Invoice title and details
+      doc.fontSize(16).text(`INVOICE #${sale.invoiceNo}`, { align: 'center' });
+      doc.moveDown();
+      
+      // Customer and date info
+      doc.fontSize(10);
+      doc.text(`Date: ${new Date(sale.saleDate).toLocaleDateString()}`, { align: 'right' });
+      doc.text(`Customer: ${sale.customerName || 'Walk-in Customer'}`);
+      if (sale.customerPhone) doc.text(`Phone: ${sale.customerPhone}`);
+      doc.moveDown();
+      
+      // Table header
+      const tableTop = doc.y;
+      doc.fontSize(10).font('Helvetica-Bold');
+      doc.text('Item', 50, tableTop);
+      doc.text('Qty', 300, tableTop);
+      doc.text('Price', 370, tableTop);
+      doc.text('Total', 450, tableTop, { align: 'right' });
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+      
+      // Line items
+      doc.font('Helvetica');
+      let yPosition = tableTop + 25;
+      
+      for (const item of sale.items || []) {
+        doc.text(item.productName || item.name, 50, yPosition, { width: 240 });
+        doc.text(item.quantity.toString(), 300, yPosition);
+        doc.text(`₹${item.price.toFixed(2)}`, 370, yPosition);
+        doc.text(`₹${(item.quantity * item.price).toFixed(2)}`, 450, yPosition, { align: 'right' });
+        yPosition += 20;
+      }
+      
+      // Totals
+      doc.moveDown();
+      const totalsX = 400;
+      yPosition = doc.y + 10;
+      
+      doc.text('Subtotal:', totalsX, yPosition);
+      doc.text(`₹${sale.subtotal?.toFixed(2) || '0.00'}`, 450, yPosition, { align: 'right' });
+      yPosition += 20;
+      
+      if (sale.discount > 0) {
+        doc.text('Discount:', totalsX, yPosition);
+        doc.text(`-₹${sale.discount.toFixed(2)}`, 450, yPosition, { align: 'right' });
+        yPosition += 20;
+      }
+      
+      if (sale.tax > 0) {
+        doc.text('Tax:', totalsX, yPosition);
+        doc.text(`₹${sale.tax.toFixed(2)}`, 450, yPosition, { align: 'right' });
+        yPosition += 20;
+      }
+      
+      doc.font('Helvetica-Bold');
+      doc.fontSize(12);
+      doc.text('Grand Total:', totalsX, yPosition);
+      doc.text(`₹${sale.grandTotal.toFixed(2)}`, 450, yPosition, { align: 'right' });
+      
+      // Footer
+      doc.fontSize(8).font('Helvetica').moveDown(2);
+      doc.text('Thank you for your business!', { align: 'center' });
+      
+      // Finalize PDF
+      doc.end();
+    });
   }
 }
 

@@ -4,11 +4,8 @@
  */
 
 // API Configuration
-// TEMPORARY: Hardcode for debugging - will revert after confirming it works
-const API_BASE_URL_TEMP = 'https://health-care-surgical-mart.onrender.com/api';
-
 export const API_CONFIG = {
-  BASE_URL: API_BASE_URL_TEMP,
+  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
 };

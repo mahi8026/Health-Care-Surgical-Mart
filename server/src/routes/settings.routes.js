@@ -1,6 +1,5 @@
 /**
  * Settings Routes
-const { logger } = require('../config/logging');
  * Handles system settings, shop configuration, and preferences
  */
 
@@ -15,10 +14,274 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
+const auditLog = require("../services/audit-log.service");
+const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+const { cacheResponse } = require("../middleware/cache.middleware");
+const { cacheService, TTL } = require("../services/cache.service");
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/settings/shop:
+ *   get:
+ *     summary: Get shop settings
+ *     description: Retrieve shop configuration including name, address, currency, and branding. Requires users.view permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Shop settings retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     name: { type: string, example: "Health Care Surgical Mart" }
+ *                     address: { type: string }
+ *                     phone: { type: string }
+ *                     email: { type: string }
+ *                     currency: { type: string, example: "BDT" }
+ *                     logo: { type: string }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update shop settings
+ *     description: Update shop configuration. Requires settings.manage permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               address: { type: string }
+ *               phone: { type: string }
+ *               email: { type: string }
+ *               currency: { type: string, example: "BDT" }
+ *     responses:
+ *       200:
+ *         description: Shop settings updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Shop settings updated" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/settings/tax:
+ *   get:
+ *     summary: Get tax settings
+ *     description: Retrieve VAT/tax configuration. Requires users.view permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Tax settings retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     vatEnabled: { type: boolean, example: true }
+ *                     vatRate: { type: number, example: 15.0 }
+ *                     vatNumber: { type: string }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update tax settings
+ *     description: Update VAT/tax configuration. Requires settings.manage permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               vatEnabled: { type: boolean }
+ *               vatRate: { type: number, minimum: 0, maximum: 100 }
+ *               vatNumber: { type: string }
+ *     responses:
+ *       200:
+ *         description: Tax settings updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Tax settings updated" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/settings/receipt:
+ *   get:
+ *     summary: Get receipt settings
+ *     description: Retrieve receipt/invoice template configuration. Requires users.view permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Receipt settings retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     header: { type: string }
+ *                     footer: { type: string }
+ *                     showLogo: { type: boolean }
+ *                     paperSize: { type: string, enum: [A4, A5, thermal80mm] }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update receipt settings
+ *     description: Update receipt/invoice template configuration. Requires settings.manage permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               header: { type: string }
+ *               footer: { type: string }
+ *               showLogo: { type: boolean }
+ *               paperSize: { type: string, enum: [A4, A5, thermal80mm] }
+ *     responses:
+ *       200:
+ *         description: Receipt settings updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Receipt settings updated" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/settings/system:
+ *   get:
+ *     summary: Get system settings
+ *     description: Retrieve system-level configuration (timezone, language, etc.). Requires users.view permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: System settings retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     timezone: { type: string, example: "Asia/Dhaka" }
+ *                     language: { type: string, example: "en" }
+ *                     dateFormat: { type: string, example: "DD/MM/YYYY" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ *   put:
+ *     summary: Update system settings
+ *     description: Update system-level configuration. Requires settings.manage permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               timezone: { type: string }
+ *               language: { type: string }
+ *               dateFormat: { type: string }
+ *     responses:
+ *       200:
+ *         description: System settings updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "System settings updated" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/settings/backup:
+ *   post:
+ *     summary: Trigger data backup
+ *     description: Initiate a manual data backup for the shop. Requires settings.manage permission.
+ *     tags: [Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Backup initiated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Backup initiated successfully" }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/settings/shop
@@ -27,6 +290,7 @@ router.use(checkShopStatus);
 router.get(
   "/shop",
   requirePermission(PERMISSIONS.VIEW_USERS), // Shop admins can view shop settings
+  cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:shop`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
@@ -107,6 +371,15 @@ router.put(
       .collection("settings")
       .updateOne({ type: "shop" }, { $set: settingsData }, { upsert: true });
 
+    // Audit: shop settings updated
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "shop",
+      `Updated shop settings for ${req.user.shopId}`,
+      { after: { name: settingsData.name, currency: settingsData.currency, timezone: settingsData.timezone } }
+    );
+
+    // Invalidate settings cache
+    cacheService.invalidateShopCache(req.user.shopId, "settings");
+
     res.json({
       success: true,
       message: "Shop settings updated successfully",
@@ -121,6 +394,7 @@ router.put(
 router.get(
   "/tax",
   requirePermission(PERMISSIONS.VIEW_USERS),
+  cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:tax`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
@@ -173,6 +447,15 @@ router.put(
       .collection("settings")
       .updateOne({ type: "tax" }, { $set: settingsData }, { upsert: true });
 
+    // Audit: tax settings updated
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "tax",
+      `Updated tax settings for ${req.user.shopId}`,
+      { after: { enableTax: settingsData.enableTax, defaultTaxRate: settingsData.defaultTaxRate } }
+    );
+
+    // Invalidate settings cache
+    cacheService.invalidateShopCache(req.user.shopId, "settings");
+
     res.json({
       success: true,
       message: "Tax settings updated successfully",
@@ -187,6 +470,7 @@ router.put(
 router.get(
   "/system",
   requirePermission(PERMISSIONS.VIEW_USERS),
+  cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:system`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
@@ -262,6 +546,15 @@ router.put(
       .collection("settings")
       .updateOne({ type: "system" }, { $set: settingsData }, { upsert: true });
 
+    // Audit: system settings updated
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "system",
+      `Updated system settings for ${req.user.shopId}`,
+      { after: { lowStockThreshold: settingsData.lowStockThreshold, defaultPaymentMethod: settingsData.defaultPaymentMethod } }
+    );
+
+    // Invalidate settings cache
+    cacheService.invalidateShopCache(req.user.shopId, "settings");
+
     res.json({
       success: true,
       message: "System settings updated successfully",
@@ -276,6 +569,7 @@ router.put(
 router.get(
   "/receipt",
   requirePermission(PERMISSIONS.VIEW_USERS),
+  cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:receipt`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
@@ -341,6 +635,15 @@ router.put(
     await shopDb
       .collection("settings")
       .updateOne({ type: "receipt" }, { $set: settingsData }, { upsert: true });
+
+    // Audit: receipt settings updated
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "receipt",
+      `Updated receipt settings for ${req.user.shopId}`,
+      { after: { paperSize: settingsData.paperSize, showLogo: settingsData.showLogo } }
+    );
+
+    // Invalidate settings cache
+    cacheService.invalidateShopCache(req.user.shopId, "settings");
 
     res.json({
       success: true,

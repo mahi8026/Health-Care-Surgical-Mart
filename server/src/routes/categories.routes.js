@@ -1,6 +1,5 @@
 /**
  * Categories Routes - Multi-Tenant
-const { logger } = require('../config/logging');
  * Handles product categories
  */
 
@@ -12,10 +11,45 @@ const {
 } = require("../middleware/auth-multi-tenant");
 const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
+const { logger } = require('../config/logging');
+const { cacheResponse } = require("../middleware/cache.middleware");
+const { TTL } = require("../services/cache.service");
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/categories:
+ *   get:
+ *     summary: Get all product categories
+ *     description: Retrieve the predefined list of medical product categories. Requires products.view permission.
+ *     tags: [Products]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Categories retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id: { type: string, example: "medical" }
+ *                       name: { type: string, example: "Medical" }
+ *                       description: { type: string }
+ *                       isActive: { type: boolean, example: true }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/categories
@@ -24,6 +58,7 @@ router.use(checkShopStatus);
 router.get(
   "/",
   requirePermission(PERMISSIONS.VIEW_PRODUCTS),
+  cacheResponse(TTL.CATEGORIES, (req) => `categories:${req.user.shopId}`),
   async (req, res) => {
     try {
       // Return predefined categories for medical store

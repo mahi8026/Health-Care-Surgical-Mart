@@ -1,10 +1,35 @@
 /**
  * Test Routes - Simple endpoints without authentication for testing
-const { logger } = require('../config/logging');
  */
 
 const express = require("express");
 const router = express.Router();
+const { logger } = require('../config/logging');
+const { authenticate } = require('../middleware/auth-multi-tenant');
+
+/**
+ * GET /api/test
+ * Simple authenticated endpoint for testing error handling
+ */
+router.get("/", authenticate, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "Authenticated test endpoint",
+      user: {
+        id: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        shopId: req.user.shopId,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 
 /**
  * POST /api/test/auth/login

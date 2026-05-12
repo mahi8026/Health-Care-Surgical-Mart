@@ -7,6 +7,14 @@ class SMSTemplate {
   }
 
   loadTemplates() {
+    this.templates.set("test_sms", {
+      name: "test_sms",
+      content: "This is a test SMS from Health Care Surgical Mart. Your SMS system is working correctly!",
+      variables: [],
+      dltId: null,
+      category: "transactional",
+    });
+
     this.templates.set("order_confirmation", {
       name: "order_confirmation",
       content:

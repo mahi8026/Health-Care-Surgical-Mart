@@ -1,6 +1,5 @@
 /**
  * Expense Analytics Routes
-const { logger } = require('../config/logging');
  * Handles expense analytics, insights, and forecasting
  */
 
@@ -15,10 +14,235 @@ const { requirePermission } = require("../utils/rbac");
 const { PERMISSIONS } = require("../utils/rbac");
 const { getShopDatabase } = require("../config/database");
 const { asyncHandler, createError } = require("../config/error-handling");
+const { logger } = require('../config/logging');
 
 // Apply authentication to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+/**
+ * @swagger
+ * /api/expense-analytics/trends:
+ *   get:
+ *     summary: Get expense trend analysis
+ *     description: Retrieve expense trends over time grouped by period. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: period
+ *         schema: { type: string, enum: [daily, weekly, monthly], default: monthly }
+ *       - in: query
+ *         name: categoryId
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Trend data retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       period: { type: string }
+ *                       total: { type: number }
+ *                       count: { type: integer }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expense-analytics/by-category:
+ *   get:
+ *     summary: Get expenses grouped by category
+ *     description: Retrieve expense breakdown by category with totals and percentages. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Category breakdown retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       categoryId: { type: string }
+ *                       categoryName: { type: string }
+ *                       total: { type: number }
+ *                       percentage: { type: number }
+ *                       count: { type: integer }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expense-analytics/top-vendors:
+ *   get:
+ *     summary: Get top vendors by expense amount
+ *     description: Retrieve top vendors ranked by total expense amount. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *     responses:
+ *       200:
+ *         description: Top vendors retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       vendor: { type: string }
+ *                       total: { type: number }
+ *                       count: { type: integer }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expense-analytics/forecast:
+ *   get:
+ *     summary: Get expense forecast
+ *     description: Retrieve AI-based expense forecast for the next period based on historical data. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: months
+ *         schema: { type: integer, minimum: 1, maximum: 12, default: 3 }
+ *         description: Number of months to forecast
+ *     responses:
+ *       200:
+ *         description: Forecast retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       month: { type: string }
+ *                       forecastedAmount: { type: number }
+ *                       confidence: { type: number }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expense-analytics/budget-vs-actual:
+ *   get:
+ *     summary: Get budget vs actual comparison
+ *     description: Compare budgeted amounts against actual expenses by category. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: month
+ *         schema: { type: integer, minimum: 1, maximum: 12 }
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Budget comparison retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       category: { type: string }
+ *                       budgeted: { type: number }
+ *                       actual: { type: number }
+ *                       variance: { type: number }
+ *                       variancePercent: { type: number }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/expense-analytics/payment-methods:
+ *   get:
+ *     summary: Get expenses by payment method
+ *     description: Retrieve expense breakdown by payment method. Requires expenses.view permission.
+ *     tags: [Expenses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Payment method breakdown retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       method: { type: string }
+ *                       total: { type: number }
+ *                       percentage: { type: number }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * GET /api/expense-analytics/trends

@@ -710,9 +710,11 @@ const CustomerDetailsModal = ({
   formatCurrency,
   formatDate,
 }) => {
+  const [activeTab, setActiveTab] = useState("info");
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white max-w-2xl w-full max-h-screen overflow-y-auto rounded-lg shadow-2xl">
+      <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-lg shadow-2xl">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-900">
@@ -725,107 +727,43 @@ const CustomerDetailsModal = ({
               <i className="fas fa-times text-xl"></i>
             </button>
           </div>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mt-4 border-b border-gray-200">
+            {[
+              { key: "info", label: "Info", icon: "fas fa-user" },
+              { key: "history", label: "Purchase History", icon: "fas fa-shopping-cart" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.key
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <i className={tab.icon}></i>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Customer Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-md font-semibold text-gray-900 mb-4">
-                Contact Information
-              </h4>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Name
-                  </label>
-                  <p className="text-gray-900">{customer.name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Phone
-                  </label>
-                  <p className="text-gray-900">{customer.phone}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Email
-                  </label>
-                  <p className="text-gray-900">
-                    {customer.email || "Not provided"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Address
-                  </label>
-                  <p className="text-gray-900">
-                    {customer.address || "Not provided"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-md font-semibold text-gray-900 mb-4">
-                Customer Details
-              </h4>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Type
-                  </label>
-                  <p className="text-gray-900">
-                    <span
-                      className={`badge ${customer.type === "Retail" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}
-                    >
-                      {customer.type}
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Total Purchases
-                  </label>
-                  <p className="text-gray-900 font-semibold">
-                    {formatCurrency(customer.totalPurchases)}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Last Purchase
-                  </label>
-                  <p className="text-gray-900">
-                    {customer.lastPurchaseDate
-                      ? formatDate(customer.lastPurchaseDate)
-                      : "Never"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Customer Since
-                  </label>
-                  <p className="text-gray-900">
-                    {formatDate(customer.createdAt)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Purchase History Placeholder */}
-          <div>
-            <h4 className="text-md font-semibold text-gray-900 mb-4">
-              Recent Purchase History
-            </h4>
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <i className="fas fa-shopping-cart text-gray-400 text-3xl mb-2"></i>
-              <p className="text-gray-500">
-                Purchase history will be displayed here
-              </p>
-              <p className="text-sm text-gray-400">Feature coming soon</p>
-            </div>
-          </div>
+        <div className="p-6">
+          {activeTab === "info" ? (
+            <CustomerInfoTab
+              customer={customer}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+            />
+          ) : (
+            <PurchaseHistoryTab
+              customer={customer}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+            />
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
@@ -834,6 +772,284 @@ const CustomerDetailsModal = ({
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Customer Info Tab
+const CustomerInfoTab = ({ customer, formatCurrency, formatDate }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <h4 className="text-md font-semibold text-gray-900 mb-4">
+        Contact Information
+      </h4>
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm font-medium text-gray-500">Name</label>
+          <p className="text-gray-900">{customer.name}</p>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-500">Phone</label>
+          <p className="text-gray-900">{customer.phone}</p>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-500">Email</label>
+          <p className="text-gray-900">{customer.email || "Not provided"}</p>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-500">Address</label>
+          <p className="text-gray-900">{customer.address || "Not provided"}</p>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h4 className="text-md font-semibold text-gray-900 mb-4">
+        Customer Details
+      </h4>
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm font-medium text-gray-500">Type</label>
+          <p className="text-gray-900">
+            <span
+              className={`badge ${customer.type === "Retail" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}
+            >
+              {customer.type}
+            </span>
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-500">Total Purchases</label>
+          <p className="text-gray-900 font-semibold">
+            {formatCurrency(customer.totalPurchases)}
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-500">Last Purchase</label>
+          <p className="text-gray-900">
+            {customer.lastPurchaseDate ? formatDate(customer.lastPurchaseDate) : "Never"}
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-500">Customer Since</label>
+          <p className="text-gray-900">{formatDate(customer.createdAt)}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Purchase History Tab — lazy-loads on first render
+const PurchaseHistoryTab = ({ customer, formatCurrency, formatDate }) => {
+  const defaultStart = new Date();
+  defaultStart.setDate(defaultStart.getDate() - 30);
+
+  const [purchases, setPurchases] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
+  const [startDate, setStartDate] = useState(
+    defaultStart.toISOString().split("T")[0]
+  );
+  const [endDate, setEndDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
+  const fetchHistory = async (p = 1, start = startDate, end = endDate) => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({
+        page: p,
+        limit: 10,
+        startDate: start,
+        endDate: end,
+      });
+      const response = await apiService.get(
+        `/customers/${customer._id}/purchase-history?${params}`
+      );
+      if (response.success) {
+        setPurchases(response.purchases);
+        setSummary(response.customer);
+        setPagination(response.pagination);
+        setPage(p);
+      } else {
+        setError(response.message || "Failed to load purchase history");
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("Purchase history error:", err);
+      }
+      setError("Failed to load purchase history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Lazy load on first render of this tab
+  useEffect(() => {
+    fetchHistory(1);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFilter = () => fetchHistory(1, startDate, endDate);
+
+  return (
+    <div className="space-y-4">
+      {/* Summary row */}
+      {summary && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-blue-50 rounded-lg p-3 text-center">
+            <p className="text-xs text-blue-600 font-medium">Total Spent (All Time)</p>
+            <p className="text-lg font-bold text-blue-800">
+              {formatCurrency(summary.totalSpent)}
+            </p>
+          </div>
+          <div className="bg-green-50 rounded-lg p-3 text-center">
+            <p className="text-xs text-green-600 font-medium">Total Orders (All Time)</p>
+            <p className="text-lg font-bold text-green-800">{summary.totalOrders}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Date range filter */}
+      <div className="flex flex-wrap gap-2 items-end">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="input-field text-sm py-1.5"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="input-field text-sm py-1.5"
+          />
+        </div>
+        <button
+          onClick={handleFilter}
+          disabled={loading}
+          className="btn-primary text-sm py-1.5 px-3"
+        >
+          <i className="fas fa-filter mr-1"></i>
+          Apply
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+          <i className="fas fa-exclamation-circle mr-1"></i>{error}
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <LoadingSpinner size="md" />
+        </div>
+      ) : purchases.length === 0 ? (
+        /* Empty state */
+        <div className="text-center py-10 bg-gray-50 rounded-lg">
+          <i className="fas fa-shopping-cart text-gray-300 text-4xl mb-3"></i>
+          <p className="text-gray-500 font-medium">No purchases found</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Try adjusting the date range filter
+          </p>
+        </div>
+      ) : (
+        /* Purchases table */
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left">
+                <th className="px-3 py-2 font-medium text-gray-600">Date</th>
+                <th className="px-3 py-2 font-medium text-gray-600">Invoice</th>
+                <th className="px-3 py-2 font-medium text-gray-600">Items</th>
+                <th className="px-3 py-2 font-medium text-gray-600 text-right">Total</th>
+                <th className="px-3 py-2 font-medium text-gray-600">Payment</th>
+                <th className="px-3 py-2 font-medium text-gray-600">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {purchases.map((purchase) => (
+                <tr key={purchase.saleId} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                    {formatDate(purchase.date)}
+                  </td>
+                  <td className="px-3 py-2 text-blue-600 font-mono text-xs">
+                    {purchase.invoiceNo}
+                  </td>
+                  <td className="px-3 py-2 text-gray-600 max-w-[180px]">
+                    <div className="truncate" title={
+                      purchase.items.map((i) => `${i.productName} ×${i.qty}`).join(", ")
+                    }>
+                      {purchase.items.length === 0
+                        ? "—"
+                        : purchase.items.length === 1
+                          ? `${purchase.items[0].productName} ×${purchase.items[0].qty}`
+                          : `${purchase.items[0].productName} ×${purchase.items[0].qty} +${purchase.items.length - 1} more`
+                      }
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">
+                    {formatCurrency(purchase.total)}
+                  </td>
+                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    {purchase.paymentMethod}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      purchase.status === "Paid"
+                        ? "bg-green-100 text-green-800"
+                        : purchase.status === "Pending"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-gray-100 text-gray-700"
+                    }`}>
+                      {purchase.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && pagination.pages > 1 && (
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <p className="text-xs text-gray-500">
+            {pagination.total} purchase{pagination.total !== 1 ? "s" : ""} found
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchHistory(page - 1, startDate, endDate)}
+              disabled={page === 1 || loading}
+              className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-40 hover:bg-gray-50"
+            >
+              ‹ Prev
+            </button>
+            <span className="text-xs text-gray-600">
+              {page} / {pagination.pages}
+            </span>
+            <button
+              onClick={() => fetchHistory(page + 1, startDate, endDate)}
+              disabled={page === pagination.pages || loading}
+              className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-40 hover:bg-gray-50"
+            >
+              Next ›
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

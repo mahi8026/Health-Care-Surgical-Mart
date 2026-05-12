@@ -1,6 +1,5 @@
 /**
  * Notifications Routes
-const { logger } = require('../config/logging');
  * API endpoints for sending notifications
  */
 
@@ -18,6 +17,268 @@ const { logger } = require("../config/logging");
 
 // Apply authentication to all routes
 router.use(authenticate);
+
+/**
+ * @swagger
+ * /api/notifications/test-email:
+ *   post:
+ *     summary: Test email configuration
+ *     description: Send a test email to verify email provider is configured correctly. Requires settings.manage permission.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "admin@shop.com"
+ *     responses:
+ *       200:
+ *         description: Test email sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Test email sent to admin@shop.com" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/notifications/test-sms:
+ *   post:
+ *     summary: Test SMS configuration
+ *     description: Send a test SMS to verify SMS provider is configured correctly. Requires settings.manage permission.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [phone]
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 example: "+8801712345678"
+ *     responses:
+ *       200:
+ *         description: Test SMS sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Test SMS sent to +8801712345678" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/notifications/send-invoice:
+ *   post:
+ *     summary: Send invoice notification (email + SMS)
+ *     description: Send invoice to customer via email and/or SMS. Requires notifications.send permission.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [saleId]
+ *             properties:
+ *               saleId:
+ *                 type: string
+ *                 example: "507f1f77bcf86cd799439011"
+ *               channels:
+ *                 type: array
+ *                 items: { type: string, enum: [email, sms] }
+ *                 example: ["email", "sms"]
+ *     responses:
+ *       200:
+ *         description: Invoice notification sent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     email: { type: object }
+ *                     sms: { type: object }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/notifications/low-stock-alert:
+ *   post:
+ *     summary: Send low stock alert notification
+ *     description: Send low stock alert to shop admin via email and/or SMS. Requires settings.manage permission.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               channels:
+ *                 type: array
+ *                 items: { type: string, enum: [email, sms] }
+ *                 example: ["email"]
+ *     responses:
+ *       200:
+ *         description: Low stock alert sent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     itemsAlerted: { type: integer, example: 5 }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/notifications/payment-reminder:
+ *   post:
+ *     summary: Send payment reminder to customer
+ *     description: Send payment due reminder to a customer with outstanding balance. Requires notifications.send permission.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [customerId]
+ *             properties:
+ *               customerId:
+ *                 type: string
+ *                 example: "507f1f77bcf86cd799439011"
+ *               channels:
+ *                 type: array
+ *                 items: { type: string, enum: [email, sms] }
+ *                 example: ["sms"]
+ *     responses:
+ *       200:
+ *         description: Payment reminder sent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Payment reminder sent" }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/notifications/bulk-sms:
+ *   post:
+ *     summary: Send bulk SMS to all customers
+ *     description: Send a promotional or informational SMS to all active customers. Requires notifications.send permission.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 maxLength: 160
+ *                 example: "Special offer: 20% off all surgical supplies this week!"
+ *               filter:
+ *                 type: object
+ *                 description: Optional customer filter criteria
+ *     responses:
+ *       200:
+ *         description: Bulk SMS queued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     queued: { type: integer, example: 120 }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ *
+ * /api/notifications/history:
+ *   get:
+ *     summary: Get notification history
+ *     description: Retrieve paginated history of all sent notifications. Requires ADMIN or MANAGER role.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 50 }
+ *       - in: query
+ *         name: type
+ *         schema: { type: string, enum: [email, sms, all], default: all }
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Notification history retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: array, items: { type: object } }
+ *                 pagination: { $ref: '#/components/schemas/PaginationMeta' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
 
 /**
  * POST /api/notifications/test-email

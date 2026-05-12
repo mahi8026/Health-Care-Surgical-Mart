@@ -1,62 +1,27 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import LoadingSpinner from "../LoadingSpinner";
-
-const STORAGE_KEY = "sms_provider_settings";
+import { apiService } from "../../services/api";
 
 const SMSSettings = () => {
-  const [settings, setSettings] = useState({
-    provider: "twilio",
-    // Twilio fields
-    accountSid: "",
-    authToken: "",
-    phoneNumber: "",
-    // MSG91 fields
-    apiKey: "",
-    senderId: "",
-  });
-  const [saving, setSaving] = useState(false);
+  const [configStatus, setConfigStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
-      } catch {
-        // ignore parse errors
-      }
-    }
+    checkConfiguration();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setSettings((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage({ type: "", text: "" });
+  const checkConfiguration = async () => {
+    setLoading(true);
     try {
-      // Try POST to /api/settings first, fall back to localStorage
-      const res = await fetch("/api/settings/sms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      }).catch(() => null);
-
-      if (res && res.ok) {
-        setMessage({ type: "success", text: "SMS settings saved successfully!" });
-      } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        setMessage({ type: "success", text: "SMS settings saved locally." });
-      }
-    } catch {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-      setMessage({ type: "success", text: "SMS settings saved locally." });
+      const response = await apiService.get("/sms/config-status");
+      setConfigStatus(response.data);
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to check SMS configuration status" });
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
@@ -68,34 +33,36 @@ const SMSSettings = () => {
     setTesting(true);
     setMessage({ type: "", text: "" });
     try {
-      const res = await fetch("/api/sms/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: testPhone,
-          message: "This is a test SMS from your notification system.",
-        }),
+      await apiService.post("/sms/send", {
+        to: testPhone,
+        templateName: "test_sms",
+        variables: {},
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success !== false) {
-        setMessage({ type: "success", text: "Test SMS sent successfully!" });
-      } else {
-        setMessage({ type: "error", text: data.message || "Failed to send test SMS." });
-      }
-    } catch {
-      setMessage({ type: "error", text: "Could not reach SMS API. Check your server." });
+      setMessage({ type: "success", text: "Test SMS sent successfully!" });
+      setTestPhone("");
+    } catch (error) {
+      setMessage({ type: "error", text: error.message || "Failed to send test SMS." });
     } finally {
       setTesting(false);
     }
   };
 
-  const isTwilio = settings.provider === "twilio";
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  const isConfigured = configStatus?.configured;
+  const provider = configStatus?.provider || "Not set";
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">SMS Provider Settings</h3>
-        <p className="text-sm text-gray-500">Configure your SMS gateway credentials.</p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">SMS Provider Configuration</h3>
+        <p className="text-sm text-gray-500">SMS credentials must be configured on the server.</p>
       </div>
 
       {message.text && (
@@ -111,117 +78,118 @@ const SMSSettings = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Provider selection */}
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">SMS Provider</label>
-          <select
-            name="provider"
-            value={settings.provider}
-            onChange={handleChange}
-            className="input-field"
-          >
-            <option value="twilio">Twilio</option>
-            <option value="msg91">MSG91</option>
-          </select>
-        </div>
-
-        {isTwilio ? (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Account SID</label>
-              <input
-                type="text"
-                name="accountSid"
-                value={settings.accountSid}
-                onChange={handleChange}
-                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Auth Token</label>
-              <input
-                type="password"
-                name="authToken"
-                value={settings.authToken}
-                onChange={handleChange}
-                placeholder="Your Twilio auth token"
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Twilio Phone Number</label>
-              <input
-                type="text"
-                name="phoneNumber"
-                value={settings.phoneNumber}
-                onChange={handleChange}
-                placeholder="+1234567890"
-                className="input-field"
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-              <input
-                type="password"
-                name="apiKey"
-                value={settings.apiKey}
-                onChange={handleChange}
-                placeholder="Your MSG91 API key"
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sender ID</label>
-              <input
-                type="text"
-                name="senderId"
-                value={settings.senderId}
-                onChange={handleChange}
-                placeholder="HLTHCR"
-                className="input-field"
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="btn-primary flex items-center gap-2"
-        >
-          {saving ? <LoadingSpinner size="sm" /> : <i className="fas fa-save"></i>}
-          {saving ? "Saving..." : "Save Settings"}
-        </button>
-      </div>
-
-      {/* Test SMS */}
-      <div className="border-t border-gray-200 pt-6">
-        <h4 className="text-sm font-semibold text-gray-900 mb-3">Send Test SMS</h4>
-        <div className="flex gap-3">
-          <input
-            type="tel"
-            value={testPhone}
-            onChange={(e) => setTestPhone(e.target.value)}
-            placeholder="Phone number with country code, e.g. +8801234567890"
-            className="input-field flex-1"
-          />
+      {/* Configuration Status */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-semibold text-gray-900">Configuration Status</h4>
           <button
-            onClick={handleTest}
-            disabled={testing}
-            className="btn-secondary flex items-center gap-2 whitespace-nowrap"
+            onClick={checkConfiguration}
+            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
           >
-            {testing ? <LoadingSpinner size="sm" /> : <i className="fas fa-paper-plane"></i>}
-            {testing ? "Sending..." : "Send Test"}
+            <i className="fas fa-sync-alt"></i>
+            Refresh
           </button>
         </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">Status:</span>
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                isConfigured
+                  ? "bg-green-100 text-green-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}
+            >
+              <i className={`fas ${isConfigured ? "fa-check-circle" : "fa-exclamation-triangle"}`}></i>
+              {isConfigured ? "Configured" : "Not Configured"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">Provider:</span>
+            <span className="text-sm font-medium text-gray-900 capitalize">{provider}</span>
+          </div>
+          {configStatus?.providers && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Available Providers:</span>
+              <span className="text-sm text-gray-900">
+                {Object.entries(configStatus.providers)
+                  .filter(([_, status]) => status)
+                  .map(([name]) => name)
+                  .join(", ") || "None"}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Configuration Instructions */}
+      {!isConfigured && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex gap-3">
+            <i className="fas fa-info-circle text-blue-600 mt-0.5"></i>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-blue-900 mb-2">How to Configure SMS</h4>
+              <p className="text-sm text-blue-800 mb-3">
+                SMS providers must be configured in the server environment variables. Follow these steps:
+              </p>
+              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                <li>Choose a provider (Twilio or MSG91) and sign up for an account</li>
+                <li>Get your API credentials from the provider dashboard</li>
+                <li>
+                  Add credentials to <code className="bg-blue-100 px-1.5 py-0.5 rounded">server/.env</code> file:
+                  <div className="mt-2 bg-blue-100 rounded p-3 font-mono text-xs">
+                    <div>TWILIO_ACCOUNT_SID=your_account_sid</div>
+                    <div>TWILIO_AUTH_TOKEN=your_auth_token</div>
+                    <div>TWILIO_PHONE_NUMBER=+1234567890</div>
+                    <div>SMS_DEFAULT_PROVIDER=twilio</div>
+                  </div>
+                </li>
+                <li>Restart the server to apply changes</li>
+                <li>Refresh this page to verify configuration</li>
+              </ol>
+              <p className="text-sm text-blue-800 mt-3">
+                For detailed instructions, see the{" "}
+                <a
+                  href="https://github.com/your-repo/docs/SMS_CONFIGURATION.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium"
+                >
+                  SMS Configuration Guide
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Test SMS - Only show if configured */}
+      {isConfigured && (
+        <div className="border-t border-gray-200 pt-6">
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">Send Test SMS</h4>
+          <p className="text-sm text-gray-500 mb-3">
+            Send a test message to verify your SMS configuration is working correctly.
+          </p>
+          <div className="flex gap-3">
+            <input
+              type="tel"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="Phone number with country code, e.g. +919876543210"
+              className="input-field flex-1"
+            />
+            <button
+              onClick={handleTest}
+              disabled={testing}
+              className="btn-secondary flex items-center gap-2 whitespace-nowrap"
+            >
+              {testing ? <LoadingSpinner size="sm" /> : <i className="fas fa-paper-plane"></i>}
+              {testing ? "Sending..." : "Send Test"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

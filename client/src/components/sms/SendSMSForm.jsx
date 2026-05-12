@@ -69,11 +69,14 @@ const SendSMSForm = () => {
           <input
             type="tel"
             required
-            placeholder="+1234567890"
+            placeholder="+8801646886795"
             value={form.to}
-            onChange={(e) => setForm((f) => ({ ...f, to: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, to: e.target.value.trim() }))}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Format: +[country code][number] (e.g., +8801646886795 for Bangladesh)
+          </p>
         </div>
 
         <div>

@@ -117,7 +117,7 @@ const ExpenseFilters = ({
     }),
   );
 
-  const categoryOptions = categories.map((category) => ({
+  const categoryOptions = (categories || []).map((category) => ({
     value: category._id,
     label: category.name,
     type: category.type,

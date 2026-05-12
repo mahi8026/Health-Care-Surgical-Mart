@@ -3,6 +3,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../config/firebase";
 import { signInWithEmail, signOutUser } from "../services/firebaseAuthService";
 import { apiService } from "../services/api";
+import { setUserContext, clearUserContext } from "../config/sentry";
 
 const AuthContext = createContext();
 
@@ -43,9 +44,14 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem("user", JSON.stringify(response.data.user));
             setToken(response.data.token);
             setMongoUser(response.data.user);
+            
+            // Set user context in Sentry
+            setUserContext(response.data.user);
           }
         } catch (error) {
-          console.error("Error verifying Firebase token:", error);
+          if (import.meta.env.DEV) {
+            console.error("Error verifying Firebase token:", error);
+          }
           setError("Failed to verify authentication");
         }
       } else {
@@ -54,6 +60,9 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("user");
         setToken(null);
         setMongoUser(null);
+        
+        // Clear user context in Sentry
+        clearUserContext();
       }
 
       setLoading(false);
@@ -98,6 +107,10 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem("user", JSON.stringify(response.data.user));
         setToken(response.data.token);
         setMongoUser(response.data.user);
+        
+        // Set user context in Sentry
+        setUserContext(response.data.user);
+
         return { success: true };
       } else {
         // Firebase auth succeeded but MongoDB verification failed
@@ -108,7 +121,9 @@ export const AuthProvider = ({ children }) => {
         };
       }
     } catch (error) {
-      console.error("Login error:", error);
+      if (import.meta.env.DEV) {
+        console.error("Login error:", error);
+      }
       setError(error.message);
       return {
         success: false,
@@ -127,9 +142,15 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       setMongoUser(null);
       setFirebaseUser(null);
+      
+      // Clear user context in Sentry
+      clearUserContext();
+      
       return { success: true };
     } catch (error) {
-      console.error("Logout error:", error);
+      if (import.meta.env.DEV) {
+        console.error("Logout error:", error);
+      }
       return {
         success: false,
         message: error.message,

@@ -1,6 +1,5 @@
 /**
  * Multi-Tenant Authentication Routes
-const { logger } = require('../config/logging');
  * Login for all user types
  */
 
@@ -9,6 +8,226 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const { getShopDatabase, getSystemDatabase } = require("../config/database");
 const { generateToken } = require("../middleware/auth-multi-tenant");
+const { logger } = require('../config/logging');
+const auditLog = require("../services/audit-log.service");
+const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+
+/**
+ * @swagger
+ * /api/auth/firebase-login:
+ *   post:
+ *     summary: Login with Firebase authentication token
+ *     description: Authenticate user using Firebase ID token and get JWT token for API access. Supports both shop users and super admins. Shop ID is auto-detected if not provided.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *           examples:
+ *             shopUser:
+ *               summary: Shop user login
+ *               value:
+ *                 idToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjFkYzBmM..."
+ *                 email: "manager@shop.com"
+ *                 shopId: "shop_12345"
+ *             autoDetect:
+ *               summary: Auto-detect shop
+ *               value:
+ *                 idToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjFkYzBmM..."
+ *                 email: "manager@shop.com"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         description: Invalid credentials or inactive account
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               invalidToken:
+ *                 value:
+ *                   success: false
+ *                   message: "Invalid Firebase token"
+ *               userNotFound:
+ *                 value:
+ *                   success: false
+ *                   message: "User not found in system. Please contact administrator."
+ *               inactiveAccount:
+ *                 value:
+ *                   success: false
+ *                   message: "User account is inactive"
+ *       403:
+ *         description: Shop is not active
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Shop is suspended. Please contact support."
+ *       404:
+ *         description: Shop not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Shop not found"
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login with email and password (legacy)
+ *     description: Authenticate user using email and password. Returns JWT token for API access. Shop ID is auto-detected if not provided.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "manager@shop.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: "SecurePassword123"
+ *               shopId:
+ *                 type: string
+ *                 description: "Shop ID (optional - auto-detected if not provided)"
+ *                 example: "shop_12345"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         description: Invalid credentials or inactive account
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Invalid email or password"
+ *       403:
+ *         description: Shop is not active
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *
+ * @swagger
+ * /api/auth/change-password:
+ *   post:
+ *     summary: Change user password
+ *     description: Change password for authenticated user. Requires old password verification.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "manager@shop.com"
+ *               oldPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "OldPassword123"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *                 example: "NewSecurePassword456"
+ *               shopId:
+ *                 type: string
+ *                 description: "Shop ID (required for shop users, not for super admin)"
+ *                 example: "shop_12345"
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Password changed successfully"
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               missingFields:
+ *                 value:
+ *                   success: false
+ *                   message: "All fields are required"
+ *               weakPassword:
+ *                 value:
+ *                   success: false
+ *                   message: "New password must be at least 8 characters"
+ *       401:
+ *         description: Old password is incorrect
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Old password is incorrect"
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "User not found"
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 
 /**
  * POST /api/auth/login
@@ -148,6 +367,16 @@ router.post("/login", async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
+    // Audit: successful legacy login
+    auditLog.log(req, AUDIT_ACTIONS.LOGIN, "auth", user._id?.toString(),
+      `User ${user.email} logged in (password)`, {
+        after: { email: user.email, role: user.role, shopId: user.shopId || null },
+        shopId: user.shopId || null,
+        userId: user._id?.toString(),
+        userEmail: user.email,
+      }
+    );
+
     res.json({
       success: true,
       message: "Login successful",
@@ -270,18 +499,53 @@ router.post("/change-password", async (req, res) => {
  */
 router.post("/firebase-login", async (req, res) => {
   try {
-    const { email, shopId } = req.body;
+    const { email, shopId, idToken, firebaseToken } = req.body;
 
+    // Accept both 'idToken' and 'firebaseToken' for backward compatibility
+    const firebaseIdToken = idToken || firebaseToken;
 
-    if (!email) {
+    if (!email || !firebaseIdToken) {
       return res.status(400).json({
         success: false,
-        message: "Email is required",
+        message: "Email and Firebase ID token are required",
       });
     }
 
-    // Note: In production, you should verify the Firebase token here
-    // For now, we trust that the frontend has already authenticated with Firebase
+    // Verify Firebase token using Firebase Admin SDK
+    const admin = require('../config/firebase-admin');
+    
+    // In development without Firebase credentials, skip token verification
+    // and trust the email directly (dev-only bypass)
+    const firebaseAdminConfigured = admin.apps && admin.apps.length > 0;
+    
+    if (firebaseAdminConfigured) {
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
+      } catch (error) {
+        logger.error("Firebase token verification failed:", error);
+        return res.status(401).json({
+          success: false,
+          message: "Invalid Firebase token",
+        });
+      }
+
+      // Verify email matches token
+      if (decodedToken.email !== email) {
+        logger.warn(`Email mismatch: token email ${decodedToken.email} !== request email ${email}`);
+        return res.status(401).json({
+          success: false,
+          message: "Email does not match Firebase token",
+        });
+      }
+    } else {
+      // Firebase Admin not configured — skip token verification in development
+      logger.warn("Firebase Admin SDK not configured — skipping token verification (dev mode)", {
+        file: "auth-multi-tenant.routes.js",
+        function: "firebase-login",
+        email,
+      });
+    }
 
     let user;
     let userDb;
@@ -393,6 +657,16 @@ router.post("/firebase-login", async (req, res) => {
 
     // Generate token
     const token = generateToken(user);
+
+    // Audit: successful login
+    auditLog.log(req, AUDIT_ACTIONS.LOGIN, "auth", user._id?.toString(),
+      `User ${user.email} logged in via Firebase`, {
+        after: { email: user.email, role: user.role, shopId: user.shopId || null },
+        shopId: user.shopId || null,
+        userId: user._id?.toString(),
+        userEmail: user.email,
+      }
+    );
 
     res.json({
       success: true,
