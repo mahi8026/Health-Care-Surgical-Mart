@@ -1,11 +1,17 @@
 /**
  * Sentry Configuration for Frontend Error Tracking
  * Captures and reports errors to Sentry for monitoring and debugging
- * 
- * @version 1.0.0
+ *
+ * @version 2.0.0 - Updated for @sentry/react v8 API
  */
 
 import * as Sentry from "@sentry/react";
+import {
+  useLocation,
+  useNavigationType,
+  createRoutesFromChildren,
+  matchRoutes,
+} from "react-router-dom";
 
 /**
  * Initialize Sentry for error tracking
@@ -20,27 +26,26 @@ export const initializeSentry = () => {
   try {
     Sentry.init({
       dsn: import.meta.env.VITE_SENTRY_DSN,
-      
+
       // Environment configuration
       environment: import.meta.env.MODE || "development",
-      
+
       // Release tracking (use git commit hash or version)
-      release: import.meta.env.VITE_SENTRY_RELEASE || `medical-store-pos-client@${import.meta.env.VITE_APP_VERSION || "2.0.0"}`,
-      
-      // Performance monitoring
+      release:
+        import.meta.env.VITE_SENTRY_RELEASE ||
+        `medical-store-pos-client@${import.meta.env.VITE_APP_VERSION || "2.0.0"}`,
+
+      // Performance monitoring integrations (v8 API)
       integrations: [
-        // Browser tracing for performance monitoring
-        Sentry.browserTracingIntegration({
-          // Track navigation and route changes
-          routingInstrumentation: Sentry.reactRouterV6Instrumentation(
-            React.useEffect,
-            useLocation,
-            useNavigationType,
-            createRoutesFromChildren,
-            matchRoutes
-          ),
+        // React Router v6 integration for route-based tracing
+        Sentry.reactRouterV6BrowserTracingIntegration({
+          useEffect: Sentry.reactRouterV6BrowserTracingIntegration,
+          useLocation,
+          useNavigationType,
+          createRoutesFromChildren,
+          matchRoutes,
         }),
-        
+
         // Replay integration for session replay (optional)
         Sentry.replayIntegration({
           maskAllText: true, // Mask all text for privacy
@@ -223,12 +228,3 @@ export const addBreadcrumb = (breadcrumb) => {
 
 // Export Sentry for direct access
 export { Sentry };
-
-// Import React Router dependencies for routing instrumentation
-import React from "react";
-import {
-  useLocation,
-  useNavigationType,
-  createRoutesFromChildren,
-  matchRoutes,
-} from "react-router-dom";

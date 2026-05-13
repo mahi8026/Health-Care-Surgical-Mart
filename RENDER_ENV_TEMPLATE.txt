@@ -1,0 +1,148 @@
+# ============================================================
+# RENDER ENVIRONMENT VARIABLES - COPY & PASTE TEMPLATE
+# ============================================================
+# Instructions:
+# 1. Fill in the [PLACEHOLDER] values with your actual credentials
+# 2. Copy the entire section for each service
+# 3. Paste into Render Dashboard → Your Service → Environment tab
+# 4. Click "Save Changes"
+# ============================================================
+
+
+# ============================================================
+# 1. SENTRY - ERROR TRACKING
+# ============================================================
+# ✅ CONFIGURED - Copy this exact value to Render Dashboard
+
+SENTRY_DSN=https://29e52d27ea1bb0b011b8414e0976bc5b@o4511383549837312.ingest.de.sentry.io/4511383552131152
+
+# Example:
+# SENTRY_DSN=https://abc123def456@o123456.ingest.sentry.io/7890123
+
+
+# ============================================================
+# 2. GOOGLE CLOUD STORAGE - FILE STORAGE
+# ============================================================
+# Console: https://console.cloud.google.com/storage
+# 1. Create bucket (unique name)
+# 2. Create service account → Download JSON
+# 3. Convert JSON to base64:
+#    Windows: [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Get-Content "file.json" -Raw)))
+#    Linux/Mac: base64 -w 0 file.json
+
+GCS_BUCKET_NAME=[your-unique-bucket-name]
+GCS_PROJECT_ID=[your-gcp-project-id]
+GOOGLE_APPLICATION_CREDENTIALS_JSON=[base64-encoded-service-account-json]
+
+# Example:
+# GCS_BUCKET_NAME=health-care-surgical-mart-files
+# GCS_PROJECT_ID=my-gcp-project-123456
+# GOOGLE_APPLICATION_CREDENTIALS_JSON=eyJ0eXBlIjoic2VydmljZV9hY2NvdW50IiwicHJvamVjdF9pZCI6Im15LXByb2plY3QiLCJwcml2YXRlX2tleV9pZCI6ImFiYzEyMyIsInByaXZhdGVfa2V5IjoiLS0tLS1CRUdJTi...
+
+
+# ============================================================
+# 3. SENDGRID - EMAIL DELIVERY
+# ============================================================
+# Sign up: https://signup.sendgrid.com/
+# Settings → API Keys → Create API Key (Full Access)
+# IMPORTANT: API key MUST start with "SG."
+
+SENDGRID_API_KEY=SG.[your-sendgrid-api-key]
+SENDGRID_FROM_EMAIL=[your-verified-email@yourdomain.com]
+SENDGRID_FROM_NAME=Health Care Surgical Mart
+EMAIL_PROVIDER=sendgrid
+
+# Example:
+# SENDGRID_API_KEY=SG.abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
+# SENDGRID_FROM_EMAIL=noreply@healthcaresurgicalmart.com
+# SENDGRID_FROM_NAME=Health Care Surgical Mart
+# EMAIL_PROVIDER=sendgrid
+
+
+# ============================================================
+# 4. TWILIO - SMS DELIVERY
+# ============================================================
+# Sign up: https://www.twilio.com/try-twilio
+# Console → Account Info → Copy SID & Auth Token
+# Phone Numbers → Buy a Number (with SMS capability)
+
+TWILIO_ACCOUNT_SID=AC[your-account-sid]
+TWILIO_AUTH_TOKEN=[your-auth-token]
+TWILIO_PHONE_NUMBER=+[country-code][phone-number]
+SMS_PROVIDER=twilio
+
+# Example:
+# TWILIO_ACCOUNT_SID=ACabcdef1234567890abcdef1234567890
+# TWILIO_AUTH_TOKEN=abc123def456ghi789jkl012mno345pq
+# TWILIO_PHONE_NUMBER=+15551234567
+# SMS_PROVIDER=twilio
+
+
+# ============================================================
+# 5. REDIS - CACHING + QUEUES
+# ============================================================
+# Option A (Recommended): Render Dashboard → New → Redis
+#   - Create Redis instance
+#   - Copy "Internal Redis URL"
+#
+# Option B: Upstash (https://upstash.com/)
+#   - Create database
+#   - Copy Redis URL
+
+REDIS_URL=redis://[host]:[port]
+ENABLE_QUEUES=true
+
+# Example (Render):
+# REDIS_URL=redis://red-abc123def456:6379
+# ENABLE_QUEUES=true
+
+# Example (Upstash):
+# REDIS_URL=rediss://default:abc123@us1-example-12345.upstash.io:6379
+# ENABLE_QUEUES=true
+
+
+# ============================================================
+# VERIFICATION
+# ============================================================
+# After adding all variables:
+# 1. Render will automatically restart your service
+# 2. Check Logs tab for success messages:
+#    ✓ Sentry initialized successfully
+#    ✓ GCS initialized: bucket [name]
+#    ✓ SendGrid email provider initialized
+#    ✓ Twilio SMS provider initialized
+#    ✓ Redis connected successfully
+#
+# 3. If you see errors, check:
+#    - No typos in variable names
+#    - Values are correct format
+#    - No extra spaces or line breaks
+#    - API keys are active (not revoked)
+# ============================================================
+
+
+# ============================================================
+# OPTIONAL: ADDITIONAL EMAIL/SMS PROVIDERS
+# ============================================================
+# If you want to use alternative providers:
+
+# Mailchimp (Marketing Emails)
+# MAILCHIMP_API_KEY=[your-api-key]
+# MAILCHIMP_SERVER_PREFIX=us1
+# MAILCHIMP_LIST_ID=[your-list-id]
+
+# MSG91 (India SMS - Alternative to Twilio)
+# MSG91_AUTH_KEY=[your-auth-key]
+# MSG91_SENDER_ID=HLTHCR
+# SMS_PROVIDER=msg91
+
+
+# ============================================================
+# NOTES
+# ============================================================
+# - All values are case-sensitive
+# - No quotes needed around values in Render
+# - Render automatically encrypts sensitive values
+# - You can edit values anytime (service will restart)
+# - Use "Bulk Edit" in Render for faster setup
+# ============================================================

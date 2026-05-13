@@ -82,6 +82,10 @@ const customerIndexes = [
   { key: { isActive: 1 }, name: "active_status_index" },
   { key: { currentDue: -1 }, name: "current_due_desc" },
   { key: { name: "text" }, name: "text_search_index" },
+  // Compound indexes for common query patterns
+  { key: { isActive: 1, type: 1 }, name: "active_type_compound" },
+  { key: { currentDue: -1, isActive: 1 }, name: "due_active_compound" },
+  { key: { type: 1, currentDue: -1 }, name: "type_due_compound" },
 ];
 
 module.exports = { customerSchema, customerIndexes };

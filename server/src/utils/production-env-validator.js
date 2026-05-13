@@ -84,7 +84,7 @@ const VALIDATION_RULES = {
   SENDGRID_API_KEY: {
     required: false,
     type: "string",
-    pattern: /^SG\..+/,
+    minLength: 10,
     description: "SendGrid API key",
     requiredIf: { EMAIL_PROVIDER: "sendgrid" },
   },
@@ -352,19 +352,19 @@ function validateEmailProvider(result) {
   const hasMailchimp = !!process.env.MAILCHIMP_API_KEY;
 
   if (!provider && !hasSendGrid && !hasMailchimp) {
-    result.addWarning(
+    result.addInfo(
       "EMAIL_PROVIDER",
       "No email provider configured. Email functionality will be disabled."
     );
   } else if (provider === "sendgrid" && !hasSendGrid) {
-    result.addError(
+    result.addWarning(
       "SENDGRID_API_KEY",
-      "SendGrid selected but API key not provided"
+      "SendGrid selected but API key not provided. Email will be disabled."
     );
   } else if (provider === "mailchimp" && !hasMailchimp) {
-    result.addError(
+    result.addWarning(
       "MAILCHIMP_API_KEY",
-      "Mailchimp selected but API key not provided"
+      "Mailchimp selected but API key not provided. Email will be disabled."
     );
   }
 }
@@ -379,17 +379,17 @@ function validateSMSProvider(result) {
   const hasMsg91 = !!process.env.MSG91_AUTH_KEY;
 
   if (!provider && !hasTwilio && !hasMsg91) {
-    result.addWarning(
+    result.addInfo(
       "SMS_PROVIDER",
       "No SMS provider configured. SMS functionality will be disabled."
     );
   } else if (provider === "twilio" && !hasTwilio) {
-    result.addError(
+    result.addWarning(
       "TWILIO_ACCOUNT_SID",
-      "Twilio selected but credentials not provided"
+      "Twilio selected but credentials not provided. SMS will be disabled."
     );
   } else if (provider === "msg91" && !hasMsg91) {
-    result.addError("MSG91_AUTH_KEY", "MSG91 selected but auth key not provided");
+    result.addWarning("MSG91_AUTH_KEY", "MSG91 selected but auth key not provided. SMS will be disabled.");
   }
 }
 

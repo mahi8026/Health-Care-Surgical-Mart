@@ -46,11 +46,21 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    chunkSizeWarningLimit: 600, // Increased from default 500kB
     rollupOptions: {
       output: {
         manualChunks: {
+          // Core React libraries
           vendor: ["react", "react-dom"],
           router: ["react-router-dom"],
+          // Firebase and auth
+          firebase: ["firebase/app", "firebase/auth"],
+          // Chart libraries
+          charts: ["chart.js", "react-chartjs-2"],
+          // UI utilities
+          ui: ["lucide-react", "react-hot-toast", "clsx", "tailwind-merge"],
+          // Form and data fetching
+          forms: ["react-hook-form", "react-query", "axios"],
         },
       },
     },

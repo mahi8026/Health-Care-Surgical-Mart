@@ -154,6 +154,10 @@ const saleIndexes = [
   { key: { createdBy: 1 }, name: "created_by_index" },
   { key: { paymentStatus: 1 }, name: "payment_status_index" },
   { key: { saleDate: -1, grandTotal: -1 }, name: "date_amount_compound" },
+  // Additional compound indexes for common queries
+  { key: { customerId: 1, saleDate: -1 }, name: "customer_date_compound" },
+  { key: { paymentStatus: 1, saleDate: -1 }, name: "payment_date_compound" },
+  { key: { customerType: 1, saleDate: -1 }, name: "type_date_compound" },
 ];
 
 module.exports = { saleSchema, saleIndexes };

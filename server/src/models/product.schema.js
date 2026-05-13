@@ -105,6 +105,10 @@ const productIndexes = [
   { key: { brand: 1 }, name: "brand_index" },
   { key: { isActive: 1 }, name: "active_status_index" },
   { key: { name: "text", brand: "text" }, name: "text_search_index" },
+  // Compound indexes for common query patterns
+  { key: { isActive: 1, category: 1 }, name: "active_category_compound" },
+  { key: { category: 1, brand: 1 }, name: "category_brand_compound" },
+  { key: { expiryDate: 1, isActive: 1 }, name: "expiry_active_compound" },
 ];
 
 module.exports = { productSchema, productIndexes };

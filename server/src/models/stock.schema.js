@@ -93,6 +93,10 @@ const stockIndexes = [
   { key: { currentQty: 1 }, name: "current_qty_index" },
   { key: { expiryDate: 1 }, name: "expiry_date_index" },
   { key: { lastUpdated: -1 }, name: "last_updated_desc" },
+  // Compound indexes for common query patterns
+  { key: { isLowStock: 1, currentQty: 1 }, name: "low_stock_qty_compound" },
+  { key: { expiryDate: 1, currentQty: 1 }, name: "expiry_qty_compound" },
+  { key: { currentQty: 1, lastUpdated: -1 }, name: "qty_updated_compound" },
 ];
 
 module.exports = { stockSchema, stockIndexes };

@@ -24,11 +24,11 @@ concurrency:
 
 jobs:
   # ──────────────────────────────────────────────────────────
-  # JOB 1: Run Tests
-  # Always runs on push and PR. Deployment is blocked if this fails.
+  # JOB 1: Backend Tests
+  # Runs on every push and PR
   # ──────────────────────────────────────────────────────────
   test:
-    name: Run Tests (51 unit tests)
+    name: Backend Tests (51 tests)
     runs-on: ubuntu-latest
 
     steps:
@@ -46,29 +46,20 @@ jobs:
         working-directory: server
         run: npm ci
 
-      - name: Run unit tests
+      - name: Run backend tests
         working-directory: server
         run: npm test
-        env:
-          NODE_ENV: test
-          JWT_SECRET: test_jwt_secret_key_for_ci_pipeline_at_least_32_chars
-          MONGODB_URI: mongodb://localhost:27017/test_db
-          DB_NAME: test_db
-          SENDGRID_API_KEY: SG.test_key_for_ci_pipeline_only
-          SENDGRID_FROM_EMAIL: test@example.com
-          ENABLE_QUEUES: 'false'
 
-      - name: Upload test results
+      - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: backend-coverage
           path: server/coverage/
-          retention-days: 7
 
   # ──────────────────────────────────────────────────────────
   # JOB 2: Deploy Backend to Render
-  # Only runs on push to main after tests pass.
+  # Runs on push to main only, after tests pass
   # ──────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend → Render
@@ -109,7 +100,7 @@ jobs:
 
   # ──────────────────────────────────────────────────────────
   # JOB 3: Deploy Frontend to Firebase Hosting
-  # Only runs on push to main after tests pass.
+  # Runs on push to main only, after tests pass
   # ──────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend → Firebase Hosting
