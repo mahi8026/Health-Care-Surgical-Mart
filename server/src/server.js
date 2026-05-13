@@ -55,6 +55,10 @@ if (process.env.NODE_ENV === "production") {
 // Initialize Express application
 const app = express();
 
+// Trust proxy - Required for Render and other reverse proxies
+// This allows express-rate-limit to correctly identify users
+app.set('trust proxy', 1);
+
 // Setup logging
 setupLogging();
 
