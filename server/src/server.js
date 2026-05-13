@@ -4,6 +4,7 @@
  *
  * @version 2.0.0
  * @author Medical Store POS Team
+ * @updated 2026-05-13 - Fixed trust proxy for Render deployment
  */
 
 const express = require("express");
