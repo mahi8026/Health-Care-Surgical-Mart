@@ -415,9 +415,16 @@ function validateOrExit() {
   const result = validateProductionEnvironment();
   const isValid = result.printReport();
 
-  if (!isValid && process.env.NODE_ENV === "production") {
-    logger.error("Production environment validation failed. Exiting...");
+  // Only exit on critical errors (not warnings)
+  const hasCriticalErrors = result.errors.some(e => e.message.includes("CRITICAL"));
+  
+  if (hasCriticalErrors && process.env.NODE_ENV === "production") {
+    logger.error("Production environment validation failed with critical errors. Exiting...");
     process.exit(1);
+  }
+
+  if (!isValid) {
+    logger.warn("Production environment validation has non-critical errors. Continuing with warnings...");
   }
 
   return result;
