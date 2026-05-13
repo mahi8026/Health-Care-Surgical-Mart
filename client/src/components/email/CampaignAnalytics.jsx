@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { apiService } from "../../services/api";
+import api from "../../config/api";
 import Pagination from "../ui/Pagination";
 
 const STATUS_COLORS = {
@@ -27,7 +27,7 @@ const CampaignAnalytics = () => {
       const params = new URLSearchParams();
       if (filters.type) params.set("type", filters.type);
       if (filters.status) params.set("status", filters.status);
-      const res = await apiService.get(`/email/logs?${params.toString()}`);
+      const res = await api.get(`/email/logs?${params.toString()}`);
       setLogs(res.data || []);
       setPage(1);
     } catch {

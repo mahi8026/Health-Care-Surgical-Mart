@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const ExpenseCategories = () => {
@@ -17,7 +17,7 @@ const ExpenseCategories = () => {
     try {
       setLoading(true);
       // Use real authenticated endpoint
-      const response = await apiService.get("/expense-categories");
+      const response = await api.get("/expense-categories");
 
       if (response.success) {
         setCategories(response.data);
@@ -42,7 +42,7 @@ const ExpenseCategories = () => {
   // Handle delete category
   const handleDelete = async (categoryId) => {
     try {
-      const response = await apiService.delete(
+      const response = await api.delete(
         `/expense-categories/${categoryId}`,
       );
       if (response.success) {
@@ -388,7 +388,7 @@ const CategoryModal = ({ category, onClose, onSave, onError }) => {
         : "/expense-categories";
       const method = category ? "put" : "post";
 
-      const response = await apiService[method](endpoint, formData);
+      const response = await api[method](endpoint, formData);
 
       if (response.success) {
         onSave();

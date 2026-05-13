@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import LoadingSpinner from "../LoadingSpinner";
-import { apiService } from "../../services/api";
+import api from "../../config/api";
 
 const SMSSettings = () => {
   const [configStatus, setConfigStatus] = useState(null);
@@ -16,7 +16,7 @@ const SMSSettings = () => {
   const checkConfiguration = async () => {
     setLoading(true);
     try {
-      const response = await apiService.get("/sms/config-status");
+      const response = await api.get("/sms/config-status");
       setConfigStatus(response.data);
     } catch (error) {
       setMessage({ type: "error", text: "Failed to check SMS configuration status" });
@@ -33,7 +33,7 @@ const SMSSettings = () => {
     setTesting(true);
     setMessage({ type: "", text: "" });
     try {
-      await apiService.post("/sms/send", {
+      await api.post("/sms/send", {
         to: testPhone,
         templateName: "test_sms",
         variables: {},

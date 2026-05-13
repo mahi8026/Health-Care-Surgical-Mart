@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "./LoadingSpinner";
 
 const CategorySelector = ({
@@ -21,7 +21,7 @@ const CategorySelector = ({
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await apiService.get("/expense-categories");
+      const response = await api.get("/expense-categories");
       if (response.success) {
         // Only show active categories
         const activeCategories = response.data.filter((cat) => cat.isActive);
@@ -152,7 +152,7 @@ const InlineCategoryModal = ({ onClose, onSave, onError }) => {
     setLoading(true);
 
     try {
-      const response = await apiService.post("/expense-categories", formData);
+      const response = await api.post("/expense-categories", formData);
 
       if (response.success) {
         onSave(response.data);

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../config/firebase";
 import { signInWithEmail, signOutUser } from "../services/firebaseAuthService";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import { setUserContext, clearUserContext } from "../config/sentry";
 
 const AuthContext = createContext();
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
           const idToken = await currentUser.getIdToken();
 
           // Verify with backend and get MongoDB user data
-          const response = await apiService.post("/auth/firebase-login", {
+          const response = await api.post("/auth/firebase-login", {
             firebaseToken: idToken,
             email: currentUser.email,
           });
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }) => {
         body.shopId = shopId;
       }
 
-      const response = await apiService.post("/auth/firebase-login", body);
+      const response = await api.post("/auth/firebase-login", body);
 
       if (response.success && response.data) {
         localStorage.setItem("token", response.data.token);

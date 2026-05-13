@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { apiService } from "../../services/api";
+import api from "../../config/api";
 import Button from "../ui/Button";
 
 const CampaignForm = () => {
@@ -23,7 +23,7 @@ const CampaignForm = () => {
     try {
       const payload = { ...form };
       if (!payload.scheduledAt) delete payload.scheduledAt;
-      await apiService.post("/email/campaign", payload);
+      await api.post("/email/campaign", payload);
       setFeedback({ type: "success", message: "Campaign created and queued successfully!" });
       setForm({ title: "", subject: "", html: "", fromName: "", replyTo: "", scheduledAt: "" });
     } catch (err) {

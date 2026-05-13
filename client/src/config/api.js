@@ -37,7 +37,9 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
-    return response;
+    // Unwrap axios response.data so callers get the API payload directly,
+    // matching the previous fetch-based apiService behaviour.
+    return response.data;
   },
   (error) => {
     // Handle common errors

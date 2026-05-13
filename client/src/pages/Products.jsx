@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import BulkProductImport from "../components/BulkProductImport";
 
@@ -18,7 +18,7 @@ const Products = () => {
   const [showBulkImport, setShowBulkImport] = useState(false);
 
   const categories = ["Medical", "Lab", "Surgical"];
-  const units = ["pcs", "box", "pack", "bottle", "strip", "vial"];
+  const units = ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr"];
 
   // Fetch products from real database
   const fetchProducts = async () => {
@@ -26,7 +26,7 @@ const Products = () => {
       setLoading(true);
 
       // Use real authenticated endpoint
-      const response = await apiService.get("/products");
+      const response = await api.get("/products");
 
       if (response.success) {
         let filteredProducts = response.data;
@@ -164,7 +164,7 @@ const Products = () => {
   const handleBulkDelete = async () => {
     try {
       const promises = selectedProducts.map((id) =>
-        apiService.delete(`/products/${id}`),
+        api.delete(`/products/${id}`),
       );
 
       await Promise.all(promises);
@@ -181,7 +181,7 @@ const Products = () => {
 
   const handleDelete = async (productId) => {
     try {
-      const response = await apiService.delete(`/products/${productId}`);
+      const response = await api.delete(`/products/${productId}`);
 
       if (response.success) {
         // Remove from displayed products
@@ -698,7 +698,10 @@ const ProductModal = ({
     minStockLevel: "",
     description: "",
     batchNo: "",
+    lotNo: "",
     expiryDate: "",
+    reorderPoint: "10",
+    maxStock: "",
     ...(product && {
       ...product,
       category:
@@ -710,6 +713,8 @@ const ProductModal = ({
           ? product.expiryDate
           : new Date(product.expiryDate).toISOString()
         : "",
+      reorderPoint: product.reorderPoint ?? 10,
+      maxStock: product.maxStock ?? "",
     }),
   });
   const [loading, setLoading] = useState(false);
@@ -721,8 +726,8 @@ const ProductModal = ({
     try {
       // Use real authenticated endpoints
       const response = product
-        ? await apiService.put(`/products/${product._id}`, formData)
-        : await apiService.post("/products", formData);
+        ? await api.put(`/products/${product._id}`, formData)
+        : await api.post("/products", formData);
 
       if (response.success) {
         // Pass the created/updated product back to parent
@@ -932,13 +937,28 @@ const ProductModal = ({
                 value={formData.batchNo}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="Enter batch number"
+                placeholder="e.g. BATCH-2024-001"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Lot Number
+              </label>
+              <input
+                type="text"
+                name="lotNo"
+                value={formData.lotNo}
+                onChange={handleChange}
+                className="input-field"
+                placeholder="e.g. LOT-A-2024"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Expiry Date
+                <span className="ml-1 text-xs text-gray-400">(leave blank if no expiry)</span>
               </label>
               <input
                 type="date"
@@ -954,6 +974,38 @@ const ProductModal = ({
                 }
                 onChange={handleChange}
                 className="input-field"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Reorder Point
+                <span className="ml-1 text-xs text-gray-400">(alert when stock ≤ this)</span>
+              </label>
+              <input
+                type="number"
+                name="reorderPoint"
+                value={formData.reorderPoint}
+                onChange={handleChange}
+                min="0"
+                className="input-field"
+                placeholder="10"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Max Stock
+                <span className="ml-1 text-xs text-gray-400">(optional)</span>
+              </label>
+              <input
+                type="number"
+                name="maxStock"
+                value={formData.maxStock}
+                onChange={handleChange}
+                min="0"
+                className="input-field"
+                placeholder="Leave blank if unlimited"
               />
             </div>
           </div>

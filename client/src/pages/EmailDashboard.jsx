@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import Button from "../components/ui/Button";
 import CampaignForm from "../components/email/CampaignForm";
 import TemplateEditor from "../components/email/TemplateEditor";
@@ -25,7 +25,7 @@ const SendEmailForm = () => {
       } catch {
         throw new Error("Variables must be valid JSON (e.g. {\"name\": \"John\"})");
       }
-      await apiService.post("/email/send", {
+      await api.post("/email/send", {
         to: form.to,
         templateName: form.templateName,
         variables,
@@ -110,7 +110,7 @@ const SyncCustomers = () => {
     setLoading(true);
     setResult(null);
     try {
-      const res = await apiService.post("/email/sync-customers");
+      const res = await api.post("/email/sync-customers");
       setResult({ type: "success", message: res.data?.message || "Customers synced successfully!" });
     } catch (err) {
       setResult({ type: "error", message: err.message || "Failed to sync customers" });

@@ -47,7 +47,7 @@ const productSchema = {
           description: "Selling price to customer - required",
         },
         unit: {
-          enum: ["pcs", "box", "pack", "bottle", "strip", "vial"],
+          enum: ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr"],
           description: "Unit of measurement - required",
         },
         minStockLevel: {
@@ -61,11 +61,25 @@ const productSchema = {
         },
         batchNo: {
           bsonType: "string",
-          description: "Batch number",
+          description: "Batch number for pharmaceutical tracking",
+        },
+        lotNo: {
+          bsonType: "string",
+          description: "Lot number for pharmaceutical tracking",
         },
         expiryDate: {
           bsonType: "date",
-          description: "Product expiry date",
+          description: "Product expiry date — null means no expiry",
+        },
+        reorderPoint: {
+          bsonType: "int",
+          minimum: 0,
+          description: "Stock level at which to reorder (default 10)",
+        },
+        maxStock: {
+          bsonType: "int",
+          minimum: 0,
+          description: "Maximum stock capacity (optional)",
         },
         isActive: {
           bsonType: "bool",

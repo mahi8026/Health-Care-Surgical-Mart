@@ -5,13 +5,33 @@ const BaseEmailAdapter = require("./base.adapter");
 class SendGridAdapter extends BaseEmailAdapter {
   constructor() {
     super();
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    const apiKey = process.env.SENDGRID_API_KEY;
+    if (apiKey && apiKey.startsWith("SG.")) {
+      sgMail.setApiKey(apiKey);
+      this.configured = true;
+    } else {
+      this.configured = false;
+      if (apiKey) {
+        // Key is set but malformed — warn so it's visible in logs
+        console.warn(
+          "[SendGrid] SENDGRID_API_KEY is set but does not start with 'SG.' — email sending will be disabled."
+        );
+      }
+    }
     this.fromEmail = process.env.SENDGRID_FROM_EMAIL;
     this.fromName =
       process.env.SENDGRID_FROM_NAME || "Healthcare Plus Pharmacy";
   }
 
   async sendEmail(to, subject, content, options = {}) {
+    if (!this.configured) {
+      return {
+        success: false,
+        error: "SendGrid is not configured. Set a valid SENDGRID_API_KEY (must start with 'SG.').",
+        provider: "sendgrid",
+        status: "not_configured",
+      };
+    }
     if (!this.validateEmail(to)) {
       return {
         success: false,
@@ -58,6 +78,14 @@ class SendGridAdapter extends BaseEmailAdapter {
   }
 
   async sendBulk(emails) {
+    if (!this.configured) {
+      return {
+        success: false,
+        error: "SendGrid is not configured. Set a valid SENDGRID_API_KEY (must start with 'SG.').",
+        provider: "sendgrid",
+        status: "not_configured",
+      };
+    }
     try {
       const messages = emails.map((email) => ({
         to: email.to,

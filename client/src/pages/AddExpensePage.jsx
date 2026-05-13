@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import ExpenseForm from "../components/ExpenseForm";
 import LoadingSpinner from "../components/LoadingSpinner";
 
@@ -24,7 +24,7 @@ const AddExpensePage = () => {
         attachments: uploadedFiles,
       };
 
-      const response = await apiService.post("/expenses", finalExpenseData);
+      const response = await api.post("/expenses", finalExpenseData);
 
       if (response.success) {
         setSuccess("Expense created successfully!");
@@ -78,14 +78,7 @@ const AddExpensePage = () => {
         const formData = new FormData();
         formData.append("receipt", file);
 
-        const response = await apiService.request("/expenses/upload-receipt", {
-          method: "POST",
-          body: formData,
-          headers: {
-            // Remove Content-Type header to let browser set it with boundary
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+        const response = await api.post("/expenses/upload-receipt", formData);
 
         if (!response.success) {
           throw new Error(response.message || `Failed to upload ${file.name}`);
@@ -274,10 +267,10 @@ const AddExpensePage = () => {
                   <div className="text-sm text-blue-700">
                     <p className="font-medium mb-1">Upload Guidelines</p>
                     <ul className="text-xs space-y-1">
-                      <li>• Supported formats: JPG, PNG, PDF</li>
-                      <li>• Maximum file size: 10MB per file</li>
-                      <li>• Multiple files can be uploaded</li>
-                      <li>• Files are stored securely in cloud storage</li>
+                      <li>â€¢ Supported formats: JPG, PNG, PDF</li>
+                      <li>â€¢ Maximum file size: 10MB per file</li>
+                      <li>â€¢ Multiple files can be uploaded</li>
+                      <li>â€¢ Files are stored securely in cloud storage</li>
                     </ul>
                   </div>
                 </div>

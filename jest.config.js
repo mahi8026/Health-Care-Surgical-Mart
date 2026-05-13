@@ -1,15 +1,15 @@
 module.exports = {
   testEnvironment: "node",
-  roots: ["<rootDir>/src", "<rootDir>/tests"],
+  roots: ["<rootDir>/server/src", "<rootDir>/server/tests"],
   testMatch: ["**/__tests__/**/*.js", "**/?(*.)+(spec|test).js"],
   collectCoverageFrom: [
-    "src/**/*.js",
-    "!src/server.js",
-    "!src/config/logging.js",
+    "server/src/**/*.js",
+    "!server/src/server.js",
+    "!server/src/config/logging.js",
     "!**/node_modules/**",
   ],
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov", "html"],
-  setupFilesAfterEnv: ["<rootDir>/tests/setup.js"],
+  setupFilesAfterEnv: ["<rootDir>/server/tests/setup.js"],
   testTimeout: 10000,
 };

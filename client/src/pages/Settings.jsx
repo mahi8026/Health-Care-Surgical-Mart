@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import UserManagement from "../components/UserManagement";
@@ -162,7 +162,7 @@ const Settings = () => {
   const testBackup = async () => {
     try {
       setSaving(true);
-      const response = await apiService.post("/settings/backup/test");
+      const response = await api.post("/settings/backup/test");
       if (response.success) {
         setSuccess("Backup test completed successfully!");
         setTimeout(() => setSuccess(""), 3000);

@@ -24,21 +24,29 @@ const saleSchema = {
           bsonType: "string",
           description: "Customer name for quick access",
         },
+        customerType: {
+          enum: ["Walk-in", "Hospital/Clinic", "Diagnostic", "Wholesaler"],
+          description: "Customer type - Walk-in, Hospital/Clinic, Diagnostic, or Wholesaler",
+        },
         items: {
           bsonType: "array",
           minItems: 1,
           description: "Array of sale items - required",
           items: {
             bsonType: "object",
-            required: ["productId", "name", "rate", "qty", "total"],
+            required: ["name", "rate", "qty", "total"],
             properties: {
               productId: {
-                bsonType: "objectId",
-                description: "Reference to product",
+                bsonType: ["objectId", "null"],
+                description: "Reference to product (null for custom items)",
+              },
+              customName: {
+                bsonType: "string",
+                description: "Custom item name (for non-inventory items)",
               },
               name: {
                 bsonType: "string",
-                description: "Product name",
+                description: "Product or custom item name",
               },
               rate: {
                 bsonType: "double",
@@ -104,6 +112,11 @@ const saleSchema = {
           minimum: 0,
           description: "Change returned to customer",
         },
+        dueAmount: {
+          bsonType: "double",
+          minimum: 0,
+          description: "Amount still owed by customer",
+        },
         paymentStatus: {
           enum: ["Paid", "Partial", "Pending"],
           description: "Payment status",
@@ -137,6 +150,7 @@ const saleIndexes = [
   { key: { invoiceNo: 1 }, unique: true, name: "invoice_unique" },
   { key: { saleDate: -1 }, name: "sale_date_desc" },
   { key: { customerId: 1 }, name: "customer_index" },
+  { key: { customerType: 1 }, name: "customer_type_index" },
   { key: { createdBy: 1 }, name: "created_by_index" },
   { key: { paymentStatus: 1 }, name: "payment_status_index" },
   { key: { saleDate: -1, grandTotal: -1 }, name: "date_amount_compound" },

@@ -315,8 +315,11 @@ ui-debug.log
 .pnp.*
 
 # ============================================
-# Project Specific
+# Kiro IDE workspace files (internal, not for repo)
 # ============================================
+.kiro/
+
+
 # Backup files
 *.backup
 *.bak
@@ -346,10 +349,5 @@ local.config.json
 !scripts/*.sh
 !scripts/*.bat
 
-# Permanent project documentation (override the *_SETUP.md / FINAL_*.md patterns above)
-!CICD_SETUP.md
-!FINAL_PROJECT_REPORT.md
-!GCS_SETUP.md
-!SENTRY_SETUP_GUIDE.md
-!SENTRY_QUICK_REFERENCE.md
-!DEPLOYMENT_CHECKLIST.md
+# Permanent project documentation (now in /docs — keep docs/ tracked)
+docs/

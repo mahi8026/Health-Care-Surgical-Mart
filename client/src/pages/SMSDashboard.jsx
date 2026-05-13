@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import SendSMSForm from "../components/sms/SendSMSForm";
 import SMSLogs from "../components/sms/SMSLogs";
 import SMSTemplates from "../components/sms/SMSTemplates";
@@ -8,7 +8,7 @@ const TABS = ["Send SMS", "SMS Logs", "Templates", "Queue Stats"];
 
 const StatCard = ({ label, value, color = "text-blue-600" }) => (
   <div className="card text-center">
-    <p className={`text-3xl font-bold ${color}`}>{value ?? "—"}</p>
+    <p className={`text-3xl font-bold ${color}`}>{value ?? "â€”"}</p>
     <p className="text-sm text-gray-600 mt-1">{label}</p>
   </div>
 );
@@ -19,7 +19,7 @@ const QueueStats = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    apiService
+    api
       .get("/sms/queue/stats")
       .then((res) => setStats(res.data))
       .catch((err) => setError(err.message || "Failed to load queue stats"))

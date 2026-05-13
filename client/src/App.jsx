@@ -17,7 +17,6 @@ import StockReport from "./pages/StockReport";
 import ExpenseCategories from "./pages/ExpenseCategories";
 import ExpensesPage from "./pages/ExpensesPage";
 import AddExpensePage from "./pages/AddExpensePage";
-import FirebaseAuthTest from "./pages/FirebaseAuthTest";
 import SMSDashboard from "./pages/SMSDashboard";
 import EmailDashboard from "./pages/EmailDashboard";
 import NotificationSettings from "./pages/NotificationSettings";
@@ -48,9 +47,6 @@ function App() {
           path="/login"
           element={!user ? <Login /> : <Navigate to="/dashboard" replace />}
         />
-
-        {/* Firebase Authentication Test Page - Public for testing */}
-        <Route path="/firebase-test" element={<FirebaseAuthTest />} />
 
         {/* Protected Routes - Require Authentication */}
         <Route

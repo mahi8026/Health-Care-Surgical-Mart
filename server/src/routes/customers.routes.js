@@ -548,4 +548,215 @@ router.get(
   }
 );
 
+/**
+ * GET /api/customers/:id/due-summary
+ * Returns current due, credit limit, available credit, and payment history
+ *
+ * @swagger
+ * /api/customers/{id}/due-summary:
+ *   get:
+ *     summary: Get customer due summary and payment history
+ *     description: Returns currentDue, creditLimit, creditAvailable, and last 20 payment records. Requires customers.view permission.
+ *     tags: [Customers]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Due summary retrieved successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ */
+router.get(
+  "/:id/due-summary",
+  requirePermission(PERMISSIONS.VIEW_CUSTOMERS),
+  async (req, res) => {
+    try {
+      const { ObjectId } = require("mongodb");
+      const { getShopDatabase } = require("../config/database");
+      const shopDb = getShopDatabase(req.user.shopId);
+
+      let customerId;
+      try { customerId = new ObjectId(req.params.id); }
+      catch { return res.status(400).json({ success: false, message: "Invalid customer ID" }); }
+
+      const customer = await shopDb.collection("customers").findOne({ _id: customerId });
+      if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
+
+      const paymentHistory = await shopDb
+        .collection("customer_payments")
+        .find({ customerId })
+        .sort({ paidAt: -1 })
+        .limit(20)
+        .toArray();
+
+      const currentDue = customer.currentDue || 0;
+      const creditLimit = customer.creditLimit || 0;
+      const creditAvailable = Math.max(0, creditLimit - currentDue);
+
+      return res.json({
+        success: true,
+        data: {
+          currentDue,
+          creditLimit,
+          creditAvailable,
+          creditEnabled: customer.creditEnabled || false,
+          totalPurchased: customer.totalPurchased || 0,
+          paymentHistory,
+        },
+      });
+    } catch (error) {
+      const { logger } = require("../config/logging");
+      logger.error("Due summary error:", error);
+      return res.status(500).json({ success: false, message: "Failed to fetch due summary" });
+    }
+  }
+);
+
+/**
+ * POST /api/customers/:id/payment
+ * Record a payment against a customer's due balance
+ * Body: { amount, paymentMethod, note }
+ *
+ * @swagger
+ * /api/customers/{id}/payment:
+ *   post:
+ *     summary: Record a payment against customer due
+ *     description: Deducts amount from currentDue, creates a payment record. Requires CREATE_SALE permission.
+ *     tags: [Customers]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [amount, paymentMethod]
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 minimum: 0.01
+ *                 example: 5000
+ *               paymentMethod:
+ *                 type: string
+ *                 enum: [cash, bank, card]
+ *                 example: cash
+ *               note:
+ *                 type: string
+ *                 example: "Partial payment for invoice INV-001"
+ *     responses:
+ *       200:
+ *         description: Payment recorded successfully
+ *       400:
+ *         description: Invalid amount or exceeds due balance
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ */
+router.post(
+  "/:id/payment",
+  requirePermission(PERMISSIONS.CREATE_SALE),
+  async (req, res) => {
+    try {
+      const { ObjectId } = require("mongodb");
+      const { getShopDatabase } = require("../config/database");
+      const { logger } = require("../config/logging");
+      const shopDb = getShopDatabase(req.user.shopId);
+
+      let customerId;
+      try { customerId = new ObjectId(req.params.id); }
+      catch { return res.status(400).json({ success: false, message: "Invalid customer ID" }); }
+
+      const { amount, paymentMethod, note } = req.body;
+      const payAmount = parseFloat(amount);
+
+      if (!payAmount || payAmount <= 0) {
+        return res.status(400).json({ success: false, message: "Amount must be greater than 0" });
+      }
+
+      const validMethods = ["cash", "bank", "card"];
+      if (!paymentMethod || !validMethods.includes(paymentMethod)) {
+        return res.status(400).json({ success: false, message: "paymentMethod must be cash, bank, or card" });
+      }
+
+      const customer = await shopDb.collection("customers").findOne({ _id: customerId });
+      if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
+
+      const currentDue = customer.currentDue || 0;
+      if (payAmount > currentDue) {
+        return res.status(400).json({
+          success: false,
+          message: `Payment amount ৳${payAmount.toFixed(2)} exceeds outstanding due ৳${currentDue.toFixed(2)}`,
+        });
+      }
+
+      const newDue = Math.max(0, currentDue - payAmount);
+
+      // Create payment record
+      const paymentRecord = {
+        customerId,
+        amount: payAmount,
+        paymentMethod,
+        note: note || "",
+        previousDue: currentDue,
+        newDue,
+        recordedBy: req.user._id,
+        recordedByName: req.user.name,
+        paidAt: new Date(),
+        createdAt: new Date(),
+      };
+
+      await shopDb.collection("customer_payments").insertOne(paymentRecord);
+
+      // Update customer due
+      await shopDb.collection("customers").updateOne(
+        { _id: customerId },
+        { $set: { currentDue: newDue, updatedAt: new Date() } }
+      );
+
+      // Audit log
+      try {
+        const auditLog = require("../services/audit-log.service");
+        const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+        auditLog.log(req, AUDIT_ACTIONS.CUSTOMER_UPDATED, "customer", req.params.id,
+          `Payment of ৳${payAmount} recorded for ${customer.name}. Due: ৳${currentDue} → ৳${newDue}`,
+          { before: { currentDue }, after: { currentDue: newDue, payment: payAmount } }
+        );
+      } catch (_) {}
+
+      logger.info(`Payment recorded: customer=${customer.name}, amount=${payAmount}, newDue=${newDue}`);
+
+      return res.json({
+        success: true,
+        message: `Payment of ৳${payAmount.toFixed(2)} recorded successfully`,
+        data: {
+          customer: {
+            _id: customer._id,
+            name: customer.name,
+            currentDue: newDue,
+            creditLimit: customer.creditLimit || 0,
+            creditAvailable: Math.max(0, (customer.creditLimit || 0) - newDue),
+          },
+          payment: paymentRecord,
+        },
+      });
+    } catch (error) {
+      const { logger } = require("../config/logging");
+      logger.error("Record payment error:", error);
+      return res.status(500).json({ success: false, message: "Failed to record payment" });
+    }
+  }
+);
+
 module.exports = router;

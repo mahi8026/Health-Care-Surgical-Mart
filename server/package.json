@@ -15,6 +15,7 @@
     "lint:fix": "eslint src/ --ext .js --fix",
     "format": "prettier --write \"src/**/*.{js,json,md}\"",
     "seed": "node src/utils/database-initializer.js",
+    "seed:test": "node src/scripts/seed-test-data.js",
     "migrate": "node database/migrations/migrate.js",
     "security:audit": "npm audit",
     "logs": "tail -f ../logs/app.log"

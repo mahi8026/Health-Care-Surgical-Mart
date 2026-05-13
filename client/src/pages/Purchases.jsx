@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import SearchableProductSelect from "../components/SearchableProductSelect";
 
@@ -35,7 +35,7 @@ const Purchases = () => {
   const fetchProducts = async () => {
     try {
       // Use real authenticated endpoint
-      const response = await apiService.get("/products");
+      const response = await api.get("/products");
 
       if (response.success) {
         // Filter to only show active products
@@ -57,7 +57,7 @@ const Purchases = () => {
   const fetchSuppliers = async () => {
     try {
       // Use real authenticated endpoint
-      const response = await apiService.get("/suppliers");
+      const response = await api.get("/suppliers");
 
       if (response.success) {
         setSuppliers(response.data);
@@ -248,7 +248,7 @@ const Purchases = () => {
       };
 
       // Use real authenticated endpoint
-      const response = await apiService.post("/purchases", purchaseOrderData);
+      const response = await api.post("/purchases", purchaseOrderData);
 
       if (response.success) {
         alert("Purchase order created successfully!");
@@ -933,7 +933,7 @@ const SupplierModal = ({ onClose, onSupplierCreated }) => {
 
     try {
       // Use real authenticated endpoint
-      const response = await apiService.post("/suppliers", formData);
+      const response = await api.post("/suppliers", formData);
 
       if (response.success) {
         alert("Supplier created successfully!");

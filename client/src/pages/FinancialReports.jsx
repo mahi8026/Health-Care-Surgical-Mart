@@ -12,7 +12,7 @@ import {
   ArcElement,
 } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 // Register Chart.js components
@@ -56,11 +56,11 @@ const FinancialReports = () => {
 
       // Use real MongoDB endpoints
       const [plData, dsData, ppData, raData, cfData] = await Promise.all([
-        apiService.get("/reports/financial/profit-loss"),
-        apiService.get("/reports/financial/daily-summary"),
-        apiService.get("/reports/financial/product-profitability"),
-        apiService.get("/reports/financial/return-analysis"),
-        apiService.get("/reports/financial/cash-flow"),
+        api.get("/reports/financial/profit-loss"),
+        api.get("/reports/financial/daily-summary"),
+        api.get("/reports/financial/product-profitability"),
+        api.get("/reports/financial/return-analysis"),
+        api.get("/reports/financial/cash-flow"),
       ]);
 
       if (plData?.success) setProfitLossData(plData.data);

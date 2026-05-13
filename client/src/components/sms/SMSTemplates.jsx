@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../../services/api";
+import api from "../../config/api";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 
@@ -14,7 +14,7 @@ const SMSTemplates = () => {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const res = await apiService.get("/sms/templates");
+      const res = await api.get("/sms/templates");
       setTemplates(res.data || []);
     } catch {
       setTemplates([]);
@@ -40,7 +40,7 @@ const SMSTemplates = () => {
     try {
       // Extract variables from {{varName}} placeholders
       const variables = [...form.content.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]);
-      await apiService.post("/sms/templates", { ...form, variables });
+      await api.post("/sms/templates", { ...form, variables });
       setModalOpen(false);
       fetchTemplates();
     } catch (err) {

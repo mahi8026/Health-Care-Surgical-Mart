@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const Returns = () => {
@@ -33,7 +33,7 @@ const Returns = () => {
     try {
       setLoading(true);
       // Use real authenticated endpoint
-      const response = await apiService.get("/returns");
+      const response = await api.get("/returns");
 
       if (response.success) {
         let filteredReturns = response.data || [];
@@ -78,7 +78,7 @@ const Returns = () => {
   const fetchReturnStats = async () => {
     try {
       // Use real authenticated endpoint
-      const response = await apiService.get("/returns/stats/summary");
+      const response = await api.get("/returns/stats/summary");
 
       if (response.success) {
         setReturnStats(response.data || {});
@@ -542,14 +542,14 @@ const ProcessReturnTab = ({ onSuccess, onError, formatCurrency }) => {
     try {
       setLoading(true);
       // First try to find the sale by invoice number
-      const salesResponse = await apiService.get(
+      const salesResponse = await api.get(
         `/sales?search=${searchTerm}&limit=1`,
       );
 
       if (salesResponse.success && salesResponse.data.length > 0) {
         const sale = salesResponse.data[0];
         // Get detailed sale info for returns
-        const returnResponse = await apiService.get(
+        const returnResponse = await api.get(
           `/returns/sale/${sale._id}`,
         );
 
@@ -625,7 +625,7 @@ const ProcessReturnTab = ({ onSuccess, onError, formatCurrency }) => {
         notes: returnData.notes,
       };
 
-      const response = await apiService.post("/returns", returnPayload);
+      const response = await api.post("/returns", returnPayload);
 
       if (response.success) {
         onSuccess("Return processed successfully!");

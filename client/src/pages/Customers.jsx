@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+const fmt = (n) =>
+  new Intl.NumberFormat("en-BD", { style: "currency", currency: "BDT", minimumFractionDigits: 0 }).format(n || 0);
+
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" }) : "Never";
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -9,6 +16,7 @@ const Customers = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [customerTypeFilter, setCustomerTypeFilter] = useState("all");
@@ -24,7 +32,9 @@ const Customers = () => {
     phone: "",
     email: "",
     address: "",
-    type: "Retail",
+    type: "Walk-in",
+    creditEnabled: false,
+    creditLimit: 0,
   });
 
   // Customer statistics
@@ -39,7 +49,7 @@ const Customers = () => {
   const fetchCustomers = async (page = 1) => {
     try {
       // Use real authenticated endpoint
-      const response = await apiService.get("/customers");
+      const response = await api.get("/customers");
 
       if (response.success) {
         let filteredCustomers = response.data;
@@ -87,9 +97,10 @@ const Customers = () => {
   const calculateStats = (customerData) => {
     const stats = {
       totalCustomers: customerData.length,
-      retailCustomers: customerData.filter((c) => c.type === "Retail").length,
-      wholesaleCustomers: customerData.filter((c) => c.type === "Wholesale")
-        .length,
+      walkInCustomers: customerData.filter((c) => c.type === "Walk-in").length,
+      hospitalClinicCustomers: customerData.filter((c) => c.type === "Hospital/Clinic").length,
+      diagnosticCustomers: customerData.filter((c) => c.type === "Diagnostic").length,
+      wholesalerCustomers: customerData.filter((c) => c.type === "Wholesaler").length,
       recentCustomers: customerData.filter((c) => {
         const createdDate = new Date(c.createdAt);
         const thirtyDaysAgo = new Date();
@@ -120,22 +131,10 @@ const Customers = () => {
   }, [searchTerm, customerTypeFilter]);
 
   // Format date
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-    });
-  };
+  const formatDate = (date) => fmtDate(date);
 
   // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-BD", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-    }).format(amount || 0);
-  };
+  const formatCurrency = (amount) => fmt(amount);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -150,7 +149,9 @@ const Customers = () => {
       phone: "",
       email: "",
       address: "",
-      type: "Retail",
+      type: "Walk-in",
+      creditEnabled: false,
+      creditLimit: 0,
     });
   };
 
@@ -163,7 +164,7 @@ const Customers = () => {
 
     try {
       setLoading(true);
-      const response = await apiService.post("/customers", formData);
+      const response = await api.post("/customers", formData);
       if (response.success) {
         setShowCreateModal(false);
         resetForm();
@@ -189,7 +190,7 @@ const Customers = () => {
 
     try {
       setLoading(true);
-      const response = await apiService.put(
+      const response = await api.put(
         `/customers/${selectedCustomer._id}`,
         formData,
       );
@@ -218,7 +219,7 @@ const Customers = () => {
 
     try {
       setLoading(true);
-      const response = await apiService.delete(`/customers/${customerId}`);
+      const response = await api.delete(`/customers/${customerId}`);
       if (response.success) {
         fetchCustomers();
         setError("");
@@ -242,6 +243,8 @@ const Customers = () => {
       email: customer.email || "",
       address: customer.address || "",
       type: customer.type,
+      creditEnabled: customer.creditEnabled || false,
+      creditLimit: customer.creditLimit || 0,
     });
     setShowEditModal(true);
   };
@@ -255,8 +258,10 @@ const Customers = () => {
   // Get customer type badge
   const getCustomerTypeBadge = (type) => {
     const badges = {
-      Retail: "bg-blue-100 text-blue-800",
-      Wholesale: "bg-purple-100 text-purple-800",
+      "Walk-in": "bg-blue-100 text-blue-800",
+      "Hospital/Clinic": "bg-green-100 text-green-800",
+      "Diagnostic": "bg-purple-100 text-purple-800",
+      "Wholesaler": "bg-orange-100 text-orange-800",
     };
     return badges[type] || "bg-gray-100 text-gray-800";
   };
@@ -379,8 +384,10 @@ const Customers = () => {
               className="input-field"
             >
               <option value="all">All Types</option>
-              <option value="Retail">Retail</option>
-              <option value="Wholesale">Wholesale</option>
+              <option value="Walk-in">Walk-in</option>
+              <option value="Hospital/Clinic">Hospital/Clinic</option>
+              <option value="Diagnostic">Diagnostic</option>
+              <option value="Wholesaler">Wholesaler</option>
             </select>
           </div>
         </div>
@@ -396,6 +403,7 @@ const Customers = () => {
                 <th className="table-header-cell">Contact</th>
                 <th className="table-header-cell">Type</th>
                 <th className="table-header-cell">Total Purchases</th>
+                <th className="table-header-cell">Due Balance</th>
                 <th className="table-header-cell">Last Purchase</th>
                 <th className="table-header-cell">Joined</th>
                 <th className="table-header-cell">Actions</th>
@@ -404,7 +412,7 @@ const Customers = () => {
             <tbody className="divide-y divide-gray-200">
               {customers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="table-cell text-center py-8">
+                  <td colSpan="8" className="table-cell text-center py-8">
                     <i className="fas fa-users text-gray-400 text-4xl mb-4"></i>
                     <p className="text-gray-500">No customers found</p>
                     <button
@@ -461,6 +469,22 @@ const Customers = () => {
                       </span>
                     </td>
                     <td className="table-cell">
+                      {(customer.currentDue || 0) > 0 ? (
+                        <div>
+                          <span className="font-bold text-red-600">
+                            {formatCurrency(customer.currentDue)}
+                          </span>
+                          {customer.creditEnabled && (
+                            <div className="text-xs text-gray-500">
+                              Limit: {formatCurrency(customer.creditLimit)}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-green-600 text-sm font-medium">No due</span>
+                      )}
+                    </td>
+                    <td className="table-cell">
                       {customer.lastPurchaseDate
                         ? formatDate(customer.lastPurchaseDate)
                         : "Never"}
@@ -484,6 +508,15 @@ const Customers = () => {
                         >
                           <i className="fas fa-edit"></i>
                         </button>
+                        {(customer.currentDue || 0) > 0 && (
+                          <button
+                            onClick={() => { setSelectedCustomer(customer); setShowPaymentModal(true); }}
+                            className="text-orange-600 hover:text-orange-900"
+                            title="Record Payment"
+                          >
+                            <i className="fas fa-money-bill-wave"></i>
+                          </button>
+                        )}
                         <button
                           onClick={() => deleteCustomer(customer._id)}
                           className="text-red-600 hover:text-red-900"
@@ -559,6 +592,22 @@ const Customers = () => {
             resetForm();
           }}
           loading={loading}
+        />
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedCustomer && (
+        <RecordPaymentModal
+          customer={selectedCustomer}
+          onClose={() => { setShowPaymentModal(false); setSelectedCustomer(null); }}
+          onSuccess={(updatedCustomer) => {
+            setCustomers((prev) =>
+              prev.map((c) => c._id === updatedCustomer._id ? { ...c, ...updatedCustomer } : c)
+            );
+            setShowPaymentModal(false);
+            setSelectedCustomer(null);
+          }}
+          formatCurrency={formatCurrency}
         />
       )}
 
@@ -671,9 +720,50 @@ const CustomerFormModal = ({
               onChange={onInputChange}
               className="input-field"
             >
-              <option value="Retail">Retail</option>
-              <option value="Wholesale">Wholesale</option>
+              <option value="Walk-in">Walk-in</option>
+              <option value="Hospital/Clinic">Hospital/Clinic</option>
+              <option value="Diagnostic">Diagnostic</option>
+              <option value="Wholesaler">Wholesaler</option>
             </select>
+          </div>
+
+          {/* Credit Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              <i className="fas fa-credit-card mr-2 text-blue-500"></i>
+              Credit Settings
+            </h4>
+            <div className="flex items-center mb-3">
+              <input
+                type="checkbox"
+                id="creditEnabled"
+                name="creditEnabled"
+                checked={formData.creditEnabled || false}
+                onChange={(e) => onInputChange({ target: { name: "creditEnabled", value: e.target.checked } })}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="creditEnabled" className="ml-2 text-sm text-gray-700">
+                Enable credit sales for this customer
+              </label>
+            </div>
+            {formData.creditEnabled && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Credit Limit (৳)
+                  <span className="ml-1 text-xs text-gray-400">0 = no credit allowed</span>
+                </label>
+                <input
+                  type="number"
+                  name="creditLimit"
+                  value={formData.creditLimit || 0}
+                  onChange={onInputChange}
+                  min="0"
+                  step="100"
+                  className="input-field"
+                  placeholder="e.g. 50000"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -780,60 +870,68 @@ const CustomerDetailsModal = ({
 const CustomerInfoTab = ({ customer, formatCurrency, formatDate }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
     <div>
-      <h4 className="text-md font-semibold text-gray-900 mb-4">
-        Contact Information
-      </h4>
+      <h4 className="text-md font-semibold text-gray-900 mb-4">Contact Information</h4>
       <div className="space-y-3">
-        <div>
-          <label className="text-sm font-medium text-gray-500">Name</label>
-          <p className="text-gray-900">{customer.name}</p>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-500">Phone</label>
-          <p className="text-gray-900">{customer.phone}</p>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-500">Email</label>
-          <p className="text-gray-900">{customer.email || "Not provided"}</p>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-500">Address</label>
-          <p className="text-gray-900">{customer.address || "Not provided"}</p>
-        </div>
+        <div><label className="text-sm font-medium text-gray-500">Name</label><p className="text-gray-900">{customer.name}</p></div>
+        <div><label className="text-sm font-medium text-gray-500">Phone</label><p className="text-gray-900">{customer.phone}</p></div>
+        <div><label className="text-sm font-medium text-gray-500">Email</label><p className="text-gray-900">{customer.email || "Not provided"}</p></div>
+        <div><label className="text-sm font-medium text-gray-500">Address</label><p className="text-gray-900">{customer.address || "Not provided"}</p></div>
       </div>
     </div>
 
     <div>
-      <h4 className="text-md font-semibold text-gray-900 mb-4">
-        Customer Details
-      </h4>
+      <h4 className="text-md font-semibold text-gray-900 mb-4">Customer Details</h4>
       <div className="space-y-3">
         <div>
           <label className="text-sm font-medium text-gray-500">Type</label>
           <p className="text-gray-900">
-            <span
-              className={`badge ${customer.type === "Retail" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}
-            >
+            <span className={`badge ${getCustomerTypeBadge(customer.type)}`}>
               {customer.type}
             </span>
           </p>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-500">Total Purchases</label>
-          <p className="text-gray-900 font-semibold">
-            {formatCurrency(customer.totalPurchases)}
-          </p>
+          <p className="text-gray-900 font-semibold">{formatCurrency(customer.totalPurchases)}</p>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-500">Last Purchase</label>
-          <p className="text-gray-900">
-            {customer.lastPurchaseDate ? formatDate(customer.lastPurchaseDate) : "Never"}
-          </p>
+          <p className="text-gray-900">{customer.lastPurchaseDate ? formatDate(customer.lastPurchaseDate) : "Never"}</p>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-500">Customer Since</label>
           <p className="text-gray-900">{formatDate(customer.createdAt)}</p>
         </div>
+      </div>
+
+      {/* Credit section */}
+      <div className="mt-4 p-3 rounded-lg border border-gray-200 bg-gray-50">
+        <h5 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+          <i className="fas fa-credit-card mr-2 text-blue-500"></i>
+          Credit Account
+        </h5>
+        {customer.creditEnabled ? (
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Credit Limit</span>
+              <span className="font-medium">{formatCurrency(customer.creditLimit)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Outstanding Due</span>
+              <span className={`font-bold ${(customer.currentDue || 0) > 0 ? "text-red-600" : "text-green-600"}`}>
+                {formatCurrency(customer.currentDue)}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Available Credit</span>
+              <span className="font-medium text-green-600">
+                {formatCurrency(Math.max(0, (customer.creditLimit || 0) - (customer.currentDue || 0)))}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">Credit not enabled for this customer.</p>
+        )}
       </div>
     </div>
   </div>
@@ -867,7 +965,7 @@ const PurchaseHistoryTab = ({ customer, formatCurrency, formatDate }) => {
         startDate: start,
         endDate: end,
       });
-      const response = await apiService.get(
+      const response = await api.get(
         `/customers/${customer._id}/purchase-history?${params}`
       );
       if (response.success) {
@@ -1055,3 +1153,143 @@ const PurchaseHistoryTab = ({ customer, formatCurrency, formatDate }) => {
 };
 
 export default Customers;
+
+// ── Record Payment Modal ──────────────────────────────────────────────────────
+const RecordPaymentModal = ({ customer, onClose, onSuccess, formatCurrency }) => {
+  const [amount, setAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const currentDue = customer.currentDue || 0;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const pay = parseFloat(amount);
+    if (!pay || pay <= 0) { setError("Enter a valid amount"); return; }
+    if (pay > currentDue) { setError(`Amount cannot exceed outstanding due of ${formatCurrency(currentDue)}`); return; }
+
+    setLoading(true);
+    setError("");
+    try {
+      const response = await api.post(`/customers/${customer._id}/payment`, {
+        amount: pay,
+        paymentMethod,
+        note,
+      });
+      if (response.success) {
+        onSuccess(response.data.customer);
+      } else {
+        setError(response.message || "Failed to record payment");
+      }
+    } catch (err) {
+      setError(err.message || "Failed to record payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white max-w-md w-full rounded-lg shadow-2xl">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <i className="fas fa-money-bill-wave mr-2 text-green-600"></i>
+            Record Payment
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <i className="fas fa-times text-xl"></i>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Customer due summary */}
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-orange-800">{customer.name}</p>
+                <p className="text-xs text-orange-600">Outstanding due</p>
+              </div>
+              <p className="text-2xl font-bold text-red-600">{formatCurrency(currentDue)}</p>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment Amount (৳) *
+              </label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="0.01"
+                max={currentDue}
+                step="0.01"
+                className="input-field"
+                placeholder={`Max: ${formatCurrency(currentDue)}`}
+                required
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setAmount(currentDue.toString())}
+                className="mt-1 text-xs text-blue-600 hover:underline"
+              >
+                Pay full amount ({formatCurrency(currentDue)})
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment Method *
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="input-field"
+              >
+                <option value="cash">Cash</option>
+                <option value="bank">Bank Transfer</option>
+                <option value="card">Card</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Note (optional)
+              </label>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="input-field"
+                placeholder="e.g. Payment for invoice INV-001"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-2">
+              <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={loading || !amount}>
+                {loading ? (
+                  <><LoadingSpinner size="sm" className="mr-2" />Recording...</>
+                ) : (
+                  <><i className="fas fa-check mr-2"></i>Record Payment</>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};

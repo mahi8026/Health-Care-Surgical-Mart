@@ -15,10 +15,6 @@ const setupRoutes = (app) => {
     logger.info("Loading authentication routes...");
     app.use("/api/auth", require("../routes/auth-multi-tenant.routes"));
 
-    // Test routes (no auth required) - for testing dashboard functionality
-    logger.info("Loading test routes...");
-    app.use("/api/test", require("../routes/test.routes"));
-
     // Super admin routes (super admin auth required)
     logger.info("Loading super admin routes...");
     app.use("/api/super-admin", require("../routes/super-admin.routes"));
@@ -133,19 +129,6 @@ const setupRoutes = (app) => {
         version: process.env.npm_package_version || "2.0.0",
       });
     });
-
-    // Debug route for development
-    if (process.env.NODE_ENV !== "production") {
-      app.get("/api/debug-token", (req, res) => {
-        const authHeader = req.headers.authorization;
-        res.json({
-          success: true,
-          authHeader: authHeader || "No authorization header",
-          user: req.user || "No user in request",
-          shopId: req.shopId || "No shop ID",
-        });
-      });
-    }
 
     logger.info("All routes loaded successfully");
   } catch (error) {

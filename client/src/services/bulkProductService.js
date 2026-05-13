@@ -1,4 +1,4 @@
-import { apiService } from "./api";
+import api from "../config/api";
 
 class BulkProductService {
   /**
@@ -13,7 +13,7 @@ class BulkProductService {
     formData.append("validateOnly", options.validateOnly || false);
     formData.append("autoGenerateSKU", options.autoGenerateSKU || false);
 
-    return await apiService.post("/bulk-products/upload", formData, {
+    return await api.post("/bulk-products/upload", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -24,28 +24,28 @@ class BulkProductService {
    * Process bulk import
    */
   async processImport(importId) {
-    return await apiService.post(`/bulk-products/process/${importId}`);
+    return await api.post(`/bulk-products/process/${importId}`);
   }
 
   /**
    * Get all bulk imports
    */
   async getImports(params = {}) {
-    return await apiService.get("/bulk-products/imports", { params });
+    return await api.get("/bulk-products/imports", { params });
   }
 
   /**
    * Get bulk import details
    */
   async getImportDetails(importId) {
-    return await apiService.get(`/bulk-products/imports/${importId}`);
+    return await api.get(`/bulk-products/imports/${importId}`);
   }
 
   /**
    * Delete bulk import
    */
   async deleteImport(importId) {
-    return await apiService.delete(`/bulk-products/imports/${importId}`);
+    return await api.delete(`/bulk-products/imports/${importId}`);
   }
 
   /**
@@ -72,7 +72,7 @@ class BulkProductService {
    * Get bulk import statistics
    */
   async getStats() {
-    return await apiService.get("/bulk-products/stats");
+    return await api.get("/bulk-products/stats");
   }
 }
 

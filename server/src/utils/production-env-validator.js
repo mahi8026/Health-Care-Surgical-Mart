@@ -60,11 +60,11 @@ const VALIDATION_RULES = {
 
   // Firebase Configuration
   FIREBASE_SERVICE_ACCOUNT_BASE64: {
-    required: true,
+    required: false,
     type: "string",
     minLength: 100,
     description: "Base64-encoded Firebase service account JSON",
-    critical: true,
+    warning: "Firebase authentication will be disabled without this or individual FIREBASE_* vars",
   },
 
   // CORS Configuration

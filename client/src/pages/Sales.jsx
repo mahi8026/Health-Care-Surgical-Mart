@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+﻿import React, { useState, useEffect } from "react";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ProfessionalInvoice from "../components/ProfessionalInvoice";
 import SearchableProductSelect from "../components/SearchableProductSelect";
@@ -18,6 +18,8 @@ const Sales = () => {
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [lastSale, setLastSale] = useState(null);
+  const [showCustomItemForm, setShowCustomItemForm] = useState(false);
+  const [customItemErrors, setCustomItemErrors] = useState({});
 
   // POS Form State
   const [posData, setPosData] = useState({
@@ -25,12 +27,11 @@ const Sales = () => {
     employee: "Current User",
     reference: "",
     saleDate: new Date().toISOString().split("T")[0],
-    saleType: "Retail",
+    customerType: "Walk-in",
     customerName: "Cash Customer",
     customerMobile: "",
     customerAddress: "",
     selectedProduct: "",
-    customProductName: "",
     saleRate: "",
     quantity: "",
     discount: 0,
@@ -41,63 +42,46 @@ const Sales = () => {
     bankPaid: 0,
   });
 
+  // Custom Item State
+  const [customItem, setCustomItem] = useState({
+    name: "",
+    rate: "",
+    quantity: "1",
+    unit: "pcs",
+  });
+
   // Fetch products for POS
   const fetchProducts = async () => {
     try {
-      // Use real authenticated endpoint
-      const response = await apiService.get("/products");
+      const params = new URLSearchParams();
+      if (searchTerm) params.append("search", searchTerm);
+      params.append("isActive", "true");
 
+      const response = await api.get(`/products?${params.toString()}`);
       if (response.success) {
-        // Show all active products in POS (including those with 0 stock)
-        // Users can still sell products even if stock shows 0 (for services, custom items, etc.)
         const availableProducts = response.data.filter(
-          (p) => p.isActive !== false, // Only filter out explicitly inactive products
+          (p) => p.stockQuantity > 0,
         );
         setProducts(availableProducts);
-      } else {
-        console.error("Failed to fetch products:", response.message);
-        setProducts([]);
       }
     } catch (error) {
       console.error("Fetch products error:", error);
-      if (error.message?.includes("401")) {
-        // Redirect to login
-        window.location.href = "/login";
-      }
-      setProducts([]);
     }
   };
 
   // Fetch customers
   const fetchCustomers = async () => {
     try {
-      // Use real authenticated endpoint
-      const response = await apiService.get("/customers");
+      const params = new URLSearchParams();
+      if (customerSearchTerm) params.append("search", customerSearchTerm);
+      params.append("limit", "20");
 
+      const response = await api.get(`/customers?${params.toString()}`);
       if (response.success) {
-        // Apply search filter on frontend if needed
-        let filteredCustomers = response.data;
-        if (customerSearchTerm) {
-          filteredCustomers = filteredCustomers.filter(
-            (customer) =>
-              customer.name
-                .toLowerCase()
-                .includes(customerSearchTerm.toLowerCase()) ||
-              customer.phone.includes(customerSearchTerm) ||
-              (customer.email &&
-                customer.email
-                  .toLowerCase()
-                  .includes(customerSearchTerm.toLowerCase())),
-          );
-        }
-        setCustomers(filteredCustomers.slice(0, 20)); // Limit to 20 results
-      } else {
-        console.error("Failed to fetch customers:", response.message);
-        setCustomers([]);
+        setCustomers(response.data);
       }
     } catch (error) {
       console.error("Fetch customers error:", error);
-      setCustomers([]);
     }
   };
 
@@ -116,58 +100,37 @@ const Sales = () => {
 
   // Add product to cart
   const addToCart = () => {
-    if (!posData.quantity || !posData.saleRate) {
-      setError("Please enter quantity and sale rate");
+    if (!posData.selectedProduct || !posData.quantity || !posData.saleRate) {
+      setError("Please select product, enter quantity and sale rate");
       setTimeout(() => setError(""), 3000);
       return;
     }
 
-    if (!posData.customProductName.trim()) {
-      setError("Please enter product name");
-      setTimeout(() => setError(""), 3000);
+    const product = products.find((p) => p._id === posData.selectedProduct);
+    if (!product) {
+      setError("Product not found");
       return;
     }
 
     const quantity = parseFloat(posData.quantity);
     const rate = parseFloat(posData.saleRate);
 
-    // Check stock only if a product from inventory is selected
-    // Show warning but allow sale (useful for services, pre-orders, etc.)
-    if (posData.selectedProduct) {
-      const product = products.find((p) => p._id === posData.selectedProduct);
-      if (product && quantity > product.stockQuantity) {
-        // Show warning but don't block the sale
-        console.warn(
-          `Warning: Selling ${quantity} units but only ${product.stockQuantity} in stock`,
-        );
-        // Optional: You can show a warning message instead of error
-        // setError(`Warning: Only ${product.stockQuantity} units in stock. Proceeding anyway.`);
-        // setTimeout(() => setError(""), 3000);
-      }
+    if (quantity > product.stockQuantity) {
+      setError(`Only ${product.stockQuantity} units available`);
+      setTimeout(() => setError(""), 3000);
+      return;
     }
 
-    // Use custom product name or generate unique ID for custom items
-    const productId = posData.selectedProduct || `custom-${Date.now()}`;
-    const productName = posData.customProductName.trim();
-
     const existingItemIndex = cart.findIndex(
-      (item) => item.productId === productId && item.name === productName,
+      (item) => item.productId === product._id,
     );
 
     if (existingItemIndex >= 0) {
       const newQuantity = cart[existingItemIndex].quantity + quantity;
-
-      // Check stock for inventory items - show warning but allow
-      if (posData.selectedProduct) {
-        const product = products.find((p) => p._id === posData.selectedProduct);
-        if (product && newQuantity > product.stockQuantity) {
-          console.warn(
-            `Warning: Total quantity ${newQuantity} exceeds stock ${product.stockQuantity}`,
-          );
-          // Optional: Show warning
-          // setError(`Warning: Total quantity exceeds ${product.stockQuantity} units in stock`);
-          // setTimeout(() => setError(""), 3000);
-        }
+      if (newQuantity > product.stockQuantity) {
+        setError(`Total quantity cannot exceed ${product.stockQuantity} units`);
+        setTimeout(() => setError(""), 3000);
+        return;
       }
 
       const updatedCart = [...cart];
@@ -178,24 +141,18 @@ const Sales = () => {
       };
       setCart(updatedCart);
     } else {
-      const product = posData.selectedProduct
-        ? products.find((p) => p._id === posData.selectedProduct)
-        : null;
-
       const cartItem = {
-        productId: productId,
-        name: productName,
-        category: product
-          ? typeof product.category === "object"
+        productId: product._id,
+        name: product.name,
+        category:
+          typeof product.category === "object"
             ? product.category.name
-            : product.category
-          : "Custom Item",
+            : product.category,
         rate: rate,
         quantity: quantity,
         total: quantity * rate,
-        unit: product?.unit || "pcs",
-        maxStock: product?.stockQuantity || 999999,
-        isCustom: !posData.selectedProduct,
+        unit: product.unit,
+        maxStock: product.stockQuantity,
       };
       setCart([...cart, cartItem]);
     }
@@ -204,7 +161,6 @@ const Sales = () => {
     setPosData((prev) => ({
       ...prev,
       selectedProduct: "",
-      customProductName: "",
       saleRate: "",
       quantity: "",
     }));
@@ -222,40 +178,21 @@ const Sales = () => {
       return;
     }
 
-    // Allow updating quantity even if exceeds stock
-    // Show warning in console but don't block
-    const product = products.find((p) => p._id === productId);
-    if (product && newQuantity > product.stockQuantity) {
-      console.warn(
-        `Warning: Quantity ${newQuantity} exceeds stock ${product.stockQuantity}`,
-      );
-      // Optional: Show warning message
-      // setError(`Warning: Only ${product.stockQuantity} units in stock`);
-      // setTimeout(() => setError(""), 2000);
+    // Skip stock check for custom items
+    const cartItem = cart.find((item) => item.productId === productId);
+    if (!cartItem?.isCustom) {
+      const product = products.find((p) => p._id === productId);
+      if (product && newQuantity > product.stockQuantity) {
+        setError(`Only ${product.stockQuantity} units available`);
+        setTimeout(() => setError(""), 3000);
+        return;
+      }
     }
 
     setCart(
       cart.map((item) =>
         item.productId === productId
           ? { ...item, quantity: newQuantity, total: newQuantity * item.rate }
-          : item,
-      ),
-    );
-  };
-
-  // Update cart item price
-  const updateCartPrice = (productId, newPrice) => {
-    const price = parseFloat(newPrice) || 0;
-    if (price < 0) {
-      setError("Price cannot be negative");
-      setTimeout(() => setError(""), 3000);
-      return;
-    }
-
-    setCart(
-      cart.map((item) =>
-        item.productId === productId
-          ? { ...item, rate: price, total: item.quantity * price }
           : item,
       ),
     );
@@ -275,6 +212,7 @@ const Sales = () => {
   const grandTotal = afterDiscount + vatAmount;
   const totalPaid =
     (parseFloat(posData.cashPaid) || 0) + (parseFloat(posData.bankPaid) || 0);
+  const dueAmount = Math.max(0, grandTotal - totalPaid);
   const returnAmount = Math.max(0, totalPaid - grandTotal);
 
   // Process sale
@@ -284,20 +222,20 @@ const Sales = () => {
       return;
     }
 
-    // Allow partial payment (due sales) - no minimum payment required
-    // if (totalPaid < grandTotal) {
-    //   setError(
-    //     `Insufficient payment amount. Total: ${grandTotal.toFixed(2)}, Paid: ${totalPaid.toFixed(2)}`,
-    //   );
-    //   return;
-    // }
+    // Allow partial payments (due sales) - no minimum payment required
+    console.log("Payment info:", {
+      totalPaid,
+      grandTotal,
+      dueAmount,
+      cashPaid: posData.cashPaid,
+      bankPaid: posData.bankPaid,
+    });
 
     setLoading(true);
     try {
-      const dueAmount = Math.max(0, grandTotal - totalPaid);
-
       const saleData = {
         invoiceNumber: posData.invoiceNo,
+        customerType: posData.customerType,
         customer: selectedCustomer
           ? {
               id: selectedCustomer._id,
@@ -307,8 +245,8 @@ const Sales = () => {
               name: posData.customerName,
             },
         items: cart.map((item) => ({
-          productId: item.productId,
-          name: item.name,
+          productId: item.isCustom ? null : item.productId,
+          customName: item.isCustom ? item.name : undefined,
           quantity: item.quantity,
           sellingPrice: item.rate,
         })),
@@ -324,14 +262,13 @@ const Sales = () => {
         notes: posData.reference,
       };
 
-      // Use real authenticated endpoint
-      const response = await apiService.post("/sales", saleData);
+      const response = await api.post("/sales", saleData);
 
       if (response.success) {
         // Create sale object for invoice
         const saleForInvoice = {
           ...response.data,
-          invoiceNo: response.data.invoiceNo || posData.invoiceNo,
+          invoiceNo: response.data.invoiceNo || invoiceNumber,
           items: cart.map((item) => ({
             ...item,
             name: item.name,
@@ -376,12 +313,7 @@ const Sales = () => {
         setError(response.message || "Failed to process sale");
       }
     } catch (error) {
-      if (error.message?.includes("401")) {
-        setError("Session expired. Please login again.");
-        setTimeout(() => (window.location.href = "/login"), 2000);
-      } else {
-        setError(error.message || "Failed to process sale");
-      }
+      setError("Failed to process sale");
       console.error("Process sale error:", error);
     } finally {
       setLoading(false);
@@ -397,12 +329,11 @@ const Sales = () => {
       employee: "Current User",
       reference: "",
       saleDate: new Date().toISOString().split("T")[0],
-      saleType: "Retail",
+      customerType: "Walk-in",
       customerName: "Cash Customer",
       customerMobile: "",
       customerAddress: "",
       selectedProduct: "",
-      customProductName: "",
       saleRate: "",
       quantity: "",
       discount: 0,
@@ -412,6 +343,14 @@ const Sales = () => {
       cashPaid: 0,
       bankPaid: 0,
     });
+    setCustomItem({
+      name: "",
+      rate: "",
+      quantity: "1",
+      unit: "pcs",
+    });
+    setCustomItemErrors({});
+    setShowCustomItemForm(false);
   };
 
   // Handle product selection
@@ -421,10 +360,86 @@ const Sales = () => {
       setPosData((prev) => ({
         ...prev,
         selectedProduct: productId,
-        customProductName: product.name,
         saleRate: product.sellingPrice.toString(),
       }));
     }
+  };
+
+  // Handle custom item changes
+  const handleCustomItemChange = (field, value) => {
+    setCustomItem((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field
+    if (customItemErrors[field]) {
+      setCustomItemErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  // Validate custom item
+  const validateCustomItem = () => {
+    const errors = {};
+    
+    if (!customItem.name.trim()) {
+      errors.name = "Item name is required";
+    } else if (customItem.name.trim().length < 2) {
+      errors.name = "Item name must be at least 2 characters";
+    } else if (customItem.name.trim().length > 100) {
+      errors.name = "Item name must not exceed 100 characters";
+    }
+
+    const rate = parseFloat(customItem.rate);
+    if (!customItem.rate || isNaN(rate)) {
+      errors.rate = "Sale rate is required";
+    } else if (rate <= 0) {
+      errors.rate = "Sale rate must be greater than 0";
+    }
+
+    const qty = parseFloat(customItem.quantity);
+    if (!customItem.quantity || isNaN(qty)) {
+      errors.quantity = "Quantity is required";
+    } else if (qty < 1) {
+      errors.quantity = "Quantity must be at least 1";
+    }
+
+    setCustomItemErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Add custom item to cart
+  const addCustomItemToCart = () => {
+    if (!validateCustomItem()) {
+      return;
+    }
+
+    const rate = parseFloat(customItem.rate);
+    const quantity = parseFloat(customItem.quantity);
+    const total = rate * quantity;
+
+    // Generate unique ID for custom item
+    const customItemId = `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const cartItem = {
+      productId: customItemId,
+      name: customItem.name.trim(),
+      category: "Custom",
+      rate: rate,
+      quantity: quantity,
+      total: total,
+      unit: customItem.unit,
+      maxStock: 999999,
+      isCustom: true,
+    };
+
+    setCart([...cart, cartItem]);
+
+    // Clear custom item form
+    setCustomItem({
+      name: "",
+      rate: "",
+      quantity: "1",
+      unit: "pcs",
+    });
+    setCustomItemErrors({});
+    setError("");
   };
 
   return (
@@ -512,34 +527,60 @@ const Sales = () => {
           <div className="bg-blue-50 p-4 rounded-b-lg space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sales Type
+                Customer Type
               </label>
-              <div className="flex space-x-4">
+              <div className="grid grid-cols-2 gap-2">
                 <label className="flex items-center">
                   <input
                     type="radio"
-                    name="saleType"
-                    value="Retail"
-                    checked={posData.saleType === "Retail"}
+                    name="customerType"
+                    value="Walk-in"
+                    checked={posData.customerType === "Walk-in"}
                     onChange={(e) =>
-                      handlePosDataChange("saleType", e.target.value)
+                      handlePosDataChange("customerType", e.target.value)
                     }
                     className="mr-2"
                   />
-                  Retail
+                  Walk-in
                 </label>
                 <label className="flex items-center">
                   <input
                     type="radio"
-                    name="saleType"
-                    value="Wholesale"
-                    checked={posData.saleType === "Wholesale"}
+                    name="customerType"
+                    value="Hospital/Clinic"
+                    checked={posData.customerType === "Hospital/Clinic"}
                     onChange={(e) =>
-                      handlePosDataChange("saleType", e.target.value)
+                      handlePosDataChange("customerType", e.target.value)
                     }
                     className="mr-2"
                   />
-                  Wholesale
+                  Hospital/Clinic
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="Diagnostic"
+                    checked={posData.customerType === "Diagnostic"}
+                    onChange={(e) =>
+                      handlePosDataChange("customerType", e.target.value)
+                    }
+                    className="mr-2"
+                  />
+                  Diagnostic
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="Wholesaler"
+                    checked={posData.customerType === "Wholesaler"}
+                    onChange={(e) =>
+                      handlePosDataChange("customerType", e.target.value)
+                    }
+                    className="mr-2"
+                  />
+                  Wholesaler
                 </label>
               </div>
             </div>
@@ -659,25 +700,7 @@ const Sales = () => {
               />
             </div>
 
-            <div>
-              <label className="flex items-center justify-between text-sm font-medium text-gray-700 mb-1">
-                <span>Product Name</span>
-                <span className="text-xs text-gray-500 italic">
-                  (Editable for custom items)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={posData.customProductName}
-                onChange={(e) =>
-                  handlePosDataChange("customProductName", e.target.value)
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter or edit product name..."
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sale Rate
@@ -707,7 +730,18 @@ const Sales = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="0"
                   min="0"
-                  step="1"
+                  step={posData.selectedProduct && ["ml", "kg", "gm", "ltr"].includes(products.find(p => p._id === posData.selectedProduct)?.unit) ? "0.1" : "1"}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit
+                </label>
+                <input
+                  type="text"
+                  value={posData.selectedProduct && products.find(p => p._id === posData.selectedProduct)?.unit ? products.find(p => p._id === posData.selectedProduct)?.unit : "pcs"}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-gray-600"
                 />
               </div>
             </div>
@@ -727,7 +761,7 @@ const Sales = () => {
                     : "0.00"
                 }
                 readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 font-medium"
               />
             </div>
 
@@ -735,13 +769,148 @@ const Sales = () => {
               onClick={addToCart}
               className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded font-semibold transition-colors"
               disabled={
-                !posData.customProductName.trim() ||
+                !posData.selectedProduct ||
                 !posData.quantity ||
                 !posData.saleRate
               }
             >
               Add Cart
             </button>
+
+            {/* Custom Item Divider */}
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomItemForm(!showCustomItemForm)}
+                  className="bg-blue-50 px-4 py-1 text-sm text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                >
+                  {showCustomItemForm ? "− HIDE CUSTOM ITEM" : "+ ADD CUSTOM ITEM"}
+                </button>
+              </div>
+            </div>
+
+            {/* Custom Item Form */}
+            {showCustomItemForm && (
+              <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Item Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={customItem.name}
+                    onChange={(e) => handleCustomItemChange("name", e.target.value)}
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                      customItemErrors.name
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                    placeholder="Enter item name"
+                    maxLength={100}
+                  />
+                  {customItemErrors.name && (
+                    <p className="text-xs text-red-600 mt-1">{customItemErrors.name}</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Sale Rate 
+                    </label>
+                    <input
+                      type="number"
+                      value={customItem.rate}
+                      onChange={(e) => handleCustomItemChange("rate", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                        customItemErrors.rate
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-gray-300 focus:ring-blue-500"
+                      }`}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                    {customItemErrors.rate && (
+                      <p className="text-xs text-red-600 mt-1">{customItemErrors.rate}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Qty *
+                    </label>
+                    <input
+                      type="number"
+                      value={customItem.quantity}
+                      onChange={(e) => handleCustomItemChange("quantity", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                        customItemErrors.quantity
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-gray-300 focus:ring-blue-500"
+                      }`}
+                      placeholder="1"
+                      min="0.1"
+                      step={customItem.unit === "ml" || customItem.unit === "kg" || customItem.unit === "gm" || customItem.unit === "ltr" ? "0.1" : "1"}
+                    />
+                    {customItemErrors.quantity && (
+                      <p className="text-xs text-red-600 mt-1">{customItemErrors.quantity}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Unit *
+                    </label>
+                    <select
+                      value={customItem.unit}
+                      onChange={(e) => handleCustomItemChange("unit", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="pcs">Pcs</option>
+                      <option value="box">Box</option>
+                      <option value="pack">Pack</option>
+                      <option value="bottle">Bottle</option>
+                      <option value="strip">Strip</option>
+                      <option value="vial">Vial</option>
+                      <option value="ml">ml</option>
+                      <option value="kg">kg</option>
+                      <option value="gm">gm</option>
+                      <option value="ltr">Ltr</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      customItem.rate && customItem.quantity
+                        ? (
+                            parseFloat(customItem.rate) *
+                            parseFloat(customItem.quantity)
+                          ).toFixed(2)
+                        : "0.00"
+                    }
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 font-medium"
+                  />
+                </div>
+
+                <button
+                  onClick={addCustomItemToCart}
+                  className="w-full bg-pink-500 hover:bg-pink-600 text-white py-2 px-4 rounded font-semibold transition-colors"
+                >
+                  <i className="fas fa-plus mr-2"></i>
+                  Add Custom Item
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -918,12 +1087,10 @@ const Sales = () => {
               </label>
               <input
                 type="text"
-                value={Math.max(0, grandTotal - totalPaid).toFixed(2)}
+                value={dueAmount.toFixed(2)}
                 readOnly
                 className={`w-full px-3 py-2 border border-gray-300 rounded font-bold ${
-                  grandTotal - totalPaid > 0
-                    ? "bg-red-100 text-red-700"
-                    : "bg-gray-100 text-gray-700"
+                  dueAmount > 0 ? "bg-orange-100 text-orange-700" : "bg-gray-100"
                 }`}
               />
             </div>
@@ -934,27 +1101,27 @@ const Sales = () => {
                 <span>Payment Status:</span>
                 <span
                   className={`font-semibold ${
-                    totalPaid >= grandTotal
-                      ? "text-green-600"
-                      : totalPaid > 0
-                        ? "text-orange-600"
-                        : "text-red-600"
+                    dueAmount === 0 
+                      ? "text-green-600" 
+                      : dueAmount > 0 && totalPaid > 0
+                      ? "text-orange-600"
+                      : "text-red-600"
                   }`}
                 >
-                  {totalPaid >= grandTotal
-                    ? "Paid"
-                    : totalPaid > 0
-                      ? "Partial"
-                      : "Unpaid"}
+                  {dueAmount === 0 
+                    ? "Paid" 
+                    : dueAmount > 0 && totalPaid > 0
+                    ? "Partial"
+                    : "Unpaid"}
                 </span>
               </div>
               <div className="flex justify-between text-xs text-gray-600">
-                <span>Required: ৳{grandTotal.toFixed(2)}</span>
+                <span>Total: ৳{grandTotal.toFixed(2)}</span>
                 <span>Paid: ৳{totalPaid.toFixed(2)}</span>
               </div>
-              {totalPaid < grandTotal && (
-                <div className="text-xs text-red-600 mt-1 font-semibold">
-                  Due: ৳{(grandTotal - totalPaid).toFixed(2)}
+              {dueAmount > 0 && (
+                <div className="text-xs text-orange-600 mt-1 font-medium">
+                  Due: ৳{dueAmount.toFixed(2)}
                 </div>
               )}
             </div>
@@ -971,19 +1138,7 @@ const Sales = () => {
                     Processing...
                   </>
                 ) : (
-                  <>
-                    {grandTotal - totalPaid > 0 ? (
-                      <>
-                        <i className="fas fa-clock mr-2"></i>
-                        Sale (Due)
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-check mr-2"></i>
-                        Sale
-                      </>
-                    )}
-                  </>
+                  "Sale"
                 )}
               </button>
               <button
@@ -1025,53 +1180,73 @@ const Sales = () => {
                 <tr key={item.productId} className="hover:bg-gray-50">
                   <td className="px-4 py-3">{index + 1}</td>
                   <td className="px-4 py-3">
-                    <div className="font-medium">{item.name}</div>
-                    {item.isCustom && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded mt-1 inline-block">
-                        <i className="fas fa-tag mr-1"></i>
-                        Custom Item
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{item.name}</span>
+                      {item.isCustom && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700 border border-gray-300">
+                          <i className="fas fa-tag mr-1 text-xs"></i>
+                          Custom
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.isCustom ? (
+                      <span className="text-gray-500 italic">{item.category}</span>
+                    ) : (
+                      item.category
                     )}
                   </td>
-                  <td className="px-4 py-3">{item.category}</td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end">
-                      <span className="text-gray-500 mr-1">৳</span>
-                      <input
-                        type="number"
-                        value={item.rate}
-                        onChange={(e) =>
-                          updateCartPrice(item.productId, e.target.value)
-                        }
-                        className="w-24 px-2 py-1 border border-gray-300 rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
+                    ৳{item.rate.toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button
-                        onClick={() =>
-                          updateCartQuantity(item.productId, item.quantity - 1)
-                        }
-                        className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded text-xs flex items-center justify-center"
-                      >
-                        <i className="fas fa-minus"></i>
-                      </button>
-                      <span className="w-12 text-center font-medium">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() =>
-                          updateCartQuantity(item.productId, item.quantity + 1)
-                        }
-                        className="w-6 h-6 bg-green-500 hover:bg-green-600 text-white rounded text-xs flex items-center justify-center"
-                        disabled={item.quantity >= item.maxStock}
-                      >
-                        <i className="fas fa-plus"></i>
-                      </button>
-                    </div>
+                    {item.isCustom ? (
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() =>
+                            updateCartQuantity(item.productId, item.quantity - 1)
+                          }
+                          className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded text-xs flex items-center justify-center"
+                        >
+                          <i className="fas fa-minus"></i>
+                        </button>
+                        <span className="w-16 text-center font-medium">
+                          {item.quantity} {item.unit}
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateCartQuantity(item.productId, item.quantity + 1)
+                          }
+                          className="w-6 h-6 bg-green-500 hover:bg-green-600 text-white rounded text-xs flex items-center justify-center"
+                        >
+                          <i className="fas fa-plus"></i>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() =>
+                            updateCartQuantity(item.productId, item.quantity - 1)
+                          }
+                          className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded text-xs flex items-center justify-center"
+                        >
+                          <i className="fas fa-minus"></i>
+                        </button>
+                        <span className="w-16 text-center font-medium">
+                          {item.quantity} {item.unit}
+                        </span>
+                        <button
+                          onClick={() =>
+                            updateCartQuantity(item.productId, item.quantity + 1)
+                          }
+                          className="w-6 h-6 bg-green-500 hover:bg-green-600 text-white rounded text-xs flex items-center justify-center"
+                          disabled={item.quantity >= item.maxStock}
+                        >
+                          <i className="fas fa-plus"></i>
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-bold">
                     ৳{item.total.toFixed(2)}
@@ -1230,21 +1405,14 @@ const CustomerFormModal = ({ onClose, onCustomerCreated }) => {
     setError("");
 
     try {
-      // Use real authenticated endpoint
-      const response = await apiService.post("/customers", formData);
-
+      const response = await api.post("/customers", formData);
       if (response.success) {
         onCustomerCreated(response.data);
       } else {
         setError(response.message || "Failed to create customer");
       }
     } catch (error) {
-      if (error.message?.includes("401")) {
-        setError("Session expired. Please login again.");
-        setTimeout(() => (window.location.href = "/login"), 2000);
-      } else {
-        setError(error.message || "Failed to create customer");
-      }
+      setError("Failed to create customer");
       console.error("Create customer error:", error);
     } finally {
       setLoading(false);

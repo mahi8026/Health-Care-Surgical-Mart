@@ -44,6 +44,28 @@ const stockSchema = {
           bsonType: "bool",
           description: "Flag for low stock alert",
         },
+        batchNo: {
+          bsonType: "string",
+          description: "Batch number for pharmaceutical tracking",
+        },
+        lotNo: {
+          bsonType: "string",
+          description: "Lot number for pharmaceutical tracking",
+        },
+        expiryDate: {
+          bsonType: "date",
+          description: "Expiry date — null means no expiry tracked",
+        },
+        reorderPoint: {
+          bsonType: "int",
+          minimum: 0,
+          description: "Reorder trigger level (default 10)",
+        },
+        maxStock: {
+          bsonType: "int",
+          minimum: 0,
+          description: "Maximum stock capacity (optional)",
+        },
         lastPurchaseDate: {
           bsonType: "date",
           description: "Last purchase date",
@@ -69,6 +91,7 @@ const stockIndexes = [
   { key: { productId: 1 }, unique: true, name: "product_unique" },
   { key: { isLowStock: 1 }, name: "low_stock_index" },
   { key: { currentQty: 1 }, name: "current_qty_index" },
+  { key: { expiryDate: 1 }, name: "expiry_date_index" },
   { key: { lastUpdated: -1 }, name: "last_updated_desc" },
 ];
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../../services/api";
+import api from "../../config/api";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 
@@ -18,7 +18,7 @@ const TemplateEditor = () => {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const res = await apiService.get("/email/templates");
+      const res = await api.get("/email/templates");
       setTemplates(res.data || []);
     } catch {
       setTemplates([]);
@@ -37,7 +37,7 @@ const TemplateEditor = () => {
     setPreviewOpen(true);
     setPreviewLoading(true);
     try {
-      const res = await apiService.get(`/email/templates/${name}/preview`);
+      const res = await api.get(`/email/templates/${name}/preview`);
       setPreviewHtml(res.data?.html || res.data || "");
     } catch (err) {
       setPreviewHtml(`<p style="color:red">Failed to load preview: ${err.message}</p>`);
@@ -57,7 +57,7 @@ const TemplateEditor = () => {
     setSaving(true);
     setFeedback(null);
     try {
-      await apiService.post("/email/templates", form);
+      await api.post("/email/templates", form);
       setCreateOpen(false);
       fetchTemplates();
     } catch (err) {

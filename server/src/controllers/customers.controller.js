@@ -72,34 +72,27 @@ class CustomersController extends BaseController {
   async createCustomer(req, res) {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
-      const { name, phone, email, address, type = "Regular" } = req.body;
+      const {
+        name, phone, email, address, type = "Retail",
+        creditEnabled = false, creditLimit = 0,
+      } = req.body;
 
-      // Validate required fields
       this.validateRequired(req.body, ["name", "phone"]);
 
-      // Check if phone already exists
       const existingCustomer = await shopDb
         .collection("customers")
         .findOne({ phone: phone.trim() });
 
       if (existingCustomer) {
-        return this.sendError(
-          res,
-          "Customer with this phone already exists",
-          400,
-        );
+        return this.sendError(res, "Customer with this phone already exists", 400);
       }
 
-      // Build customer object
       const customerData = this._buildCustomerObject(
-        { name, phone, email, address, type },
+        { name, phone, email, address, type, creditEnabled, creditLimit },
         req.user,
       );
 
-      // Insert customer
-      const result = await shopDb
-        .collection("customers")
-        .insertOne(customerData);
+      const result = await shopDb.collection("customers").insertOne(customerData);
 
       this.sendSuccess(
         res,
@@ -119,12 +112,13 @@ class CustomersController extends BaseController {
   async updateCustomer(req, res) {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
-      const { name, phone, email, address, type } = req.body;
+      const {
+        name, phone, email, address, type,
+        creditEnabled, creditLimit,
+      } = req.body;
 
-      // Validate required fields
       this.validateRequired(req.body, ["name", "phone"]);
 
-      // Check if customer exists
       const existingCustomer = await shopDb
         .collection("customers")
         .findOne({ _id: new ObjectId(req.params.id) });
@@ -133,7 +127,6 @@ class CustomersController extends BaseController {
         return this.sendError(res, "Customer not found", 404);
       }
 
-      // Check if phone is taken by another customer
       const phoneCheck = await shopDb.collection("customers").findOne({
         phone: phone.trim(),
         _id: { $ne: new ObjectId(req.params.id) },
@@ -143,13 +136,11 @@ class CustomersController extends BaseController {
         return this.sendError(res, "Phone number is already taken", 400);
       }
 
-      // Build update data
       const updateData = this._buildUpdateData(
-        { name, phone, email, address, type },
+        { name, phone, email, address, type, creditEnabled, creditLimit },
         req.user,
       );
 
-      // Update customer
       await shopDb
         .collection("customers")
         .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
@@ -224,13 +215,17 @@ class CustomersController extends BaseController {
   /**
    * Build customer object for creation
    */
-  _buildCustomerObject({ name, phone, email, address, type }, user) {
+  _buildCustomerObject({ name, phone, email, address, type, creditEnabled, creditLimit }, user) {
     return {
       name: name.trim(),
       phone: phone.trim(),
       email: email?.trim() || null,
       address: address?.trim() || null,
-      type,
+      type: type || "Retail",
+      creditEnabled: creditEnabled === true || creditEnabled === "true",
+      creditLimit: parseFloat(creditLimit) || 0,
+      currentDue: 0,
+      totalPurchased: 0,
       totalPurchases: 0,
       lastPurchaseDate: null,
       createdAt: new Date(),
@@ -239,19 +234,19 @@ class CustomersController extends BaseController {
     };
   }
 
-  /**
-   * Build update data object
-   */
-  _buildUpdateData({ name, phone, email, address, type }, user) {
-    return {
+  _buildUpdateData({ name, phone, email, address, type, creditEnabled, creditLimit }, user) {
+    const update = {
       name: name.trim(),
       phone: phone.trim(),
       email: email?.trim() || null,
       address: address?.trim() || null,
-      type,
+      type: type || "Retail",
       updatedAt: new Date(),
       updatedBy: user.id || user._id,
     };
+    if (creditEnabled !== undefined) update.creditEnabled = creditEnabled === true || creditEnabled === "true";
+    if (creditLimit !== undefined) update.creditLimit = parseFloat(creditLimit) || 0;
+    return update;
   }
 }
 

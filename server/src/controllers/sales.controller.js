@@ -17,6 +17,7 @@ class SalesController {
       const {
         invoiceNumber,
         customer,
+        customerType,
         items,
         subtotal,
         discount,
@@ -31,25 +32,50 @@ class SalesController {
 
       // Validate required fields
       if (!items || items.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Sale must have at least one item",
-        });
+        return res.status(400).json({ success: false, message: "Sale must have at least one item" });
       }
-
       if (!grandTotal || grandTotal <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid sale amount",
-        });
+        return res.status(400).json({ success: false, message: "Invalid sale amount" });
+      }
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ success: false, message: "User authentication required" });
       }
 
-      // Validate user exists
-      if (!req.user || !req.user._id) {
-        return res.status(401).json({
-          success: false,
-          message: "User authentication required",
-        });
+      // ── Credit sale validation ────────────────────────────────────────────
+      const paymentMethod = req.body.paymentMethod || "cash";
+      if (paymentMethod === "credit") {
+        if (!customer || !customer.id) {
+          return res.status(400).json({
+            success: false,
+            message: "A customer must be selected for credit sales",
+          });
+        }
+
+        const creditCustomer = await req.shopDb
+          .collection("customers")
+          .findOne({ _id: new ObjectId(customer.id) });
+
+        if (!creditCustomer) {
+          return res.status(404).json({ success: false, message: "Customer not found" });
+        }
+        if (!creditCustomer.creditEnabled) {
+          return res.status(400).json({
+            success: false,
+            message: `Credit is not enabled for ${creditCustomer.name}. Enable credit in customer settings first.`,
+          });
+        }
+
+        const currentDue = creditCustomer.currentDue || 0;
+        const creditLimit = creditCustomer.creditLimit || 0;
+        const newDue = currentDue + parseFloat(grandTotal);
+
+        if (newDue > creditLimit) {
+          const available = Math.max(0, creditLimit - currentDue);
+          return res.status(400).json({
+            success: false,
+            message: `Credit limit exceeded. Available credit: ৳${available.toFixed(2)} (Limit: ৳${creditLimit.toFixed(2)}, Current due: ৳${currentDue.toFixed(2)})`,
+          });
+        }
       }
 
       // Use provided invoice number or generate one
@@ -62,6 +88,7 @@ class SalesController {
       const sale = this._buildSaleRecord({
         invoiceNo,
         customer,
+        customerType,
         enrichedItems,
         subtotal,
         discount,
@@ -70,6 +97,8 @@ class SalesController {
         grandTotal,
         cashPaid,
         bankPaid,
+        paymentMethod: req.body.paymentMethod || "cash",
+        dueAmount: req.body.dueAmount,
         notes,
         user: req.user,
       });
@@ -81,6 +110,11 @@ class SalesController {
 
       // Update stock quantities
       await this._updateStockForSale(req.shopDb, enrichedItems);
+
+      // Update customer totals (totalPurchased, lastPurchaseDate, currentDue for credit)
+      if (customer?.id) {
+        await this._updateCustomerAfterSale(req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod);
+      }
 
       // Send notification (async, don't wait) - wrapped in try-catch
       setImmediate(() => {
@@ -113,20 +147,22 @@ class SalesController {
           saleDate: sale.saleDate,
         },
       });
-    } catch (error) {      logger.error("Create sale error:", error);
+    } catch (error) {
+      logger.error("Create sale error:", error);
+
+      // Expired item or business rule violation → 400
+      if (error.message?.startsWith("Cannot sell expired item")) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
 
       if (error.code === 121) {
-        logger.error(
-          "Schema validation failed:",
-          error.errInfo?.details,
-        );
+        logger.error("Schema validation failed:", error.errInfo?.details);
       }
 
       return res.status(500).json({
         success: false,
         message: error.message || "Failed to create sale",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
+        error: process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
@@ -200,6 +236,24 @@ class SalesController {
     const enrichedItems = [];
 
     for (const item of items) {
+      // Handle custom items (no productId)
+      if (!item.productId || item.productId === null) {
+        if (!item.customName) {
+          throw new Error("Custom items must have a customName");
+        }
+        
+        enrichedItems.push({
+          productId: null,
+          customName: item.customName,
+          name: item.customName,
+          rate: parseFloat(item.sellingPrice),
+          qty: parseFloat(item.quantity),
+          total: parseFloat(item.sellingPrice) * parseFloat(item.quantity),
+        });
+        continue;
+      }
+
+      // Handle regular products
       const product = await shopDb.collection("products").findOne({
         _id: new ObjectId(item.productId),
       });
@@ -216,6 +270,15 @@ class SalesController {
       if (!stock || stock.currentQty < item.quantity) {
         logger.warn(
           `Warning: Insufficient stock for ${product.name}. Available: ${stock?.currentQty || 0}, Requested: ${item.quantity}`,
+        );
+      }
+
+      // Block sale of expired items (only if expiryDate is set)
+      const stockExpiry = stock?.expiryDate || product.expiryDate;
+      if (stockExpiry && new Date(stockExpiry) < new Date()) {
+        const expiredDate = new Date(stockExpiry).toLocaleDateString("en-BD");
+        throw new Error(
+          `Cannot sell expired item: ${product.name} (expired ${expiredDate})`
         );
       }
 
@@ -237,23 +300,20 @@ class SalesController {
    * Build sale record object
    */
   _buildSaleRecord({
-    invoiceNo,
-    customer,
-    enrichedItems,
-    subtotal,
-    discount,
-    vatAmount,
-    vatPercent,
-    grandTotal,
-    cashPaid,
-    bankPaid,
-    notes,
-    user,
+    invoiceNo, customer, customerType, enrichedItems, subtotal, discount,
+    vatAmount, vatPercent, grandTotal, cashPaid, bankPaid,
+    paymentMethod, dueAmount, notes, user,
   }) {
+    const paid = (parseFloat(cashPaid) || 0) + (parseFloat(bankPaid) || 0);
+    const due = paymentMethod === "credit"
+      ? parseFloat(grandTotal)
+      : Math.max(0, parseFloat(grandTotal) - paid);
+
     return {
       invoiceNo,
       customerId: customer?.id ? new ObjectId(customer.id) : null,
       customerName: customer?.name || "Cash Customer",
+      customerType: customerType || "Walk-in",
       items: enrichedItems,
       subtotal: parseFloat(subtotal) || 0,
       discountAmount: parseFloat(discount) || 0,
@@ -261,15 +321,12 @@ class SalesController {
       vatAmount: parseFloat(vatAmount) || 0,
       vatPercent: parseFloat(vatPercent) || 0,
       grandTotal: parseFloat(grandTotal),
-      cashPaid: parseFloat(cashPaid) || 0,
-      bankPaid: parseFloat(bankPaid) || 0,
-      returnAmount: Math.max(
-        0,
-        (parseFloat(cashPaid) || 0) +
-          (parseFloat(bankPaid) || 0) -
-          parseFloat(grandTotal),
-      ),
-      paymentStatus: "Paid",
+      cashPaid: paymentMethod === "credit" ? 0 : (parseFloat(cashPaid) || 0),
+      bankPaid: paymentMethod === "credit" ? 0 : (parseFloat(bankPaid) || 0),
+      returnAmount: paymentMethod === "credit" ? 0 : Math.max(0, paid - parseFloat(grandTotal)),
+      dueAmount: due,
+      paymentMethod: paymentMethod || "cash",
+      paymentStatus: due > 0 ? (paymentMethod === "credit" ? "Credit" : "Partial") : "Paid",
       saleDate: new Date(),
       createdBy: new ObjectId(user._id),
       createdByName: user.name,
@@ -279,10 +336,38 @@ class SalesController {
   }
 
   /**
+   * Update customer totals after a sale
+   */
+  async _updateCustomerAfterSale(shopDb, customerId, saleTotal, paymentMethod) {
+    try {
+      const update = {
+        $inc: { totalPurchased: saleTotal, totalPurchases: saleTotal },
+        $set: { lastPurchaseDate: new Date(), updatedAt: new Date() },
+      };
+      // Credit sale: add to currentDue
+      if (paymentMethod === "credit") {
+        update.$inc.currentDue = saleTotal;
+      }
+      await shopDb.collection("customers").updateOne(
+        { _id: new ObjectId(customerId) },
+        update
+      );
+    } catch (err) {
+      logger.warn("Failed to update customer totals after sale:", err.message);
+    }
+  }
+
+  /**
    * Update stock quantities after sale
    */
   async _updateStockForSale(shopDb, enrichedItems) {
     for (const item of enrichedItems) {
+      // Skip stock updates for custom items (no productId)
+      if (!item.productId || item.productId === null) {
+        logger.info(`Skipping stock update for custom item: ${item.name}`);
+        continue;
+      }
+
       const existingStock = await shopDb.collection("stock").findOne({
         productId: item.productId,
       });

@@ -12,7 +12,7 @@ import {
   ArcElement,
 } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
-import { apiService } from "../services/api";
+import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 // Register Chart.js components
@@ -32,6 +32,8 @@ const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [stockData, setStockData] = useState(null);
   const [expenseData, setExpenseData] = useState(null);
+  const [expiringItems, setExpiringItems] = useState([]);
+  const [expiredItems, setExpiredItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -39,7 +41,7 @@ const Dashboard = () => {
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
-      const response = await apiService.get("/reports/dashboard");
+      const response = await api.get("/reports/dashboard");
 
       if (response.success) {
         setDashboardData(response.data);
@@ -63,7 +65,7 @@ const Dashboard = () => {
   // Fetch stock valuation data
   const fetchStockData = async () => {
     try {
-      const response = await apiService.get("/reports/stock-valuation");
+      const response = await api.get("/reports/stock-valuation");
 
       if (response.success) {
         setStockData(response.data);
@@ -83,12 +85,12 @@ const Dashboard = () => {
   const fetchExpenseData = async () => {
     try {
       // Fetch month-over-month comparison
-      const comparisonResponse = await apiService.get(
+      const comparisonResponse = await api.get(
         "/expense-analytics/month-over-month?months=6",
       );
 
       // Fetch category distribution
-      const distributionResponse = await apiService.get(
+      const distributionResponse = await api.get(
         "/expense-analytics/category-distribution",
       );
 
@@ -130,6 +132,13 @@ const Dashboard = () => {
         fetchDashboardData(),
         fetchStockData(),
         fetchExpenseData(),
+        // Expiry data — non-blocking
+        api.get("/stock/expiring-soon?days=30")
+          .then((r) => { if (r?.success) setExpiringItems(r.data || []); })
+          .catch(() => {}),
+        api.get("/stock/expired")
+          .then((r) => { if (r?.success) setExpiredItems(r.data || []); })
+          .catch(() => {}),
       ]);
       setLoading(false);
     };
@@ -143,6 +152,12 @@ const Dashboard = () => {
       fetchDashboardData(),
       fetchStockData(),
       fetchExpenseData(),
+      api.get("/stock/expiring-soon?days=30")
+        .then((r) => { if (r?.success) setExpiringItems(r.data || []); })
+        .catch(() => {}),
+      api.get("/stock/expired")
+        .then((r) => { if (r?.success) setExpiredItems(r.data || []); })
+        .catch(() => {}),
     ]);
     setRefreshing(false);
   };
@@ -599,6 +614,65 @@ const Dashboard = () => {
               </p>
               <p className="text-sm text-gray-600">Total Products</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expiry Alert Widget */}
+      {(expiredItems.length > 0 || expiringItems.length > 0) && (
+        <div className="card">
+          {/* Red banner for expired items */}
+          {expiredItems.length > 0 && (
+            <div className="bg-red-600 text-white px-4 py-3 rounded-t-lg flex items-center">
+              <i className="fas fa-ban mr-2 text-lg"></i>
+              <span className="font-semibold">
+                {expiredItems.length} item{expiredItems.length > 1 ? "s" : ""} EXPIRED — cannot be sold
+              </span>
+              <a href="/stock-report" className="ml-auto text-white underline text-sm">
+                View all →
+              </a>
+            </div>
+          )}
+          <div className={`p-4 ${expiredItems.length > 0 ? "" : "rounded-t-lg"}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <i className="fas fa-calendar-times text-orange-500 mr-2"></i>
+                Expiring Within 30 Days
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                  {expiringItems.length}
+                </span>
+              </h3>
+              <a href="/stock-report" className="text-sm text-blue-600 hover:underline">
+                View stock report →
+              </a>
+            </div>
+            {expiringItems.length === 0 ? (
+              <p className="text-sm text-gray-500">No items expiring in the next 30 days.</p>
+            ) : (
+              <div className="space-y-2">
+                {expiringItems.slice(0, 5).map((item, i) => {
+                  const daysLeft = item.daysLeft ?? Math.ceil((new Date(item.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+                  const color = daysLeft <= 7 ? "text-red-600" : daysLeft <= 14 ? "text-orange-600" : "text-yellow-600";
+                  return (
+                    <div key={i} className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">{item.productName}</span>
+                        {item.batchNo && <span className="ml-2 text-xs text-gray-500">Batch: {item.batchNo}</span>}
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-sm font-bold ${color}`}>{daysLeft}d left</span>
+                        <div className="text-xs text-gray-500">Qty: {item.currentQty}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {expiringItems.length > 5 && (
+                  <p className="text-xs text-gray-500 text-center">
+                    +{expiringItems.length - 5} more — <a href="/stock-report" className="text-blue-600 hover:underline">view all</a>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

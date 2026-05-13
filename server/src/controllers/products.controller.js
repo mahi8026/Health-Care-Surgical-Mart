@@ -64,7 +64,10 @@ class ProductsController extends BaseController {
         minStockLevel,
         description,
         batchNo,
+        lotNo,
         expiryDate,
+        reorderPoint,
+        maxStock,
       } = req.body;
 
       // Validate required fields
@@ -99,7 +102,10 @@ class ProductsController extends BaseController {
         minStockLevel,
         description,
         batchNo,
+        lotNo,
         expiryDate,
+        reorderPoint,
+        maxStock,
       });
 
       // Insert product
@@ -145,7 +151,10 @@ class ProductsController extends BaseController {
         minStockLevel,
         description,
         batchNo,
+        lotNo,
         expiryDate,
+        reorderPoint,
+        maxStock,
         isActive,
       } = req.body;
 
@@ -182,7 +191,10 @@ class ProductsController extends BaseController {
         minStockLevel,
         description,
         batchNo,
+        lotNo,
         expiryDate,
+        reorderPoint,
+        maxStock,
         isActive,
       });
 
@@ -273,15 +285,13 @@ class ProductsController extends BaseController {
    * Fetch products with stock information
    */
   async _fetchProductsWithStock(shopDb, matchStage) {
-    const stockCollectionName = shopDb.getCollectionName("stock");
-
     return await shopDb
       .collection("products")
       .aggregate([
         { $match: matchStage },
         {
           $lookup: {
-            from: stockCollectionName,
+            from: "stock",
             localField: "_id",
             foreignField: "productId",
             as: "stock",
@@ -320,17 +330,9 @@ class ProductsController extends BaseController {
    * Build product object for creation
    */
   _buildProductObject({
-    name,
-    category,
-    brand,
-    sku,
-    purchasePrice,
-    sellingPrice,
-    unit,
-    minStockLevel,
-    description,
-    batchNo,
-    expiryDate,
+    name, category, brand, sku, purchasePrice, sellingPrice,
+    unit, minStockLevel, description, batchNo, lotNo, expiryDate,
+    reorderPoint, maxStock,
   }) {
     return {
       name,
@@ -343,7 +345,10 @@ class ProductsController extends BaseController {
       minStockLevel: parseInt(minStockLevel),
       description: description || "",
       batchNo: batchNo || "",
+      lotNo: lotNo || "",
       expiryDate: expiryDate ? new Date(expiryDate) : null,
+      reorderPoint: reorderPoint !== undefined ? parseInt(reorderPoint) : 10,
+      maxStock: maxStock !== undefined ? parseInt(maxStock) : null,
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -354,40 +359,26 @@ class ProductsController extends BaseController {
    * Build update data object
    */
   _buildUpdateData({
-    name,
-    category,
-    brand,
-    sku,
-    purchasePrice,
-    sellingPrice,
-    unit,
-    minStockLevel,
-    description,
-    batchNo,
-    expiryDate,
-    isActive,
+    name, category, brand, sku, purchasePrice, sellingPrice,
+    unit, minStockLevel, description, batchNo, lotNo, expiryDate,
+    reorderPoint, maxStock, isActive,
   }) {
-    const updateData = {
-      updatedAt: new Date(),
-    };
-
-    if (name) updateData.name = name;
-    if (category) updateData.category = category;
+    const updateData = { updatedAt: new Date() };
+    if (name !== undefined) updateData.name = name;
+    if (category !== undefined) updateData.category = category;
     if (brand !== undefined) updateData.brand = brand;
-    if (sku) updateData.sku = sku;
-    if (purchasePrice !== undefined)
-      updateData.purchasePrice = parseFloat(purchasePrice);
-    if (sellingPrice !== undefined)
-      updateData.sellingPrice = parseFloat(sellingPrice);
-    if (unit) updateData.unit = unit;
-    if (minStockLevel !== undefined)
-      updateData.minStockLevel = parseInt(minStockLevel);
+    if (sku !== undefined) updateData.sku = sku;
+    if (purchasePrice !== undefined) updateData.purchasePrice = parseFloat(purchasePrice);
+    if (sellingPrice !== undefined) updateData.sellingPrice = parseFloat(sellingPrice);
+    if (unit !== undefined) updateData.unit = unit;
+    if (minStockLevel !== undefined) updateData.minStockLevel = parseInt(minStockLevel);
     if (description !== undefined) updateData.description = description;
     if (batchNo !== undefined) updateData.batchNo = batchNo;
-    if (expiryDate !== undefined)
-      updateData.expiryDate = expiryDate ? new Date(expiryDate) : null;
+    if (lotNo !== undefined) updateData.lotNo = lotNo;
+    if (expiryDate !== undefined) updateData.expiryDate = expiryDate ? new Date(expiryDate) : null;
+    if (reorderPoint !== undefined) updateData.reorderPoint = parseInt(reorderPoint);
+    if (maxStock !== undefined) updateData.maxStock = maxStock ? parseInt(maxStock) : null;
     if (isActive !== undefined) updateData.isActive = isActive;
-
     return updateData;
   }
 

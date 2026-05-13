@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { apiService } from "../services/api";
+import api from "../config/api";
 
 const BulkProductImport = ({ onClose, onSuccess }) => {
   const [file, setFile] = useState(null);
@@ -72,7 +72,7 @@ Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
 
     try {
 
-      const response = await apiService.post(
+      const response = await api.post(
         "/bulk-products/bulk-import",
         formData,
         {
