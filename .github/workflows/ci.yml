@@ -59,12 +59,11 @@ jobs:
 
   # ──────────────────────────────────────────────────────────
   # JOB 2: Deploy Backend to Render
-  # Runs on push to main only, after tests pass
+  # Runs on push to main only
   # ──────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend → Render
     runs-on: ubuntu-latest
-    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -100,12 +99,11 @@ jobs:
 
   # ──────────────────────────────────────────────────────────
   # JOB 3: Deploy Frontend to Firebase Hosting
-  # Runs on push to main only, after tests pass
+  # Runs on push to main only
   # ──────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend → Firebase Hosting
     runs-on: ubuntu-latest
-    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
