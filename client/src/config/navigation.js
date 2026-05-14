@@ -47,7 +47,7 @@ export const navigationConfig = [
     name: "Sales History",
     icon: "fas fa-history",
     path: "/sales-history",
-    permission: PERMISSIONS.VIEW_SALES,
+    permissions: [PERMISSIONS.VIEW_SALES, PERMISSIONS.CREATE_SALE],
     description: "View and manage previous sales",
   },
 
