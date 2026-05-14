@@ -37,21 +37,8 @@ const initializeSentry = (app) => {
       // Profiling disabled due to compatibility issues
       // profilesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
       
-      integrations: [
-        // Enable HTTP instrumentation
-        new Sentry.Integrations.Http({ tracing: true }),
-        
-        // Enable Express instrumentation
-        new Sentry.Integrations.Express({ app }),
-        
-        // Enable MongoDB instrumentation
-        new Sentry.Integrations.Mongo({
-          useMongoose: false, // We use native MongoDB driver
-        }),
-        
-        // Profiling disabled due to compatibility issues
-        // new ProfilingIntegration(),
-      ],
+      // Integrations - use only available ones
+      integrations: [],
       
       // Filter out sensitive data
       beforeSend(event, hint) {
@@ -142,9 +129,11 @@ const initializeSentry = (app) => {
  * Setup Sentry request handler (must be first middleware)
  */
 const setupSentryRequestHandler = (app) => {
-  if (process.env.SENTRY_DSN) {
+  if (process.env.SENTRY_DSN && Sentry.Handlers) {
     app.use(Sentry.Handlers.requestHandler());
-    app.use(Sentry.Handlers.tracingHandler());
+    if (Sentry.Handlers.tracingHandler) {
+      app.use(Sentry.Handlers.tracingHandler());
+    }
   }
 };
 
@@ -152,7 +141,7 @@ const setupSentryRequestHandler = (app) => {
  * Setup Sentry error handler (must be before other error handlers)
  */
 const setupSentryErrorHandler = (app) => {
-  if (process.env.SENTRY_DSN) {
+  if (process.env.SENTRY_DSN && Sentry.Handlers) {
     app.use(Sentry.Handlers.errorHandler({
       shouldHandleError(error) {
         // Only send errors with status code >= 500 to Sentry

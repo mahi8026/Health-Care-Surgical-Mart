@@ -42,6 +42,14 @@ export const navigationConfig = [
       color: "green",
     },
   },
+  {
+    id: "sales-history",
+    name: "Sales History",
+    icon: "fas fa-history",
+    path: "/sales-history",
+    permission: PERMISSIONS.VIEW_SALES,
+    description: "View and manage previous sales",
+  },
 
   // Inventory Management Section
   {
@@ -205,7 +213,7 @@ export const getFilteredNavigation = (user, hasPermission) => {
 export const navigationSections = {
   main: {
     title: "Main",
-    items: ["dashboard", "sales"],
+    items: ["dashboard", "sales", "sales-history"],
   },
   inventory: {
     title: "Inventory",

@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 
 // Lazy load other pages
 const Sales = lazy(() => import("./pages/Sales"));
+const SalesHistory = lazy(() => import("./pages/SalesHistory"));
 const Products = lazy(() => import("./pages/Products"));
 const Purchases = lazy(() => import("./pages/Purchases"));
 const Customers = lazy(() => import("./pages/Customers"));
@@ -76,6 +77,16 @@ function App() {
               element={
                 <ProtectedRoute permission={PERMISSIONS.CREATE_SALE}>
                   <Sales />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Sales History - Requires VIEW_SALES permission */}
+            <Route
+              path="sales-history"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_SALES}>
+                  <SalesHistory />
                 </ProtectedRoute>
               }
             />

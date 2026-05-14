@@ -1,8 +1,14 @@
 import React from "react";
 
-const ProfessionalInvoice = ({ sale, onClose }) => {
+const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownload = async () => {
+    if (onDownload) {
+      await onDownload(sale._id, sale.invoiceNo);
+    }
   };
 
   // Helper function to format date
@@ -406,6 +412,15 @@ const ProfessionalInvoice = ({ sale, onClose }) => {
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center z-10">
             <h2 className="text-xl font-bold text-gray-900">Invoice Preview</h2>
             <div className="flex gap-3">
+              {onDownload && (
+                <button
+                  onClick={handleDownload}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                >
+                  <i className="fas fa-download"></i>
+                  Download PDF
+                </button>
+              )}
               <button
                 onClick={handlePrint}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"

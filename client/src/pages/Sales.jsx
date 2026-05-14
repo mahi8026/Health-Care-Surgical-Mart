@@ -1309,6 +1309,22 @@ const Sales = () => {
         <ProfessionalInvoice
           sale={lastSale}
           onClose={() => setShowInvoiceModal(false)}
+          onDownload={async (saleId, invoiceNo) => {
+            try {
+              const response = await api.post(`/sales/${saleId}/send-invoice`);
+              if (response.success && response.invoiceUrl) {
+                window.open(response.invoiceUrl, "_blank");
+                alert(
+                  response.emailSent
+                    ? "Invoice downloaded and sent to customer email"
+                    : "Invoice downloaded successfully"
+                );
+              }
+            } catch (err) {
+              console.error("Download error:", err);
+              alert("Failed to download invoice");
+            }
+          }}
         />
       )}
     </div>

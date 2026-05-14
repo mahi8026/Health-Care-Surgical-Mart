@@ -8,15 +8,19 @@ const { getShopDatabase, getSystemDatabase } = require("../config/database");
 const { ObjectId } = require("mongodb");
 const { logger } = require("../config/logging");
 
-// Validate JWT_SECRET at module load time
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error(
-    "FATAL: JWT_SECRET environment variable is missing or too short. " +
-    "JWT_SECRET must be at least 32 characters. " +
-    "Generate a secure secret using: node -e \"require('crypto').randomBytes(32, (err, buf) => { if (err) throw err; process.stdout.write(buf.toString('hex')); })\""
-  );
+// Lazy validation of JWT_SECRET (only when middleware is used)
+function getJWTSecret() {
+  const JWT_SECRET = process.env.JWT_SECRET;
+  
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    throw new Error(
+      "FATAL: JWT_SECRET environment variable is missing or too short. " +
+      "JWT_SECRET must be at least 32 characters. " +
+      "Generate a secure secret using: node -e \"require('crypto').randomBytes(32, (err, buf) => { if (err) throw err; process.stdout.write(buf.toString('hex')); })\""
+    );
+  }
+  
+  return JWT_SECRET;
 }
 
 /**
@@ -39,7 +43,7 @@ async function authenticate(req, res, next) {
     // Verify token with nested try-catch for JWT-specific errors
     let decoded;
     try {
-      decoded = jwt.verify(token, JWT_SECRET);
+      decoded = jwt.verify(token, getJWTSecret());
     } catch (jwtError) {
       if (jwtError.name === "JsonWebTokenError") {
         return res.status(401).json({
@@ -184,7 +188,7 @@ function generateToken(user) {
     shopId: user.shopId || null,
   };
 
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, getJWTSecret(), {
     expiresIn: "24h",
   });
 }
