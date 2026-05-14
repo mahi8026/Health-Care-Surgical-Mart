@@ -247,104 +247,136 @@ class EmailService {
    */
   async generateInvoicePDF(sale) {
     const PDFDocument = require('pdfkit');
-    
-    // Get shop details for branding (with fallback for testing)
+
+    // Get shop details for branding
     let shop = null;
     try {
       const { getSystemDatabase } = require('../../config/database');
       const systemDb = getSystemDatabase();
       shop = await systemDb.collection('shops').findOne({ shopId: sale.shopId });
-    } catch (error) {
-      // Database not available (e.g., in tests) - use defaults
+    } catch (_) {
       shop = null;
     }
-    
+
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ 
-        margin: 50, 
-        compress: false,
-        info: {
-          Title: `Invoice #${sale.invoiceNo}`,
-          Subject: `Invoice ${sale.invoiceNo}`,
-          Keywords: sale.invoiceNo
-        }
-      });
+      const doc = new PDFDocument({ margin: 40, size: 'A4', compress: false });
       const chunks = [];
-      
-      // Collect PDF data
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-      
-      // Header with shop branding
-      doc.fontSize(20).text(shop?.shopName || 'Healthcare Surgical Mart', { align: 'center' });
-      doc.fontSize(10).text(shop?.address || '', { align: 'center' });
-      doc.text(shop?.phone || '', { align: 'center' });
-      doc.moveDown();
-      
-      // Invoice title and details
-      doc.fontSize(16).text(`INVOICE #${sale.invoiceNo}`, { align: 'center' });
-      doc.moveDown();
-      
-      // Customer and date info
-      doc.fontSize(10);
-      doc.text(`Date: ${new Date(sale.saleDate).toLocaleDateString()}`, { align: 'right' });
-      doc.text(`Customer: ${sale.customerName || 'Walk-in Customer'}`);
-      if (sale.customerPhone) doc.text(`Phone: ${sale.customerPhone}`);
-      doc.moveDown();
-      
-      // Table header
-      const tableTop = doc.y;
-      doc.fontSize(10).font('Helvetica-Bold');
-      doc.text('Item', 50, tableTop);
-      doc.text('Qty', 300, tableTop);
-      doc.text('Price', 370, tableTop);
-      doc.text('Total', 450, tableTop, { align: 'right' });
-      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-      
-      // Line items
-      doc.font('Helvetica');
-      let yPosition = tableTop + 25;
-      
-      for (const item of sale.items || []) {
-        doc.text(item.productName || item.name, 50, yPosition, { width: 240 });
-        doc.text(item.quantity.toString(), 300, yPosition);
-        doc.text(`₹${item.price.toFixed(2)}`, 370, yPosition);
-        doc.text(`₹${(item.quantity * item.price).toFixed(2)}`, 450, yPosition, { align: 'right' });
-        yPosition += 20;
+
+      const shopName = shop?.name || shop?.shopName || 'Health Care Surgical Mart';
+      const currency = '৳';
+
+      // ── Header ──────────────────────────────────────────────────────────
+      doc.fontSize(18).font('Helvetica-Bold').text(shopName, { align: 'center' });
+      if (shop?.address) doc.fontSize(9).font('Helvetica').text(shop.address, { align: 'center' });
+      if (shop?.phone)   doc.fontSize(9).text(`Phone: ${shop.phone}`, { align: 'center' });
+      doc.moveDown(0.5);
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(1.5).stroke();
+      doc.moveDown(0.5);
+
+      // ── Invoice title ────────────────────────────────────────────────────
+      doc.fontSize(14).font('Helvetica-Bold').text('INVOICE', { align: 'center' });
+      doc.moveDown(0.5);
+
+      // ── Two-column info block ────────────────────────────────────────────
+      const infoTop = doc.y;
+      doc.fontSize(9).font('Helvetica-Bold').text('Bill To:', 40, infoTop);
+      doc.font('Helvetica').text(sale.customerName || 'Cash Customer', 40, infoTop + 14);
+      if (sale.customerPhone) doc.text(`Phone: ${sale.customerPhone}`, 40, infoTop + 26);
+      if (sale.customerAddress) doc.text(sale.customerAddress, 40, infoTop + 38);
+
+      doc.font('Helvetica-Bold').text('Invoice No:', 380, infoTop);
+      doc.font('Helvetica').text(sale.invoiceNo || 'N/A', 460, infoTop);
+      doc.font('Helvetica-Bold').text('Date:', 380, infoTop + 14);
+      doc.font('Helvetica').text(
+        new Date(sale.saleDate || sale.createdAt).toLocaleDateString('en-GB', {
+          day: '2-digit', month: 'short', year: 'numeric'
+        }),
+        460, infoTop + 14
+      );
+      doc.font('Helvetica-Bold').text('Status:', 380, infoTop + 28);
+      doc.font('Helvetica').text(sale.paymentStatus || 'N/A', 460, infoTop + 28);
+
+      doc.moveDown(3.5);
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(0.5).stroke();
+      doc.moveDown(0.3);
+
+      // ── Table header ─────────────────────────────────────────────────────
+      const col = { sl: 40, name: 65, qty: 340, rate: 400, total: 480 };
+      const rowH = 18;
+      let y = doc.y;
+
+      doc.rect(40, y, 515, rowH).fill('#2563eb');
+      doc.fillColor('white').fontSize(9).font('Helvetica-Bold');
+      doc.text('#',          col.sl,   y + 5, { width: 20 });
+      doc.text('Item',       col.name, y + 5, { width: 270 });
+      doc.text('Qty',        col.qty,  y + 5, { width: 55, align: 'right' });
+      doc.text('Rate',       col.rate, y + 5, { width: 75, align: 'right' });
+      doc.text('Total',      col.total,y + 5, { width: 75, align: 'right' });
+      doc.fillColor('black');
+      y += rowH + 2;
+
+      // ── Table rows ───────────────────────────────────────────────────────
+      doc.fontSize(9).font('Helvetica');
+      const items = sale.items || [];
+      items.forEach((item, i) => {
+        // Support both field name variants
+        const qty   = item.qty ?? item.quantity ?? 0;
+        const rate  = item.rate ?? item.sellingPrice ?? item.price ?? 0;
+        const total = item.total ?? (qty * rate);
+        const name  = item.name || item.productName || 'Item';
+
+        if (i % 2 === 1) doc.rect(40, y, 515, rowH).fill('#f8fafc').stroke('#e2e8f0');
+        doc.fillColor('black');
+        doc.text(String(i + 1),                col.sl,   y + 4, { width: 20 });
+        doc.text(name,                          col.name, y + 4, { width: 270 });
+        doc.text(String(qty),                   col.qty,  y + 4, { width: 55, align: 'right' });
+        doc.text(`${currency}${Number(rate).toFixed(2)}`,  col.rate,  y + 4, { width: 75, align: 'right' });
+        doc.text(`${currency}${Number(total).toFixed(2)}`, col.total, y + 4, { width: 75, align: 'right' });
+        y += rowH;
+      });
+
+      doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).stroke();
+      y += 8;
+
+      // ── Totals ───────────────────────────────────────────────────────────
+      const totalsX = 380;
+      const valX    = 480;
+      const totW    = 75;
+
+      const addRow = (label, value, bold = false) => {
+        doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 10 : 9);
+        doc.text(label, totalsX, y, { width: 95 });
+        doc.text(value, valX,    y, { width: totW, align: 'right' });
+        y += bold ? 16 : 14;
+      };
+
+      addRow('Subtotal:',  `${currency}${Number(sale.subtotal || 0).toFixed(2)}`);
+      if ((sale.discountAmount || 0) > 0)
+        addRow('Discount:', `-${currency}${Number(sale.discountAmount).toFixed(2)}`);
+      if ((sale.vatAmount || 0) > 0)
+        addRow(`VAT (${sale.vatPercent || 0}%):`, `${currency}${Number(sale.vatAmount).toFixed(2)}`);
+
+      doc.moveTo(totalsX, y).lineTo(555, y).lineWidth(0.5).stroke();
+      y += 4;
+      addRow('Grand Total:', `${currency}${Number(sale.grandTotal || 0).toFixed(2)}`, true);
+
+      const paid = (sale.cashPaid || 0) + (sale.bankPaid || 0);
+      addRow('Paid:', `${currency}${Number(paid).toFixed(2)}`);
+      if ((sale.dueAmount || 0) > 0) {
+        doc.fillColor('#dc2626');
+        addRow('Due:', `${currency}${Number(sale.dueAmount).toFixed(2)}`);
+        doc.fillColor('black');
       }
-      
-      // Totals
-      doc.moveDown();
-      const totalsX = 400;
-      yPosition = doc.y + 10;
-      
-      doc.text('Subtotal:', totalsX, yPosition);
-      doc.text(`₹${sale.subtotal?.toFixed(2) || '0.00'}`, 450, yPosition, { align: 'right' });
-      yPosition += 20;
-      
-      if (sale.discount > 0) {
-        doc.text('Discount:', totalsX, yPosition);
-        doc.text(`-₹${sale.discount.toFixed(2)}`, 450, yPosition, { align: 'right' });
-        yPosition += 20;
-      }
-      
-      if (sale.tax > 0) {
-        doc.text('Tax:', totalsX, yPosition);
-        doc.text(`₹${sale.tax.toFixed(2)}`, 450, yPosition, { align: 'right' });
-        yPosition += 20;
-      }
-      
-      doc.font('Helvetica-Bold');
-      doc.fontSize(12);
-      doc.text('Grand Total:', totalsX, yPosition);
-      doc.text(`₹${sale.grandTotal.toFixed(2)}`, 450, yPosition, { align: 'right' });
-      
-      // Footer
-      doc.fontSize(8).font('Helvetica').moveDown(2);
-      doc.text('Thank you for your business!', { align: 'center' });
-      
-      // Finalize PDF
+
+      // ── Footer ───────────────────────────────────────────────────────────
+      doc.moveDown(2);
+      doc.fontSize(8).font('Helvetica').fillColor('#6b7280')
+        .text('Thank you for your business!', { align: 'center' });
+      doc.text('This is a computer-generated invoice.', { align: 'center' });
+
       doc.end();
     });
   }
