@@ -265,6 +265,44 @@ router.get(
 );
 
 /**
+ * GET /api/sales/:id/download-invoice
+ * Generate PDF invoice and stream directly to browser (no storage needed)
+ */
+router.get(
+  "/:id/download-invoice",
+  requirePermission(PERMISSIONS.VIEW_SALES),
+  async (req, res) => {
+    try {
+      const { ObjectId } = require("mongodb");
+      const EmailService = require("../services/email/email.service");
+
+      const sale = await req.shopDb.collection("sales").findOne({
+        _id: new ObjectId(req.params.id),
+      });
+
+      if (!sale) {
+        return res.status(404).json({ success: false, message: "Sale not found" });
+      }
+
+      // Enrich sale with items product names if needed
+      sale.shopId = req.user.shopId;
+
+      const pdfBuffer = await EmailService.generateInvoicePDF(sale);
+
+      const filename = `invoice-${sale.invoiceNo || req.params.id}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", pdfBuffer.length);
+      return res.send(pdfBuffer);
+    } catch (error) {
+      const { logger } = require("../config/logging");
+      logger.error("Download invoice error:", { error: error.message, saleId: req.params.id });
+      return res.status(500).json({ success: false, message: "Failed to generate invoice PDF" });
+    }
+  }
+);
+
+/**
  * @swagger
  * /api/sales/{id}/send-invoice:
  *   post:
