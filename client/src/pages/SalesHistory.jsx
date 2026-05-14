@@ -180,23 +180,23 @@ const SalesHistory = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="bg-gray-50">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          <i className="fas fa-history mr-3 text-blue-600"></i>
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">
+          <i className="fas fa-history mr-2 text-blue-600"></i>
           Sales History
         </h1>
-        <p className="text-gray-600">
+        <p className="text-gray-500 text-sm">
           View and manage all previous sales transactions
         </p>
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            <i className="fas fa-filter mr-2 text-gray-600"></i>
+      <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-gray-900">
+            <i className="fas fa-filter mr-2 text-gray-500"></i>
             Filters
           </h2>
           <button
@@ -208,7 +208,7 @@ const SalesHistory = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
           {/* Search */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -283,7 +283,7 @@ const SalesHistory = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <i className="fas fa-exclamation-circle mr-2"></i>
