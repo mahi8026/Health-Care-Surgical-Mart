@@ -31,6 +31,19 @@ jobs:
     name: Backend Tests (51 tests)
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: server
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-secret-key-minimum-32-characters-long-for-ci
+      MONGODB_URI: mongodb://localhost:27017/test
+      FIREBASE_PROJECT_ID: test-project
+      SENDGRID_API_KEY: SG.test_key_for_testing_purposes_only_minimum_length
+      SENDGRID_FROM_EMAIL: test@example.com
+      ENABLE_QUEUES: "false"
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,11 +56,9 @@ jobs:
           cache-dependency-path: server/package-lock.json
 
       - name: Install server dependencies
-        working-directory: server
         run: npm ci
 
       - name: Run backend tests
-        working-directory: server
         run: npm test
 
       - name: Upload coverage reports
