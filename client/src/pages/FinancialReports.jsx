@@ -54,13 +54,19 @@ const FinancialReports = () => {
       setLoading(true);
       setError("");
 
-      // Use real MongoDB endpoints
+      // Build query params with date range
+      const params = new URLSearchParams({
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+      });
+
+      // Use real MongoDB endpoints with date range
       const [plData, dsData, ppData, raData, cfData] = await Promise.all([
-        api.get("/financial-reports/profit-loss"),
-        api.get("/financial-reports/daily-summary"),
-        api.get("/financial-reports/product-profitability"),
-        api.get("/financial-reports/return-analysis"),
-        api.get("/financial-reports/cash-flow"),
+        api.get(`/financial-reports/profit-loss?${params}`),
+        api.get(`/financial-reports/daily-summary?${params}`),
+        api.get(`/financial-reports/product-profitability?${params}`),
+        api.get(`/financial-reports/return-analysis?${params}`),
+        api.get(`/financial-reports/cash-flow?${params}`),
       ]);
 
       if (plData?.success) setProfitLossData(plData.data);

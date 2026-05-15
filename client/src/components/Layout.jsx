@@ -55,7 +55,7 @@ const Layout = () => {
             {/* Logo and Title */}
             <div className="flex items-center">
               <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="mr-4 text-gray-500 hover:text-gray-700 lg:hidden"
                 aria-label="Toggle sidebar"
               >

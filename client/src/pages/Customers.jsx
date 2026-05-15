@@ -97,10 +97,8 @@ const Customers = () => {
   const calculateStats = (customerData) => {
     const stats = {
       totalCustomers: customerData.length,
-      walkInCustomers: customerData.filter((c) => c.type === "Walk-in").length,
-      hospitalClinicCustomers: customerData.filter((c) => c.type === "Hospital/Clinic").length,
-      diagnosticCustomers: customerData.filter((c) => c.type === "Diagnostic").length,
-      wholesalerCustomers: customerData.filter((c) => c.type === "Wholesaler").length,
+      retailCustomers: customerData.filter((c) => c.type === "Walk-in" || c.type === "Hospital/Clinic" || c.type === "Diagnostic").length,
+      wholesaleCustomers: customerData.filter((c) => c.type === "Wholesaler").length,
       recentCustomers: customerData.filter((c) => {
         const createdDate = new Date(c.createdAt);
         const thirtyDaysAgo = new Date();

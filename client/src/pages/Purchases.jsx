@@ -227,7 +227,6 @@ const Purchases = () => {
     setLoading(true);
     try {
       const purchaseOrderData = {
-        supplierId: selectedSupplier?._id,
         supplierName: selectedSupplier?.name || purchaseData.supplierName,
         invoiceNo: purchaseData.invoiceNo,
         purchaseDate: purchaseData.purchaseDate,
@@ -246,6 +245,11 @@ const Purchases = () => {
         notes: purchaseData.notes,
         status: "pending",
       };
+
+      // Only include supplierId if a supplier is selected
+      if (selectedSupplier?._id) {
+        purchaseOrderData.supplierId = selectedSupplier._id;
+      }
 
       // Use real authenticated endpoint
       const response = await api.post("/purchases", purchaseOrderData);
