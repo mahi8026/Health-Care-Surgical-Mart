@@ -42,13 +42,9 @@ const Returns = () => {
         if (filters.search) {
           filteredReturns = filteredReturns.filter(
             (r) =>
-              r.returnNo.toLowerCase().includes(filters.search.toLowerCase()) ||
-              r.saleInvoiceNo
-                .toLowerCase()
-                .includes(filters.search.toLowerCase()) ||
-              r.customerName
-                .toLowerCase()
-                .includes(filters.search.toLowerCase()),
+              (r.returnNumber || r.returnNo || "").toLowerCase().includes(filters.search.toLowerCase()) ||
+              (r.originalInvoiceNumber || r.saleInvoiceNo || "").toLowerCase().includes(filters.search.toLowerCase()) ||
+              (r.customerName || "").toLowerCase().includes(filters.search.toLowerCase()),
           );
         }
 

@@ -56,11 +56,11 @@ const FinancialReports = () => {
 
       // Use real MongoDB endpoints
       const [plData, dsData, ppData, raData, cfData] = await Promise.all([
-        api.get("/reports/financial/profit-loss"),
-        api.get("/reports/financial/daily-summary"),
-        api.get("/reports/financial/product-profitability"),
-        api.get("/reports/financial/return-analysis"),
-        api.get("/reports/financial/cash-flow"),
+        api.get("/financial-reports/profit-loss"),
+        api.get("/financial-reports/daily-summary"),
+        api.get("/financial-reports/product-profitability"),
+        api.get("/financial-reports/return-analysis"),
+        api.get("/financial-reports/cash-flow"),
       ]);
 
       if (plData?.success) setProfitLossData(plData.data);

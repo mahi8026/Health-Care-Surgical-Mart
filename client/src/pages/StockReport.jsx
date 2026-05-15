@@ -263,7 +263,7 @@ const StockAdjustmentModal = ({ isOpen, onClose, product, onSuccess }) => {
       if (formData.batchNo) payload.batchNo = formData.batchNo;
       if (formData.expiryDate) payload.expiryDate = formData.expiryDate;
 
-      const response = await api.post(`/stock/${productId}/adjust`, payload);
+      const response = await api.put(`/stock/${productId}/adjust`, payload);
       if (response.success) {
         onSuccess?.();
         onClose();

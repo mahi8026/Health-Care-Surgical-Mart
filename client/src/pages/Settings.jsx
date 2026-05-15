@@ -65,26 +65,25 @@ const Settings = () => {
     try {
       setLoading(true);
 
-      // Use test endpoints temporarily
       const [shopResponse, taxResponse, systemResponse, receiptResponse] =
         await Promise.all([
-          fetch("/api/test/settings/shop").then((r) => r.json()),
-          fetch("/api/test/settings/tax").then((r) => r.json()),
-          fetch("/api/test/settings/system").then((r) => r.json()),
-          fetch("/api/test/settings/receipt").then((r) => r.json()),
+          api.get("/settings/shop"),
+          api.get("/settings/tax"),
+          api.get("/settings/system"),
+          api.get("/settings/receipt"),
         ]);
 
       if (shopResponse.success) {
-        setShopSettings({ ...shopSettings, ...shopResponse.data });
+        setShopSettings((prev) => ({ ...prev, ...shopResponse.data }));
       }
       if (taxResponse.success) {
-        setTaxSettings({ ...taxSettings, ...taxResponse.data });
+        setTaxSettings((prev) => ({ ...prev, ...taxResponse.data }));
       }
       if (systemResponse.success) {
-        setSystemSettings({ ...systemSettings, ...systemResponse.data });
+        setSystemSettings((prev) => ({ ...prev, ...systemResponse.data }));
       }
       if (receiptResponse.success) {
-        setReceiptSettings({ ...receiptSettings, ...receiptResponse.data });
+        setReceiptSettings((prev) => ({ ...prev, ...receiptResponse.data }));
       }
     } catch (error) {
       console.error("Settings fetch error:", error);
@@ -100,14 +99,7 @@ const Settings = () => {
       setSaving(true);
       setError("");
 
-      // Use test endpoints temporarily
-      const response = await fetch(`/api/test/settings/${settingsType}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      }).then((r) => r.json());
+      const response = await api.put(`/settings/${settingsType}`, data);
 
       if (response.success) {
         setSuccess("Settings saved successfully!");

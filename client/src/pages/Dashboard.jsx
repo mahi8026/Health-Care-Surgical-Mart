@@ -295,8 +295,8 @@ const Dashboard = () => {
             icon: "fas fa-shopping-cart",
             bgColor: "bg-blue-100",
             textColor: "text-blue-600",
-            trend: "+12%",
-            trendUp: true,
+            trend: dashboardData?.todaySales?.totalOrders > 0 ? `${dashboardData.todaySales.totalOrders} orders` : "No sales yet",
+            trendUp: (dashboardData?.todaySales?.totalOrders || 0) > 0,
           },
           {
             title: "Monthly Revenue",
@@ -305,8 +305,8 @@ const Dashboard = () => {
             icon: "fas fa-chart-line",
             bgColor: "bg-green-100",
             textColor: "text-green-600",
-            trend: "+8%",
-            trendUp: true,
+            trend: dashboardData?.monthlySales?.totalOrders > 0 ? `${dashboardData.monthlySales.totalOrders} orders` : "No sales yet",
+            trendUp: (dashboardData?.monthlySales?.totalOrders || 0) > 0,
           },
           {
             title: "Monthly Expenses",
@@ -325,8 +325,8 @@ const Dashboard = () => {
             icon: "fas fa-boxes",
             bgColor: "bg-purple-100",
             textColor: "text-purple-600",
-            trend: "+5%",
-            trendUp: true,
+            trend: `${stockData?.lowStockCount || 0} low stock`,
+            trendUp: (stockData?.lowStockCount || 0) === 0,
           },
           {
             title: "Low Stock Alerts",
@@ -335,8 +335,8 @@ const Dashboard = () => {
             icon: "fas fa-exclamation-triangle",
             bgColor: "bg-orange-100",
             textColor: "text-orange-600",
-            trend: "-3%",
-            trendUp: false,
+            trend: (dashboardData?.lowStockProducts?.length || 0) === 0 ? "All stocked" : "Needs attention",
+            trendUp: (dashboardData?.lowStockProducts?.length || 0) === 0,
           },
           {
             title: "Top Expense Category",
