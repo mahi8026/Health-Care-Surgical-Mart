@@ -67,6 +67,10 @@ jobs:
     steps:
       - name: Trigger Render deploy hook
         run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK secret not set — skipping deploy"
+            exit 0
+          fi
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}")
           echo "Render deploy hook response: $HTTP_STATUS"
