@@ -4,8 +4,8 @@
 # Runs on every push and PR to main.
 #
 # Jobs:
-#   1. test           — always runs (blocks deployment on failure)
-#   2. deploy-backend — push to main only, needs: test
+#   1. test            — always runs (blocks deployment on failure)
+#   2. deploy-backend  — push to main only, needs: test
 #   3. deploy-frontend — push to main only, needs: test
 # ============================================================
 
@@ -59,7 +59,7 @@ jobs:
         run: npm ci
 
       - name: Run backend tests
-        run: npm test
+        run: npm test -- --forceExit
 
       - name: Upload coverage reports
         if: always()
@@ -70,11 +70,12 @@ jobs:
 
   # ──────────────────────────────────────────────────────────
   # JOB 2: Deploy Backend to Render
-  # Runs on push to main only
+  # Runs on push to main only, after tests pass
   # ──────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend → Render
     runs-on: ubuntu-latest
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -110,11 +111,12 @@ jobs:
 
   # ──────────────────────────────────────────────────────────
   # JOB 3: Deploy Frontend to Firebase Hosting
-  # Runs on push to main only
+  # Runs on push to main only, after tests pass
   # ──────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend → Firebase Hosting
     runs-on: ubuntu-latest
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
