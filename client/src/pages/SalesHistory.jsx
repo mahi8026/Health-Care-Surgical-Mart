@@ -41,8 +41,9 @@ const SalesHistory = () => {
 
       const response = await api.get(`/sales?${params.toString()}`);
       if (response.success) {
-        setSales(response.data || []);
-        if (response.pagination) setPagination(response.pagination);
+        setSales(response.data?.sales || response.data || []);
+        if (response.data?.pagination) setPagination(response.data.pagination);
+        else if (response.pagination) setPagination(response.pagination);
       } else {
         setError(response.message || "Failed to fetch sales history");
       }
