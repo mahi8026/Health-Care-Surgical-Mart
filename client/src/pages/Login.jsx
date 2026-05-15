@@ -3,8 +3,8 @@ import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const Login = () => {
-  const [email, setEmail] = useState("john@healthcareplus.com");
-  const [password, setPassword] = useState("Admin@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [shopId, setShopId] = useState("");
   const [userType, setUserType] = useState("shop_admin");
   const [error, setError] = useState("");
@@ -36,21 +36,10 @@ const Login = () => {
   const handleUserTypeChange = (type) => {
     setUserType(type);
     setError("");
-
-    // Set default credentials based on user type
-    if (type === "super_admin") {
-      setEmail("superadmin@medicalpos.com");
-      setPassword("SuperAdmin@123");
-      setShopId("");
-    } else if (type === "shop_admin") {
-      setEmail("john@healthcareplus.com");
-      setPassword("Admin@123");
-      setShopId("");
-    } else if (type === "staff") {
-      setEmail("staff@shop.com");
-      setPassword("Staff@123");
-      setShopId("");
-    }
+    // Clear fields when switching user type
+    setEmail("");
+    setPassword("");
+    setShopId("");
   };
 
   return (
@@ -174,24 +163,9 @@ const Login = () => {
           </button>
         </form>
 
-        {/* Demo Credentials */}
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p className="font-semibold mb-2">Demo Credentials:</p>
-          <div className="space-y-1 text-xs bg-gray-50 p-3 rounded-lg">
-            <p>
-              <strong>Super Admin:</strong> superadmin@medicalpos.com /
-              SuperAdmin@123
-            </p>
-            <p>
-              <strong>Shop Admin:</strong> john@healthcareplus.com / Admin@123
-            </p>
-            <p>
-              <strong>Staff:</strong> staff@shop.com / Staff@123
-            </p>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            (Shop ID auto-detected from email)
-          </p>
+        {/* Help Text */}
+        <div className="mt-6 text-center text-xs text-gray-500">
+          <p>Contact your administrator if you need login credentials</p>
         </div>
       </div>
     </div>
