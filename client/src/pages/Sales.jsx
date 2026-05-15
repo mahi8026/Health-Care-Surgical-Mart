@@ -294,6 +294,8 @@ const Sales = () => {
           cashPaid: parseFloat(posData.cashPaid) || 0,
           bankPaid: parseFloat(posData.bankPaid) || 0,
           dueAmount: dueAmount,
+          previousDue: response.data.previousDue || 0,
+          totalOutstanding: response.data.totalOutstanding || dueAmount,
           changeAmount: returnAmount,
           returnAmount: returnAmount,
           paymentStatus: dueAmount > 0 ? "Partial" : "Paid",

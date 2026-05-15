@@ -247,44 +247,74 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Paid</span>
-                <span className="font-medium">
-                  {formatCurrency(
-                    (sale?.cashPaid || 0) + (sale?.bankPaid || 0),
-                  )}{" "}
-                  ৳
+                <span className="font-medium text-green-700">
+                  {formatCurrency((sale?.cashPaid || 0) + (sale?.bankPaid || 0))} ৳
                 </span>
               </div>
-              {(sale?.dueAmount > 0 ||
-                (sale?.grandTotal || grandTotal) -
-                  ((sale?.cashPaid || 0) + (sale?.bankPaid || 0)) >
-                  0) && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-600 font-semibold">Due</span>
-                  <span className="font-bold text-red-600">
-                    {formatCurrency(
-                      sale?.dueAmount ||
-                        Math.max(
-                          0,
-                          (sale?.grandTotal || grandTotal) -
-                            ((sale?.cashPaid || 0) + (sale?.bankPaid || 0)),
-                        ),
-                    )}{" "}
-                    ৳
-                  </span>
-                </div>
-              )}
-              {(sale?.changeAmount > 0 ||
-                sale?.returnAmount > 0 ||
-                returnAmount > 0) && (
+              {(sale?.changeAmount > 0 || sale?.returnAmount > 0 || returnAmount > 0) && (
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-600">Return</span>
                   <span className="font-medium">
-                    {formatCurrency(
-                      sale?.changeAmount || sale?.returnAmount || returnAmount,
-                    )}{" "}
-                    ৳
+                    {formatCurrency(sale?.changeAmount || sale?.returnAmount || returnAmount)} ৳
                   </span>
                 </div>
+              )}
+
+              {/* ── Previous Due System ── */}
+              {(sale?.dueAmount > 0 || sale?.previousDue > 0 || sale?.totalOutstanding > 0) && (
+                <>
+                  <div className="border-t border-dashed border-gray-300 pt-2"></div>
+
+                  {/* Current sale due */}
+                  {(sale?.dueAmount > 0) && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-600">This Sale Due</span>
+                      <span className="font-semibold text-orange-600">
+                        {formatCurrency(sale.dueAmount)} ৳
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Previous due from earlier sales */}
+                  {(sale?.previousDue > 0) && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-600">Previous Due</span>
+                      <span className="font-semibold text-orange-600">
+                        {formatCurrency(sale.previousDue)} ৳
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Total outstanding — shown only when there's a previous due */}
+                  {(sale?.previousDue > 0 && sale?.dueAmount > 0) && (
+                    <div className="flex justify-between text-sm font-bold border-t border-red-200 pt-2 mt-1">
+                      <span className="text-red-700">Total Outstanding</span>
+                      <span className="text-red-700">
+                        {formatCurrency(sale?.totalOutstanding || (sale.previousDue + sale.dueAmount))} ৳
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Only previous due (current sale fully paid) */}
+                  {(sale?.previousDue > 0 && !(sale?.dueAmount > 0)) && (
+                    <div className="flex justify-between text-sm font-bold border-t border-red-200 pt-2 mt-1">
+                      <span className="text-red-700">Total Outstanding</span>
+                      <span className="text-red-700">
+                        {formatCurrency(sale.previousDue)} ৳
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Only current due (no previous due) */}
+                  {(!(sale?.previousDue > 0) && sale?.dueAmount > 0) && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-600 font-semibold">Due</span>
+                      <span className="font-bold text-red-600">
+                        {formatCurrency(sale.dueAmount)} ৳
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -85,6 +85,17 @@ class SalesController {
       // Enrich items with product details (outside transaction — read-only)
       const enrichedItems = await this._enrichSaleItems(req.shopDb, items);
 
+      // Fetch customer's previous due balance before this sale
+      let previousDue = 0;
+      if (customer?.id) {
+        try {
+          const customerDoc = await req.shopDb.collection("customers").findOne(
+            { _id: new ObjectId(customer.id) }
+          );
+          previousDue = customerDoc?.currentDue || 0;
+        } catch (_) { /* non-blocking */ }
+      }
+
       // Create sale record object
       const sale = this._buildSaleRecord({
         invoiceNo,
@@ -100,6 +111,7 @@ class SalesController {
         bankPaid,
         paymentMethod: req.body.paymentMethod || "cash",
         dueAmount: req.body.dueAmount,
+        previousDue,
         notes,
         user: req.user,
       });
@@ -196,6 +208,9 @@ class SalesController {
           _id: insertedId,
           invoiceNo: sale.invoiceNo,
           grandTotal: sale.grandTotal,
+          dueAmount: sale.dueAmount,
+          previousDue: sale.previousDue,
+          totalOutstanding: sale.totalOutstanding,
           saleDate: sale.saleDate,
         },
       });
@@ -378,7 +393,7 @@ class SalesController {
   _buildSaleRecord({
     invoiceNo, customer, customerType, enrichedItems, subtotal, discount,
     vatAmount, vatPercent, grandTotal, cashPaid, bankPaid,
-    paymentMethod, dueAmount, notes, user,
+    paymentMethod, dueAmount, previousDue = 0, notes, user,
   }) {
     const paid = (parseFloat(cashPaid) || 0) + (parseFloat(bankPaid) || 0);
     const due = paymentMethod === "credit"
@@ -390,6 +405,8 @@ class SalesController {
     const discountPercent = parsedSubtotal > 0
       ? Math.round((discountAmount / parsedSubtotal) * 100 * 100) / 100
       : 0;
+
+    const totalOutstanding = (parseFloat(previousDue) || 0) + due;
 
     return {
       invoiceNo,
@@ -407,6 +424,8 @@ class SalesController {
       bankPaid: paymentMethod === "credit" ? 0 : (parseFloat(bankPaid) || 0),
       returnAmount: paymentMethod === "credit" ? 0 : Math.max(0, paid - parseFloat(grandTotal)),
       dueAmount: due,
+      previousDue: parseFloat(previousDue) || 0,
+      totalOutstanding,
       paymentMethod: paymentMethod || "cash",
       paymentStatus: due > 0 ? (paymentMethod === "credit" ? "Credit" : "Partial") : "Paid",
       saleDate: new Date(),
