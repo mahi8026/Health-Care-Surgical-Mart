@@ -1,6 +1,10 @@
 /**
  * Base Service Class
  * Provides common CRUD operations for all services
+ *
+ * NOTE: api.js interceptor already unwraps response.data, so `response`
+ * here IS the API payload { success, data, pagination, ... }.
+ * Do NOT call response.data again — return response directly.
  */
 
 import api from "../config/api";
@@ -11,32 +15,26 @@ export class BaseService {
   }
 
   async getAll(params = {}) {
-    const response = await api.get(this.endpoint, { params });
-    return response.data;
+    return await api.get(this.endpoint, { params });
   }
 
   async getById(id) {
-    const response = await api.get(`${this.endpoint}/${id}`);
-    return response.data;
+    return await api.get(`${this.endpoint}/${id}`);
   }
 
   async create(data) {
-    const response = await api.post(this.endpoint, data);
-    return response.data;
+    return await api.post(this.endpoint, data);
   }
 
   async update(id, data) {
-    const response = await api.put(`${this.endpoint}/${id}`, data);
-    return response.data;
+    return await api.put(`${this.endpoint}/${id}`, data);
   }
 
   async delete(id) {
-    const response = await api.delete(`${this.endpoint}/${id}`);
-    return response.data;
+    return await api.delete(`${this.endpoint}/${id}`);
   }
 
   async bulkDelete(ids) {
-    const response = await api.post(`${this.endpoint}/bulk-delete`, { ids });
-    return response.data;
+    return await api.post(`${this.endpoint}/bulk-delete`, { ids });
   }
 }

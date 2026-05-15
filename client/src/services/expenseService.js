@@ -1,6 +1,9 @@
 /**
  * Expense Service
  * Handles all expense-related API operations
+ *
+ * NOTE: api.js interceptor already unwraps response.data.
+ * Return response directly — do NOT call response.data.
  */
 
 import { BaseService } from "./baseService";
@@ -13,75 +16,59 @@ class ExpenseService extends BaseService {
 
   // Get expenses with advanced filtering
   async getExpenses(filters = {}) {
-    const response = await api.get(this.endpoint, { params: filters });
-    return response.data;
+    return await api.get(this.endpoint, { params: filters });
   }
 
   // Upload receipt for expense
   async uploadReceipt(expenseId, file) {
     const formData = new FormData();
-    formData.append("receipt", file);
+    formData.append("receipts", file); // server expects "receipts" (plural)
     formData.append("expenseId", expenseId);
-
-    const response = await api.post("/expenses/upload-receipt", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+    return await api.post("/expenses/upload-receipt", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
-    return response.data;
   }
 
   // Get expense analytics
   async getAnalytics(params = {}) {
-    const response = await api.get("/expenses/analytics", { params });
-    return response.data;
+    return await api.get("/expenses/analytics", { params });
   }
 
   // Get expense summary
   async getSummary(params = {}) {
-    const response = await api.get("/expenses/summary", { params });
-    return response.data;
+    return await api.get("/expenses/summary", { params });
   }
 
   // Recurring expenses
   async getRecurringExpenses(params = {}) {
-    const response = await api.get("/expenses/recurring", { params });
-    return response.data;
+    return await api.get("/expenses/recurring", { params });
   }
 
   async createRecurringExpense(data) {
-    const response = await api.post("/expenses/recurring", data);
-    return response.data;
+    return await api.post("/expenses/recurring", data);
   }
 
   async updateRecurringExpense(id, data) {
-    const response = await api.put(`/expenses/recurring/${id}`, data);
-    return response.data;
+    return await api.put(`/expenses/recurring/${id}`, data);
   }
 
   async stopRecurringExpense(id) {
-    const response = await api.delete(`/expenses/recurring/${id}`);
-    return response.data;
+    return await api.delete(`/expenses/recurring/${id}`);
   }
 
   // Process recurring expenses (admin function)
   async processRecurringExpenses() {
-    const response = await api.post("/expenses/process-recurring");
-    return response.data;
+    return await api.post("/expenses/process-recurring");
   }
 
   // Get filter options (categories, payment methods, vendors, etc.)
   async getFilterOptions() {
-    const response = await api.get("/expenses/filter-options");
-    return response.data;
+    return await api.get("/expenses/filter-options");
   }
 
-  // Bulk delete expenses
+  // Bulk delete expenses — server has POST /expenses/bulk-delete
   async bulkDelete(expenseIds) {
-    const response = await api.delete("/expenses/bulk", {
-      data: { expenseIds },
-    });
-    return response.data;
+    return await api.post("/expenses/bulk-delete", { expenseIds });
   }
 }
 

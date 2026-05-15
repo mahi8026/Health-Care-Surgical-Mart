@@ -1,6 +1,9 @@
 /**
  * Expense Category Service
  * Handles all expense category-related API operations
+ *
+ * NOTE: api.js interceptor already unwraps response.data.
+ * Return response directly — do NOT call response.data.
  */
 
 import { BaseService } from "./baseService";
@@ -11,34 +14,29 @@ class ExpenseCategoryService extends BaseService {
     super("/expense-categories");
   }
 
-  // Get active categories only
+  // Get active categories only (server returns active by default)
   async getActiveCategories() {
-    const response = await api.get(`${this.endpoint}?active=true`);
-    return response.data;
+    return await api.get(this.endpoint);
   }
 
   // Get categories by type
   async getCategoriesByType(type) {
-    const response = await api.get(`${this.endpoint}?type=${type}`);
-    return response.data;
+    return await api.get(`${this.endpoint}?type=${type}`);
   }
 
   // Soft delete category (deactivate)
   async deactivateCategory(id) {
-    const response = await api.put(`${this.endpoint}/${id}/deactivate`);
-    return response.data;
+    return await api.put(`${this.endpoint}/${id}/deactivate`);
   }
 
   // Reactivate category
   async reactivateCategory(id) {
-    const response = await api.put(`${this.endpoint}/${id}/reactivate`);
-    return response.data;
+    return await api.put(`${this.endpoint}/${id}/reactivate`);
   }
 
   // Check if category can be deleted (no associated expenses)
   async checkDeletable(id) {
-    const response = await api.get(`${this.endpoint}/${id}/check-deletable`);
-    return response.data;
+    return await api.get(`${this.endpoint}/${id}/check-deletable`);
   }
 }
 

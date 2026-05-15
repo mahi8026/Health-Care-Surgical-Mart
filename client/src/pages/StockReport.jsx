@@ -255,7 +255,8 @@ const StockAdjustmentModal = ({ isOpen, onClose, product, onSuccess }) => {
     try {
       const productId = product._id || product.productId;
       const payload = {
-        adjustmentType: formData.adjustmentType,
+        type: formData.adjustmentType,  // server's PUT endpoint reads "type" not "adjustmentType"
+        adjustmentType: formData.adjustmentType, // keep for compatibility
         quantity: parseFloat(formData.quantity),
         reason: formData.reason,
         note: formData.note,

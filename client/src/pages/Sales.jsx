@@ -268,7 +268,7 @@ const Sales = () => {
         // Create sale object for invoice
         const saleForInvoice = {
           ...response.data,
-          invoiceNo: response.data.invoiceNo || invoiceNumber,
+          invoiceNo: response.data.invoiceNo || posData.invoiceNo,
           items: cart.map((item) => ({
             ...item,
             name: item.name,

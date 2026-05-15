@@ -604,7 +604,7 @@ const Dashboard = () => {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">
-                {formatCurrency(stockData.summary?.totalProfit || 0)}
+                {formatCurrency(stockData.summary?.potentialProfit || stockData.summary?.totalProfit || 0)}
               </p>
               <p className="text-sm text-gray-600">Potential Profit</p>
             </div>
