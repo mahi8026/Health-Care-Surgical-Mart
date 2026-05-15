@@ -127,6 +127,7 @@ class SalesController {
                 parseFloat(grandTotal),
                 req.body.paymentMethod,
                 session,
+                sale.dueAmount,
               );
             }
           });
@@ -145,7 +146,7 @@ class SalesController {
             await this._updateStockForSale(req.shopDb, enrichedItems);
             if (customer?.id) {
               await this._updateCustomerAfterSale(
-                req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod,
+                req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
               );
             }
           } else {
@@ -162,7 +163,7 @@ class SalesController {
         await this._updateStockForSale(req.shopDb, enrichedItems);
         if (customer?.id) {
           await this._updateCustomerAfterSale(
-            req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod,
+            req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
           );
         }
       }
@@ -419,15 +420,17 @@ class SalesController {
   /**
    * Update customer totals after a sale
    */
-  async _updateCustomerAfterSale(shopDb, customerId, saleTotal, paymentMethod, session = null) {
+  async _updateCustomerAfterSale(shopDb, customerId, saleTotal, paymentMethod, session = null, dueAmount = 0) {
     try {
       const update = {
         $inc: { totalPurchased: saleTotal, totalPurchases: saleTotal },
         $set: { lastPurchaseDate: new Date(), updatedAt: new Date() },
       };
-      // Credit sale: add to currentDue
+      // Add to currentDue for credit sales OR partial payments
       if (paymentMethod === "credit") {
         update.$inc.currentDue = saleTotal;
+      } else if (dueAmount > 0) {
+        update.$inc.currentDue = dueAmount;
       }
       const options = session ? { session } : {};
       await shopDb.collection("customers").updateOne(
