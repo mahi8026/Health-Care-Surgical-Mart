@@ -11,12 +11,26 @@ const {
   handleValidationErrors,
   xssProtection,
 } = require("./security");
+const {
+  advancedSecurityHeaders,
+  sanitizeRequest,
+  preventSessionFixation,
+} = require("../middleware/security-headers");
 
 /**
  * Setup application middleware
  * @param {Express} app - Express application instance
  */
 const setupMiddleware = (app) => {
+  // Advanced security headers (must be first)
+  app.use(advancedSecurityHeaders);
+
+  // Request sanitization (prevent injection attacks)
+  app.use(sanitizeRequest);
+
+  // Session fixation prevention
+  app.use(preventSessionFixation);
+
   // Request logging
   app.use(requestLogger);
 
