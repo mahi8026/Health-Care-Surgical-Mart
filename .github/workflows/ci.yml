@@ -58,13 +58,6 @@ jobs:
       - name: Install server dependencies
         run: npm ci
 
-      - name: Debug environment
-        run: |
-          node --version
-          npm --version
-          npx jest --version
-          npx jest --listTests
-
       - name: Run backend tests
         run: npm test
 
