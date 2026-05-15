@@ -125,17 +125,18 @@ jobs:
         working-directory: client
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_API_URL: https://health-care-surgical-mart.onrender.com/api
+          VITE_FIREBASE_API_KEY: AIzaSyCGCOhLgDSooqfDzDKDfJhDjv0VaiauJrA
           VITE_FIREBASE_AUTH_DOMAIN: health-care-60ee6.firebaseapp.com
           VITE_FIREBASE_PROJECT_ID: health-care-60ee6
           VITE_FIREBASE_STORAGE_BUCKET: health-care-60ee6.firebasestorage.app
           VITE_FIREBASE_MESSAGING_SENDER_ID: '650347403792'
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_APP_ID: 1:650347403792:web:d4ead8c6ce94991fbdc895
           VITE_APP_NAME: Health Care Surgical Mart
           VITE_APP_VERSION: '2.0.0'
-          VITE_ENABLE_ANALYTICS: 'false'
+          VITE_ENABLE_ANALYTICS: 'true'
           VITE_ENABLE_FILE_UPLOAD: 'true'
+          VITE_SENTRY_DSN: https://29e52d27ea1bb0b011b8414e0976bc5b@o4511383549837312.ingest.de.sentry.io/4511383552131152
 
       - name: Deploy to Firebase Hosting (live channel)
         uses: FirebaseExtended/action-hosting-deploy@v0
