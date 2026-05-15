@@ -278,16 +278,6 @@ router.get(
 );
 
 /**
- * GET /api/customers/:id
- * Get customer by ID
- */
-router.get(
-  "/:id",
-  requirePermission(PERMISSIONS.VIEW_CUSTOMERS),
-  customersController.getCustomerById.bind(customersController),
-);
-
-/**
  * POST /api/customers
  * Create new customer
  */
@@ -295,6 +285,66 @@ router.post(
   "/",
   requirePermission(PERMISSIONS.CREATE_CUSTOMER),
   customersController.createCustomer.bind(customersController),
+);
+
+/**
+ * POST /api/customers/recalculate-due
+ * Recalculate currentDue for all customers from actual sales data.
+ * Must be defined BEFORE /:id routes to avoid being matched as an ID.
+ */
+router.post(
+  "/recalculate-due",
+  requirePermission(PERMISSIONS.EDIT_CUSTOMER),
+  async (req, res) => {
+    try {
+      const { getShopDatabase } = require("../config/database");
+      const shopDb = getShopDatabase(req.user.shopId);
+
+      const customers = await shopDb.collection("customers").find({}).toArray();
+      const results = [];
+
+      for (const customer of customers) {
+        const agg = await shopDb.collection("sales").aggregate([
+          { $match: { customerId: customer._id } },
+          { $group: { _id: null, totalDue: { $sum: "$dueAmount" } } },
+        ]).toArray();
+
+        const calculatedDue = agg[0]?.totalDue || 0;
+        const previousDue = customer.currentDue || 0;
+
+        if (Math.abs(calculatedDue - previousDue) > 0.01) {
+          await shopDb.collection("customers").updateOne(
+            { _id: customer._id },
+            { $set: { currentDue: calculatedDue, updatedAt: new Date() } }
+          );
+          results.push({ name: customer.name, previousDue, calculatedDue, fixed: true });
+        } else {
+          results.push({ name: customer.name, previousDue, calculatedDue, fixed: false });
+        }
+      }
+
+      const fixed = results.filter(r => r.fixed).length;
+      return res.json({
+        success: true,
+        message: `Recalculated due for ${customers.length} customers. Fixed ${fixed}.`,
+        data: results,
+      });
+    } catch (error) {
+      const { logger } = require("../config/logging");
+      logger.error("Recalculate due error:", error);
+      return res.status(500).json({ success: false, message: "Failed to recalculate due balances" });
+    }
+  }
+);
+
+/**
+ * GET /api/customers/:id
+ * Get customer by ID
+ */
+router.get(
+  "/:id",
+  requirePermission(PERMISSIONS.VIEW_CUSTOMERS),
+  customersController.getCustomerById.bind(customersController),
 );
 
 /**
@@ -755,58 +805,6 @@ router.post(
       const { logger } = require("../config/logging");
       logger.error("Record payment error:", error);
       return res.status(500).json({ success: false, message: "Failed to record payment" });
-    }
-  }
-);
-
-/**
- * POST /api/customers/recalculate-due
- * Recalculate currentDue for all customers from actual sales data.
- * One-time fix for existing records where currentDue was not updated.
- */
-router.post(
-  "/recalculate-due",
-  requirePermission(PERMISSIONS.EDIT_CUSTOMER),
-  async (req, res) => {
-    try {
-      const { ObjectId } = require("mongodb");
-      const { getShopDatabase } = require("../config/database");
-      const shopDb = getShopDatabase(req.user.shopId);
-
-      const customers = await shopDb.collection("customers").find({}).toArray();
-      const results = [];
-
-      for (const customer of customers) {
-        // Sum dueAmount from all sales for this customer
-        const agg = await shopDb.collection("sales").aggregate([
-          { $match: { customerId: customer._id } },
-          { $group: { _id: null, totalDue: { $sum: "$dueAmount" } } },
-        ]).toArray();
-
-        const calculatedDue = agg[0]?.totalDue || 0;
-        const previousDue = customer.currentDue || 0;
-
-        if (Math.abs(calculatedDue - previousDue) > 0.01) {
-          await shopDb.collection("customers").updateOne(
-            { _id: customer._id },
-            { $set: { currentDue: calculatedDue, updatedAt: new Date() } }
-          );
-          results.push({ name: customer.name, previousDue, calculatedDue, fixed: true });
-        } else {
-          results.push({ name: customer.name, previousDue, calculatedDue, fixed: false });
-        }
-      }
-
-      const fixed = results.filter(r => r.fixed).length;
-      return res.json({
-        success: true,
-        message: `Recalculated due for ${customers.length} customers. Fixed ${fixed}.`,
-        data: results,
-      });
-    } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Recalculate due error:", error);
-      return res.status(500).json({ success: false, message: "Failed to recalculate due balances" });
     }
   }
 );
