@@ -27,14 +27,14 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      // Use test endpoint temporarily
-      const response = await fetch("/api/test/users").then((r) => r.json());
+      setError("");
+      const response = await api.get("/users");
       if (response.success) {
         setUsers(response.data || []);
       }
     } catch (error) {
       console.error("Users fetch error:", error);
-      setError("Failed to fetch users");
+      setError(error.response?.data?.message || "Failed to fetch users");
     } finally {
       setLoading(false);
     }
@@ -78,14 +78,8 @@ const UserManagement = () => {
 
     try {
       setSaving(true);
-      // Use test endpoint temporarily
-      const response = await fetch("/api/test/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      }).then((r) => r.json());
+      setError("");
+      const response = await api.post("/users", formData);
 
       if (response.success) {
         setShowCreateModal(false);
@@ -97,7 +91,7 @@ const UserManagement = () => {
         setError(response.message || "Failed to create user");
       }
     } catch (error) {
-      setError("Failed to create user");
+      setError(error.response?.data?.message || "Failed to create user");
     } finally {
       setSaving(false);
     }
@@ -112,19 +106,13 @@ const UserManagement = () => {
 
     try {
       setSaving(true);
+      setError("");
       const updateData = { ...formData };
       if (!updateData.password) {
         delete updateData.password; // Don't update password if empty
       }
 
-      // Use test endpoint temporarily
-      const response = await fetch(`/api/test/users/${selectedUser._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateData),
-      }).then((r) => r.json());
+      const response = await api.put(`/users/${selectedUser._id}`, updateData);
 
       if (response.success) {
         setShowEditModal(false);
@@ -137,7 +125,7 @@ const UserManagement = () => {
         setError(response.message || "Failed to update user");
       }
     } catch (error) {
-      setError("Failed to update user");
+      setError(error.response?.data?.message || "Failed to update user");
     } finally {
       setSaving(false);
     }
@@ -151,10 +139,8 @@ const UserManagement = () => {
 
     try {
       setSaving(true);
-      // Use test endpoint temporarily
-      const response = await fetch(`/api/test/users/${userId}`, {
-        method: "DELETE",
-      }).then((r) => r.json());
+      setError("");
+      const response = await api.delete(`/users/${userId}`);
 
       if (response.success) {
         fetchUsers();
@@ -164,7 +150,7 @@ const UserManagement = () => {
         setError(response.message || "Failed to delete user");
       }
     } catch (error) {
-      setError("Failed to delete user");
+      setError(error.response?.data?.message || "Failed to delete user");
     } finally {
       setSaving(false);
     }
@@ -174,14 +160,10 @@ const UserManagement = () => {
   const toggleUserStatus = async (userId, currentStatus) => {
     try {
       setSaving(true);
-      // Use test endpoint temporarily
-      const response = await fetch(`/api/test/users/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ isActive: !currentStatus }),
-      }).then((r) => r.json());
+      setError("");
+      const response = await api.put(`/users/${userId}`, { 
+        isActive: !currentStatus 
+      });
 
       if (response.success) {
         fetchUsers();
@@ -191,7 +173,7 @@ const UserManagement = () => {
         setTimeout(() => setSuccess(""), 3000);
       }
     } catch (error) {
-      setError("Failed to update user status");
+      setError(error.response?.data?.message || "Failed to update user status");
     } finally {
       setSaving(false);
     }
