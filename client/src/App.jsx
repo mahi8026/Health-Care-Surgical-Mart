@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import { PERMISSIONS } from "./utils/permissions";
@@ -41,6 +41,15 @@ const PageLoader = () => (
  */
 function App() {
   const { user, loading } = useAuth();
+
+  // Keep Render backend alive — ping every 14 minutes to prevent cold starts
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL || '/api';
+    const ping = () => fetch(`${apiUrl}/health`, { method: 'GET' }).catch(() => {});
+    ping(); // ping immediately on load
+    const interval = setInterval(ping, 14 * 60 * 1000); // every 14 minutes
+    return () => clearInterval(interval);
+  }, []);
 
   if (loading) {
     return <PageLoader />;

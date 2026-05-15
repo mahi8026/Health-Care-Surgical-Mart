@@ -6,7 +6,7 @@
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || '/api',
-  TIMEOUT: 30000,
+  TIMEOUT: 90000, // 90s — allows time for Render free tier to wake up (~60s cold start)
   RETRY_ATTEMPTS: 3,
 };
 
