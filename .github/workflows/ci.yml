@@ -1,13 +1,6 @@
 # ============================================================
 # Health Care Surgical Mart — CI/CD Pipeline
 # ============================================================
-# Runs on every push and PR to main.
-#
-# Jobs:
-#   1. test            — always runs (blocks deployment on failure)
-#   2. deploy-backend  — push to main only, needs: test
-#   3. deploy-frontend — push to main only, needs: test
-# ============================================================
 
 name: CI/CD Pipeline
 
@@ -17,7 +10,6 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel in-progress runs for the same branch to save minutes
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -25,15 +17,10 @@ concurrency:
 jobs:
   # ──────────────────────────────────────────────────────────
   # JOB 1: Backend Tests
-  # Runs on every push and PR
   # ──────────────────────────────────────────────────────────
   test:
     name: Backend Tests (51 tests)
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: server
 
     env:
       NODE_ENV: test
@@ -52,17 +39,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: server/package-lock.json
 
       - name: Install server dependencies
+        working-directory: server
         run: npm ci
 
       - name: Run backend tests
+        working-directory: server
         run: npm test
 
       - name: Upload coverage reports
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
@@ -70,7 +57,6 @@ jobs:
 
   # ──────────────────────────────────────────────────────────
   # JOB 2: Deploy Backend to Render
-  # Runs on push to main only, after tests pass
   # ──────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend → Render
@@ -111,7 +97,6 @@ jobs:
 
   # ──────────────────────────────────────────────────────────
   # JOB 3: Deploy Frontend to Firebase Hosting
-  # Runs on push to main only, after tests pass
   # ──────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend → Firebase Hosting
@@ -127,8 +112,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: client/package-lock.json
 
       - name: Install client dependencies
         working-directory: client
