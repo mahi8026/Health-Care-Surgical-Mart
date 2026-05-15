@@ -69,6 +69,11 @@ initializeSentry(app);
 // Setup Sentry request handler (must be before other middleware)
 setupSentryRequestHandler(app);
 
+// Advanced security headers (must be early in middleware chain)
+const { advancedSecurityHeaders, sanitizeRequest } = require("./middleware/security-headers");
+app.use(advancedSecurityHeaders);
+app.use(sanitizeRequest);
+
 // Security middleware
 app.use(
   helmet({

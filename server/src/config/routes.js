@@ -120,6 +120,10 @@ const setupRoutes = (app) => {
     // Audit Logs routes (SUPER_ADMIN + SHOP_ADMIN)
     app.use("/api/audit-logs", require("../routes/audit-logs.routes"));
 
+    // Health check routes (public + admin)
+    logger.info("Loading health check routes...");
+    app.use("/health", require("../routes/health.routes"));
+
     // Test route (no auth required)
     app.get("/api/test", (req, res) => {
       res.json({
@@ -130,7 +134,7 @@ const setupRoutes = (app) => {
       });
     });
 
-    logger.info("All routes loaded successfully");
+    logger.info("All routes loaded successfully with advanced security and health monitoring");
   } catch (error) {
     logger.error("Error loading routes:", error);
     throw error;

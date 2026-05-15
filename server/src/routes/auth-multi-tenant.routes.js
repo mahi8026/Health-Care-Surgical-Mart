@@ -11,6 +11,7 @@ const { generateToken } = require("../middleware/auth-multi-tenant");
 const { logger } = require('../config/logging');
 const auditLog = require("../services/audit-log.service");
 const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+const { bruteForceProtection } = require("../middleware/security-headers");
 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
 
@@ -235,7 +236,7 @@ const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
  * POST /api/auth/login
  * Login for all user types
  */
-router.post("/login", async (req, res) => {
+router.post("/login", bruteForceProtection, async (req, res) => {
   try {
     const { email, password, shopId } = req.body;
 
@@ -341,10 +342,19 @@ router.post("/login", async (req, res) => {
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      // Increment login attempts on failure
+      if (req.incrementLoginAttempts) {
+        req.incrementLoginAttempts();
+      }
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
+    }
+
+    // Reset login attempts on successful authentication
+    if (req.resetLoginAttempts) {
+      req.resetLoginAttempts();
     }
 
     // Check if user is active
@@ -500,7 +510,7 @@ router.post("/change-password", async (req, res) => {
  * POST /api/auth/firebase-login
  * Login with Firebase token
  */
-router.post("/firebase-login", async (req, res) => {
+router.post("/firebase-login", bruteForceProtection, async (req, res) => {
   try {
     const { email, shopId, idToken, firebaseToken } = req.body;
 
@@ -633,6 +643,10 @@ router.post("/firebase-login", async (req, res) => {
     }
 
     if (!user) {
+      // Increment login attempts on failure
+      if (req.incrementLoginAttempts) {
+        req.incrementLoginAttempts();
+      }
       return res.status(401).json({
         success: false,
         message: "User not found in system. Please contact administrator.",
@@ -641,10 +655,19 @@ router.post("/firebase-login", async (req, res) => {
 
     // Check if user is active
     if (!user.isActive) {
+      // Increment login attempts on failure
+      if (req.incrementLoginAttempts) {
+        req.incrementLoginAttempts();
+      }
       return res.status(401).json({
         success: false,
         message: "User account is inactive",
       });
+    }
+
+    // Reset login attempts on successful authentication
+    if (req.resetLoginAttempts) {
+      req.resetLoginAttempts();
     }
 
     // Update last login
