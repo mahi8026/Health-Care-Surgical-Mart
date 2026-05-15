@@ -42,18 +42,11 @@ jobs:
 
       - name: Install server dependencies
         working-directory: server
-        run: npm ci --loglevel=error
+        run: npm ci
 
       - name: Run backend tests
         working-directory: server
-        run: |
-          echo "Node version: $(node --version)"
-          echo "NPM version: $(npm --version)"
-          echo "Jest version: $(npx jest --version)"
-          echo "Test files found:"
-          npx jest --listTests
-          echo "--- Running tests ---"
-          npm test
+        run: npm test
 
       - name: Upload coverage reports
         if: success()

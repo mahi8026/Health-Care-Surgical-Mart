@@ -230,7 +230,7 @@ ssl/
 # ============================================
 # Package Manager Files
 # ============================================
-package-lock.json
+# package-lock.json is intentionally committed so CI can use `npm ci`
 yarn.lock
 pnpm-lock.yaml
 .yarn-integrity
