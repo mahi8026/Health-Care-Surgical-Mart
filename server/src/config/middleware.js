@@ -9,7 +9,6 @@ const {
   createRateLimiters,
   createValidators,
   handleValidationErrors,
-  sqlInjectionProtection,
   xssProtection,
 } = require("./security");
 
@@ -22,7 +21,6 @@ const setupMiddleware = (app) => {
   app.use(requestLogger);
 
   // Security middleware
-  app.use(sqlInjectionProtection);
   app.use(xssProtection);
 
   // Rate limiters

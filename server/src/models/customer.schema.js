@@ -53,11 +53,6 @@ const customerSchema = {
           bsonType: "bool",
           description: "Whether credit sales are allowed for this customer",
         },
-        outstandingBalance: {
-          bsonType: "double",
-          minimum: 0,
-          description: "Outstanding balance (legacy — use currentDue)",
-        },
         isActive: {
           bsonType: "bool",
           description: "Customer active status",

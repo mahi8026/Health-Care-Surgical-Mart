@@ -5,8 +5,7 @@ const csv = require("csv-parser");
 const XLSX = require("xlsx");
 const fs = require("fs");
 const path = require("path");
-const Product = require("../models/product.schema");
-const Stock = require("../models/stock.schema");
+const { ObjectId } = require("mongodb");
 const { authenticate } = require("../middleware/auth-multi-tenant");
 const { importUpload, processUploadedFiles } = require("../services/file-upload.service");
 const { cacheService } = require("../services/cache.service");
@@ -457,9 +456,8 @@ router.post(
 
         try {
           // Check if product with same SKU exists
-          const existingProduct = await Product.findOne({
+          const existingProduct = await req.shopDb.collection("products").findOne({
             sku: productData.sku.trim(),
-            shopId: req.user.shopId,
           });
 
           if (existingProduct) {
@@ -471,7 +469,7 @@ router.post(
           }
 
           // Create product
-          const newProduct = new Product({
+          const newProduct = {
             name: productData.name.trim(),
             sku: productData.sku.trim(),
             category: productData.category.trim(),
@@ -480,21 +478,26 @@ router.post(
             unit: productData.unit.trim(),
             minStockLevel: parseInt(productData.minStockLevel) || 0,
             description: productData.description?.trim() || "",
-            shopId: req.user.shopId,
             isActive: true,
-          });
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
 
-          await newProduct.save();
+          const productResult = await req.shopDb.collection("products").insertOne(newProduct);
+          const newProductId = productResult.insertedId;
 
           // Create initial stock entry
-          const stock = new Stock({
-            productId: newProduct._id,
-            shopId: req.user.shopId,
+          await req.shopDb.collection("stock").insertOne({
+            productId: newProductId,
+            productName: newProduct.name,
             currentQty: 0,
+            reservedQty: 0,
+            availableQty: 0,
             minStockLevel: newProduct.minStockLevel,
+            isLowStock: true,
+            lastUpdated: new Date(),
+            createdAt: new Date(),
           });
-
-          await stock.save();
 
           results.imported.push({
             name: newProduct.name,
@@ -555,12 +558,11 @@ router.post(
 // Bulk export products
 router.get("/bulk-export", authenticate, async (req, res) => {
   try {
-    const products = await Product.find({
-      shopId: req.user.shopId,
+    const products = await req.shopDb.collection("products").find({
       isActive: true,
-    }).select(
-      "name sku category purchasePrice sellingPrice unit minStockLevel description",
-    );
+    }).project({
+      name: 1, sku: 1, category: 1, purchasePrice: 1, sellingPrice: 1, unit: 1, minStockLevel: 1, description: 1,
+    }).toArray();
 
     // Convert to CSV format
     const csvHeader =
@@ -618,9 +620,8 @@ router.put("/bulk-update", authenticate, async (req, res) => {
           continue;
         }
 
-        const product = await Product.findOne({
+        const product = await req.shopDb.collection("products").findOne({
           sku: update.sku,
-          shopId: req.user.shopId,
         });
 
         if (!product) {
@@ -631,20 +632,20 @@ router.put("/bulk-update", authenticate, async (req, res) => {
           continue;
         }
 
-        // Update fields
-        if (update.name) product.name = update.name;
-        if (update.category) product.category = update.category;
-        if (update.purchasePrice)
-          product.purchasePrice = parseFloat(update.purchasePrice);
-        if (update.sellingPrice)
-          product.sellingPrice = parseFloat(update.sellingPrice);
-        if (update.unit) product.unit = update.unit;
-        if (update.minStockLevel !== undefined)
-          product.minStockLevel = parseInt(update.minStockLevel);
-        if (update.description !== undefined)
-          product.description = update.description;
+        // Build update fields
+        const updateFields = { updatedAt: new Date() };
+        if (update.name) updateFields.name = update.name;
+        if (update.category) updateFields.category = update.category;
+        if (update.purchasePrice) updateFields.purchasePrice = parseFloat(update.purchasePrice);
+        if (update.sellingPrice) updateFields.sellingPrice = parseFloat(update.sellingPrice);
+        if (update.unit) updateFields.unit = update.unit;
+        if (update.minStockLevel !== undefined) updateFields.minStockLevel = parseInt(update.minStockLevel);
+        if (update.description !== undefined) updateFields.description = update.description;
 
-        await product.save();
+        await req.shopDb.collection("products").updateOne(
+          { _id: product._id },
+          { $set: updateFields },
+        );
         results.successCount++;
       } catch (error) {
         results.errors.push(`Row ${i + 1}: ${error.message}`);
@@ -694,10 +695,7 @@ router.post("/bulk-delete", authenticate, async (req, res) => {
       const sku = skus[i];
 
       try {
-        const product = await Product.findOne({
-          sku,
-          shopId: req.user.shopId,
-        });
+        const product = await req.shopDb.collection("products").findOne({ sku });
 
         if (!product) {
           results.errors.push(`SKU ${sku}: Product not found`);
@@ -706,8 +704,10 @@ router.post("/bulk-delete", authenticate, async (req, res) => {
         }
 
         // Soft delete
-        product.isActive = false;
-        await product.save();
+        await req.shopDb.collection("products").updateOne(
+          { _id: product._id },
+          { $set: { isActive: false, updatedAt: new Date() } },
+        );
         results.successCount++;
       } catch (error) {
         results.errors.push(`SKU ${sku}: ${error.message}`);

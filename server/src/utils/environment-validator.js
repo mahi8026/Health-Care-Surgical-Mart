@@ -17,7 +17,7 @@ const optionalEnvVars = {
   PORT: "5000",
   HOST: "0.0.0.0",
   DB_NAME: "medical_store_system",
-  JWT_EXPIRES_IN: "24h",
+  JWT_SECRET_IN: "24h",
   RATE_LIMIT_WINDOW_MS: "900000", // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: "100",
   LOG_LEVEL: "info",
@@ -28,6 +28,7 @@ const optionalEnvVars = {
   DB_CONNECT_TIMEOUT: "10000",
   DB_SOCKET_TIMEOUT: "45000",
   DB_SERVER_SELECTION_TIMEOUT: "5000",
+  BCRYPT_ROUNDS: "12",
 };
 
 /**
@@ -114,6 +115,7 @@ const validateEnvironment = () => {
     "DB_CONNECT_TIMEOUT",
     "DB_SOCKET_TIMEOUT",
     "DB_SERVER_SELECTION_TIMEOUT",
+    "BCRYPT_ROUNDS",
   ];
 
   numericVars.forEach((varName) => {
@@ -121,6 +123,14 @@ const validateEnvironment = () => {
       errors.push(`${varName} must be a valid number`);
     }
   });
+
+  // Validate BCRYPT_ROUNDS range (10-14 recommended)
+  if (process.env.BCRYPT_ROUNDS) {
+    const rounds = parseInt(process.env.BCRYPT_ROUNDS);
+    if (rounds < 10 || rounds > 14) {
+      warnings.push("BCRYPT_ROUNDS should be between 10 and 14 for optimal security/performance balance");
+    }
+  }
 
   // Log results
   if (warnings.length > 0) {

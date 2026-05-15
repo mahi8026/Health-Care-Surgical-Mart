@@ -12,6 +12,8 @@ const { logger } = require('../config/logging');
 const auditLog = require("../services/audit-log.service");
 const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
 
+const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+
 /**
  * @swagger
  * /api/auth/firebase-login:
@@ -290,6 +292,7 @@ router.post("/login", async (req, res) => {
                 break;
               }
             } catch (error) {
+              logger.warn('Failed to query shop database during legacy login auto-detect', { shopId: shop.shopId, error: error.message });
             }
           }
         }
@@ -467,7 +470,7 @@ router.post("/change-password", async (req, res) => {
     }
 
     // Hash new password
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
     // Update password
     await collection.updateOne(
@@ -591,6 +594,7 @@ router.post("/firebase-login", async (req, res) => {
                 break;
               }
             } catch (error) {
+              logger.warn('Failed to query shop database during Firebase login auto-detect', { shopId: shop.shopId, error: error.message });
             }
           }
         }

@@ -285,63 +285,6 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 /**
- * SQL injection protection
- */
-const sqlInjectionProtection = (req, res, next) => {
-  const suspiciousPatterns = [
-    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)/i,
-    /(--|\/\*|\*\/|;|'|"|`)/,
-    /(\b(OR|AND)\b.*=.*)/i,
-  ];
-
-  const checkForSQLInjection = (obj, path = "") => {
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const value = obj[key];
-        const currentPath = path ? `${path}.${key}` : key;
-
-        if (typeof value === "string") {
-          for (const pattern of suspiciousPatterns) {
-            if (pattern.test(value)) {
-              logSecurityEvent("sql_injection_attempt", {
-                ip: req.ip,
-                url: req.url,
-                field: currentPath,
-                value: value,
-                userAgent: req.get("User-Agent"),
-              });
-
-              return res.status(400).json({
-                success: false,
-                message: "Invalid input detected",
-              });
-            }
-          }
-        } else if (typeof value === "object" && value !== null) {
-          const result = checkForSQLInjection(value, currentPath);
-          if (result) return result;
-        }
-      }
-    }
-    return null;
-  };
-
-  // Check request body
-  if (req.body) {
-    const result = checkForSQLInjection(req.body);
-    if (result) return result;
-  }
-
-  // Check query parameters
-  if (req.query) {
-    const result = checkForSQLInjection(req.query);
-    if (result) return result;
-  }
-
-  next();
-};
-
-/**
  * XSS protection
  */
 const xssProtection = (req, res, next) => {
@@ -394,6 +337,5 @@ module.exports = {
   createRateLimiters,
   createValidators,
   handleValidationErrors,
-  sqlInjectionProtection,
   xssProtection,
 };

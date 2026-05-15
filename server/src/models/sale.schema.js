@@ -17,8 +17,8 @@ const saleSchema = {
           description: "Unique invoice number - required",
         },
         customerId: {
-          bsonType: "objectId",
-          description: "Reference to customer",
+          bsonType: ["objectId", "null"],
+          description: "Reference to customer (null for walk-in)",
         },
         customerName: {
           bsonType: "string",
@@ -118,8 +118,12 @@ const saleSchema = {
           description: "Amount still owed by customer",
         },
         paymentStatus: {
-          enum: ["Paid", "Partial", "Pending"],
+          enum: ["Paid", "Partial", "Pending", "Credit"],
           description: "Payment status",
+        },
+        paymentMethod: {
+          bsonType: "string",
+          description: "Payment method (cash, bank, card, credit)",
         },
         saleDate: {
           bsonType: "date",

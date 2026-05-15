@@ -7,6 +7,7 @@ const { ObjectId } = require("mongodb");
 const { logger } = require("../config/logging");
 const EmailService = require("../services/email/email.service");
 const { cacheService } = require("../services/cache.service");
+const { client: getMongoClient } = require("../config/database");
 
 class SalesController {
   /**
@@ -81,10 +82,10 @@ class SalesController {
       // Use provided invoice number or generate one
       const invoiceNo = invoiceNumber || `INV-${Date.now()}`;
 
-      // Enrich items with product details
+      // Enrich items with product details (outside transaction — read-only)
       const enrichedItems = await this._enrichSaleItems(req.shopDb, items);
 
-      // Create sale record
+      // Create sale record object
       const sale = this._buildSaleRecord({
         invoiceNo,
         customer,
@@ -103,17 +104,67 @@ class SalesController {
         user: req.user,
       });
 
-      // Insert sale
-      const result = await req.shopDb.collection("sales").insertOne(sale, {
-        bypassDocumentValidation: true,
-      });
+      // ── Transactional writes ──────────────────────────────────────────────
+      let insertedId;
+      const mongoClient = getMongoClient();
 
-      // Update stock quantities
-      await this._updateStockForSale(req.shopDb, enrichedItems);
+      if (mongoClient) {
+        const session = mongoClient.startSession();
+        try {
+          await session.withTransaction(async () => {
+            // 1. Insert sale
+            const result = await req.shopDb.collection("sales").insertOne(sale, { session });
+            insertedId = result.insertedId;
 
-      // Update customer totals (totalPurchased, lastPurchaseDate, currentDue for credit)
-      if (customer?.id) {
-        await this._updateCustomerAfterSale(req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod);
+            // 2. Update stock quantities
+            await this._updateStockForSale(req.shopDb, enrichedItems, session);
+
+            // 3. Update customer totals (credit due, totalPurchased, lastPurchaseDate)
+            if (customer?.id) {
+              await this._updateCustomerAfterSale(
+                req.shopDb,
+                customer.id,
+                parseFloat(grandTotal),
+                req.body.paymentMethod,
+                session,
+              );
+            }
+          });
+        } catch (txError) {
+          // Replica-set not available — fall back to non-transactional writes
+          if (
+            txError.message?.includes("Transaction numbers are only allowed on a replica set") ||
+            txError.codeName === "IllegalOperation"
+          ) {
+            logger.warn(
+              "MongoDB transactions not supported (standalone node) — falling back to non-transactional writes",
+              { error: txError.message },
+            );
+            const result = await req.shopDb.collection("sales").insertOne(sale);
+            insertedId = result.insertedId;
+            await this._updateStockForSale(req.shopDb, enrichedItems);
+            if (customer?.id) {
+              await this._updateCustomerAfterSale(
+                req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod,
+              );
+            }
+          } else {
+            throw txError;
+          }
+        } finally {
+          await session.endSession();
+        }
+      } else {
+        // Client not yet available (e.g. test environment) — non-transactional
+        logger.warn("MongoDB client unavailable — using non-transactional sale insert");
+        const result = await req.shopDb.collection("sales").insertOne(sale);
+        insertedId = result.insertedId;
+        await this._updateStockForSale(req.shopDb, enrichedItems);
+        if (customer?.id) {
+          await this._updateCustomerAfterSale(
+            req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod,
+          );
+        }
       }
 
       // Send notification (async, don't wait) - wrapped in try-catch
@@ -127,7 +178,7 @@ class SalesController {
       try {
         const auditLog = require("../services/audit-log.service");
         const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
-        auditLog.log(req, AUDIT_ACTIONS.SALE_CREATED, "sale", result.insertedId.toString(),
+        auditLog.log(req, AUDIT_ACTIONS.SALE_CREATED, "sale", insertedId.toString(),
           `Created sale ${sale.invoiceNo} — total ৳${sale.grandTotal}`,
           { after: { invoiceNo: sale.invoiceNo, grandTotal: sale.grandTotal, itemCount: enrichedItems.length } }
         );
@@ -141,7 +192,7 @@ class SalesController {
         success: true,
         message: "Sale created successfully",
         data: {
-          _id: result.insertedId,
+          _id: insertedId,
           invoiceNo: sale.invoiceNo,
           grandTotal: sale.grandTotal,
           saleDate: sale.saleDate,
@@ -172,22 +223,46 @@ class SalesController {
    */
   async getSales(req, res) {
     try {
-      const { startDate, endDate, customerId, limit = 50 } = req.query;
+      const {
+        startDate,
+        endDate,
+        customerId,
+        limit = 20,
+        page = 1,
+      } = req.query;
+
+      const parsedLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+      const parsedPage = Math.max(parseInt(page) || 1, 1);
+      const skip = (parsedPage - 1) * parsedLimit;
 
       // Build filter
       const filter = this._buildSalesFilter({ startDate, endDate, customerId });
 
-      const sales = await req.shopDb
-        .collection("sales")
-        .find(filter)
-        .sort({ saleDate: -1 })
-        .limit(parseInt(limit))
-        .toArray();
+      // Run count and data fetch in parallel
+      const [total, sales] = await Promise.all([
+        req.shopDb.collection("sales").countDocuments(filter),
+        req.shopDb
+          .collection("sales")
+          .find(filter)
+          .sort({ saleDate: -1 })
+          .skip(skip)
+          .limit(parsedLimit)
+          .toArray(),
+      ]);
+
+      const pages = Math.ceil(total / parsedLimit);
 
       res.json({
         success: true,
-        count: sales.length,
-        data: sales,
+        data: {
+          sales,
+          pagination: {
+            page: parsedPage,
+            limit: parsedLimit,
+            total,
+            pages,
+          },
+        },
       });
     } catch (error) {
       logger.error("Get sales error:", error);
@@ -309,15 +384,21 @@ class SalesController {
       ? parseFloat(grandTotal)
       : Math.max(0, parseFloat(grandTotal) - paid);
 
+    const parsedSubtotal = parseFloat(subtotal) || 0;
+    const discountAmount = parseFloat(discount) || 0;
+    const discountPercent = parsedSubtotal > 0
+      ? Math.round((discountAmount / parsedSubtotal) * 100 * 100) / 100
+      : 0;
+
     return {
       invoiceNo,
       customerId: customer?.id ? new ObjectId(customer.id) : null,
       customerName: customer?.name || "Cash Customer",
       customerType: customerType || "Walk-in",
       items: enrichedItems,
-      subtotal: parseFloat(subtotal) || 0,
-      discountAmount: parseFloat(discount) || 0,
-      discountPercent: 0,
+      subtotal: parsedSubtotal,
+      discountAmount: discountAmount,
+      discountPercent: discountPercent,
       vatAmount: parseFloat(vatAmount) || 0,
       vatPercent: parseFloat(vatPercent) || 0,
       grandTotal: parseFloat(grandTotal),
@@ -338,7 +419,7 @@ class SalesController {
   /**
    * Update customer totals after a sale
    */
-  async _updateCustomerAfterSale(shopDb, customerId, saleTotal, paymentMethod) {
+  async _updateCustomerAfterSale(shopDb, customerId, saleTotal, paymentMethod, session = null) {
     try {
       const update = {
         $inc: { totalPurchased: saleTotal, totalPurchases: saleTotal },
@@ -348,9 +429,11 @@ class SalesController {
       if (paymentMethod === "credit") {
         update.$inc.currentDue = saleTotal;
       }
+      const options = session ? { session } : {};
       await shopDb.collection("customers").updateOne(
         { _id: new ObjectId(customerId) },
-        update
+        update,
+        options,
       );
     } catch (err) {
       logger.warn("Failed to update customer totals after sale:", err.message);
@@ -360,7 +443,9 @@ class SalesController {
   /**
    * Update stock quantities after sale
    */
-  async _updateStockForSale(shopDb, enrichedItems) {
+  async _updateStockForSale(shopDb, enrichedItems, session = null) {
+    const options = session ? { session } : {};
+
     for (const item of enrichedItems) {
       // Skip stock updates for custom items (no productId)
       if (!item.productId || item.productId === null) {
@@ -368,9 +453,10 @@ class SalesController {
         continue;
       }
 
-      const existingStock = await shopDb.collection("stock").findOne({
-        productId: item.productId,
-      });
+      const existingStock = await shopDb.collection("stock").findOne(
+        { productId: item.productId },
+        options,
+      );
 
       if (existingStock) {
         // Update existing stock
@@ -386,25 +472,30 @@ class SalesController {
               lastSaleDate: new Date(),
             },
           },
+          options,
         );
       } else {
         // Create stock record with negative quantity
-        const product = await shopDb.collection("products").findOne({
-          _id: item.productId,
-        });
+        const product = await shopDb.collection("products").findOne(
+          { _id: item.productId },
+          options,
+        );
 
-        await shopDb.collection("stock").insertOne({
-          productId: item.productId,
-          productName: product?.name || item.name,
-          currentQty: -item.qty,
-          reservedQty: 0,
-          availableQty: -item.qty,
-          minStockLevel: product?.minStockLevel || 0,
-          isLowStock: true,
-          lastUpdated: new Date(),
-          lastSaleDate: new Date(),
-          createdAt: new Date(),
-        });
+        await shopDb.collection("stock").insertOne(
+          {
+            productId: item.productId,
+            productName: product?.name || item.name,
+            currentQty: -item.qty,
+            reservedQty: 0,
+            availableQty: -item.qty,
+            minStockLevel: product?.minStockLevel || 0,
+            isLowStock: true,
+            lastUpdated: new Date(),
+            lastSaleDate: new Date(),
+            createdAt: new Date(),
+          },
+          options,
+        );
 
         logger.warn(
           `Created stock record for ${item.name} with negative quantity: -${item.qty}`,
@@ -412,16 +503,17 @@ class SalesController {
       }
 
       // Update low stock flag
-      const updatedStock = await shopDb.collection("stock").findOne({
-        productId: item.productId,
-      });
+      const updatedStock = await shopDb.collection("stock").findOne(
+        { productId: item.productId },
+        options,
+      );
 
       if (updatedStock) {
         const isLowStock =
           updatedStock.currentQty <= (updatedStock.minStockLevel || 0);
         await shopDb
           .collection("stock")
-          .updateOne({ productId: item.productId }, { $set: { isLowStock } });
+          .updateOne({ productId: item.productId }, { $set: { isLowStock } }, options);
       }
     }
   }

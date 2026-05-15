@@ -18,6 +18,8 @@ A comprehensive Point of Sale (POS) system designed for medical stores and pharm
 ## 📋 Features
 
 ### Core Functionality
+
+> **⚠️ Important:** The **only authoritative configuration file** is `server/.env`. The root `.env.unused` file is obsolete and should not be used. All environment variables must be set in `server/.env` for the backend to function correctly.
 - 🛒 Sales Management with invoice generation
 - 📦 Inventory & Stock Management
 - 💰 Purchase Order Management

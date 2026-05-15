@@ -132,7 +132,7 @@ router.use(checkShopStatus);
  *           type: integer
  *           minimum: 1
  *           default: 1
- *         description: Page number
+ *         description: Page number (defaults to 1)
  *       - in: query
  *         name: limit
  *         schema:
@@ -140,7 +140,7 @@ router.use(checkShopStatus);
  *           minimum: 1
  *           maximum: 100
  *           default: 20
- *         description: Items per page
+ *         description: Items per page (max 100, defaults to 20)
  *       - in: query
  *         name: startDate
  *         schema:
@@ -184,11 +184,27 @@ router.use(checkShopStatus);
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Sale'
- *                 pagination:
- *                   $ref: '#/components/schemas/PaginationMeta'
+ *                   type: object
+ *                   properties:
+ *                     sales:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Sale'
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         page:
+ *                           type: integer
+ *                           example: 1
+ *                         limit:
+ *                           type: integer
+ *                           example: 20
+ *                         total:
+ *                           type: integer
+ *                           example: 150
+ *                         pages:
+ *                           type: integer
+ *                           example: 8
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
