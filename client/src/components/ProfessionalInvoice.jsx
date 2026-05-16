@@ -204,7 +204,16 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
         <div className="bg-gray-100 border border-gray-300 rounded p-2 text-xs">
           <div className="flex justify-between items-center">
             <span className="text-gray-700">
-              <strong>Payment Method:</strong> {sale?.paymentMethod || "Cash"}
+              <strong>Payment Method:</strong> {
+                sale?.dueAmount > 0 && (sale?.cashPaid || 0) === 0 && (sale?.bankPaid || 0) === 0
+                  ? "Due/Credit"
+                  : sale?.paymentMethod || 
+                    ((sale?.cashPaid || 0) > 0 && (sale?.bankPaid || 0) > 0 
+                      ? "Cash + Bank" 
+                      : (sale?.bankPaid || 0) > 0 
+                        ? "Bank" 
+                        : "Cash")
+              }
             </span>
             <span className="text-gray-700">
               <strong>Cash Paid:</strong> ৳{formatCurrency(sale?.cashPaid || 0)}
@@ -347,9 +356,6 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
 
         {/* Signature */}
         <div className="mt-8 flex justify-between items-end">
-          <div className="text-[10px] text-gray-400 italic">
-            Computer generated invoice
-          </div>
           <div className="text-center">
             <div className="h-10 w-40 border-b-2 border-gray-400 mb-1"></div>
             <div className="text-xs font-bold text-gray-700">
@@ -363,7 +369,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
       <footer className="mt-4 pt-3 border-t border-gray-300 text-center">
         <div className="text-xs text-gray-600">
           <p className="mb-1">
-            <strong>Contact:</strong> Phone: +880-1234-567890 | Email: info@healthcaresurgicalmart.com
+            <strong>Contact:</strong> Phone: +880-1792880999 | Email:healthcaresurgicalmart@gmail.com
           </p>
           <p className="text-[10px] text-gray-500 italic">
             Thank you for your business! This is a computer generated invoice — no signature required.
@@ -375,12 +381,12 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
 
   return (
     <>
-      {/* Print Styles - Optimized for A4 with Readable Text and Full Page Usage */}
+      {/* Print Styles - Compact Layout for 12-15 Products per Page */}
       <style>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 1.5cm 1.5cm 1.5cm 1.5cm;
+            margin: 0.8cm 1.2cm 0.8cm 1.2cm;
           }
           
           body * { visibility: hidden; }
@@ -396,119 +402,122 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           }
           .print-hide { display: none !important; }
           
-          /* Optimized spacing to fill page */
-          .invoice-content header { margin-bottom: 0.5cm !important; }
-          .invoice-content section { margin-bottom: 0.4cm !important; }
-          .invoice-content .mb-4 { margin-bottom: 0.35cm !important; }
-          .invoice-content .mb-3 { margin-bottom: 0.25cm !important; }
-          .invoice-content .mb-2 { margin-bottom: 0.2cm !important; }
-          .invoice-content .mb-1 { margin-bottom: 0.1cm !important; }
-          .invoice-content .mt-8 { margin-top: 0.5cm !important; }
-          .invoice-content .mt-5 { margin-top: 0.15cm !important; }
-          .invoice-content .mt-4 { margin-top: 0.3cm !important; }
-          .invoice-content .mt-3 { margin-top: 0.2cm !important; }
-          .invoice-content .mt-2 { margin-bottom: 0.15cm !important; }
-          .invoice-content .mt-1 { margin-top: 0.1cm !important; }
-          .invoice-content .pt-3 { padding-top: 0.25cm !important; }
+          /* Compact spacing */
+          .invoice-content header { margin-bottom: 0.2cm !important; }
+          .invoice-content section { margin-bottom: 0.2cm !important; }
+          .invoice-content .mb-4 { margin-bottom: 0.2cm !important; }
+          .invoice-content .mb-3 { margin-bottom: 0.15cm !important; }
+          .invoice-content .mb-2 { margin-bottom: 0.12cm !important; }
+          .invoice-content .mb-1 { margin-bottom: 0.08cm !important; }
+          .invoice-content .mt-8 { margin-top: 0.3cm !important; }
+          .invoice-content .mt-5 { margin-top: 0.2cm !important; }
+          .invoice-content .mt-4 { margin-top: 0.2cm !important; }
+          .invoice-content .mt-3 { margin-top: 0.15cm !important; }
+          .invoice-content .mt-2 { margin-top: 0.12cm !important; }
+          .invoice-content .mt-1 { margin-top: 0.08cm !important; }
+          .invoice-content .pt-3 { padding-top: 0.15cm !important; }
           
-          /* Optimized padding */
-          .invoice-content .p-6 { padding: 0.35cm !important; }
-          .invoice-content .p-4 { padding: 0.3cm !important; }
-          .invoice-content .p-3 { padding: 0.25cm !important; }
-          .invoice-content .p-2 { padding: 0.15cm !important; }
-          .invoice-content .py-2 { padding-top: 0.15cm !important; padding-bottom: 0.15cm !important; }
-          .invoice-content .py-1 { padding-top: 0.1cm !important; padding-bottom: 0.1cm !important; }
-          .invoice-content .px-4 { padding-left: 0.3cm !important; padding-right: 0.3cm !important; }
-          .invoice-content .px-2 { padding-left: 0.2cm !important; padding-right: 0.2cm !important; }
+          /* Compact padding */
+          .invoice-content .p-6 { padding: 0.2cm !important; }
+          .invoice-content .p-4 { padding: 0.2cm !important; }
+          .invoice-content .p-3 { padding: 0.15cm !important; }
+          .invoice-content .p-2 { padding: 0.08cm !important; }
+          .invoice-content .py-2 { padding-top: 0.08cm !important; padding-bottom: 0.08cm !important; }
+          .invoice-content .py-1 { padding-top: 0.05cm !important; padding-bottom: 0.05cm !important; }
+          .invoice-content .px-4 { padding-left: 0.15cm !important; padding-right: 0.15cm !important; }
+          .invoice-content .px-2 { padding-left: 0.12cm !important; padding-right: 0.12cm !important; }
           
-          /* Optimized gaps */
-          .invoice-content .gap-6 { gap: 0.5cm !important; }
-          .invoice-content .gap-4 { gap: 0.35cm !important; }
-          .invoice-content .gap-1 { gap: 0.1cm !important; }
-          .invoice-content .space-y-2 > * + * { margin-top: 0.15cm !important; }
-          .invoice-content .space-y-0\\.5 > * + * { margin-top: 0.08cm !important; }
+          /* Compact gaps */
+          .invoice-content .gap-6 { gap: 0.3cm !important; }
+          .invoice-content .gap-4 { gap: 0.25cm !important; }
+          .invoice-content .gap-1 { gap: 0.08cm !important; }
+          .invoice-content .space-y-2 > * + * { margin-top: 0.1cm !important; }
+          .invoice-content .space-y-0\\.5 > * + * { margin-top: 0.05cm !important; }
           
-          /* Header - Readable sizes */
-          .invoice-content header img { width: 90px !important; height: 65px !important; }
-          .invoice-content header h1 { font-size: 26pt !important; line-height: 1.2 !important; font-weight: bold !important; }
-          .invoice-content header .text-sm { font-size: 9pt !important; line-height: 1.3 !important; }
-          .invoice-content .inline-block { padding: 0.1cm 0.3cm !important; font-size: 10pt !important; }
+          /* Header - Compact */
+          .invoice-content header img { width: 70px !important; height: 50px !important; }
+          .invoice-content header h1 { font-size: 20pt !important; line-height: 1.1 !important; font-weight: bold !important; }
+          .invoice-content header .text-sm { font-size: 8pt !important; line-height: 1.2 !important; }
+          .invoice-content .inline-block { padding: 2px 10px !important; font-size: 8pt !important; }
           
-          /* All font sizes - READABLE */
-          .invoice-content .text-4xl { font-size: 26pt !important; line-height: 1.2 !important; }
-          .invoice-content .text-base { font-size: 14pt !important; line-height: 1.3 !important; }
-          .invoice-content .text-sm { font-size: 11pt !important; line-height: 1.3 !important; }
-          .invoice-content .text-xs { font-size: 11pt !important; line-height: 1.3 !important; }
-          .invoice-content .text-\\[10px\\] { font-size: 9pt !important; line-height: 1.3 !important; }
+          /* All font sizes - Compact but readable */
+          .invoice-content .text-4xl { font-size: 20pt !important; line-height: 1.1 !important; }
+          .invoice-content .text-base { font-size: 12pt !important; line-height: 1.2 !important; }
+          .invoice-content .text-sm { font-size: 9pt !important; line-height: 1.2 !important; }
+          .invoice-content .text-xs { font-size: 9pt !important; line-height: 1.2 !important; }
+          .invoice-content .text-\\[10px\\] { font-size: 8pt !important; line-height: 1.2 !important; }
           
-          /* Bill To and Invoice Details sections */
+          /* Bill To and Invoice Details sections - Compact */
           .invoice-content .w-1\\/2 h3 { 
-            font-size: 11pt !important; 
+            font-size: 9pt !important; 
             font-weight: bold !important; 
-            margin-bottom: 0.15cm !important;
+            margin-bottom: 0.1cm !important;
           }
           .invoice-content .w-1\\/2 label { 
+            font-size: 7.5pt !important; 
+            font-weight: bold !important;
+          }
+          .invoice-content .w-1\\/2 .font-semibold { font-size: 9pt !important; }
+          .invoice-content .w-1\\/2 .font-bold { font-size: 9pt !important; }
+          .invoice-content .w-1\\/2 .font-medium { font-size: 9pt !important; }
+          .invoice-content .w-1\\/2 .text-gray-700 { font-size: 9pt !important; }
+          .invoice-content .w-1\\/2 .text-gray-900 { font-size: 9pt !important; }
+          .invoice-content .w-1\\/2 .text-xs { font-size: 9pt !important; }
+          
+          /* Table - COMPACT (KEY: fits more products) */
+          .invoice-content table { font-size: 9pt !important; }
+          .invoice-content thead th { 
+            padding: 4px 6px !important; 
             font-size: 9pt !important; 
             font-weight: bold !important;
           }
-          .invoice-content .w-1\\/2 .font-semibold { font-size: 11pt !important; }
-          .invoice-content .w-1\\/2 .font-bold { font-size: 11pt !important; }
-          .invoice-content .w-1\\/2 .font-medium { font-size: 11pt !important; }
-          .invoice-content .w-1\\/2 .text-gray-700 { font-size: 11pt !important; }
-          .invoice-content .w-1\\/2 .text-gray-900 { font-size: 11pt !important; }
-          .invoice-content .w-1\\/2 .text-xs { font-size: 11pt !important; }
-          
-          /* Table - Readable */
-          .invoice-content table { font-size: 11pt !important; }
-          .invoice-content thead th { 
-            padding: 6px 8px !important; 
-            font-size: 11pt !important; 
-            font-weight: bold !important;
-          }
           .invoice-content tbody td { 
-            padding: 5px 8px !important; 
-            font-size: 11pt !important; 
-            line-height: 1.3 !important; 
+            padding: 3px 6px !important; 
+            font-size: 9pt !important; 
+            line-height: 1.2 !important; 
           }
           .invoice-content tbody td .font-medium { 
-            font-size: 11pt !important; 
+            font-size: 9pt !important; 
             font-weight: 600 !important;
           }
+          /* HIDE Category/SKU line in print to save space */
           .invoice-content tbody td .text-\\[10px\\] { 
-            font-size: 9pt !important;
+            display: none !important;
           }
           
-          /* Payment Information Strip */
+          /* Payment Information Strip - Compact */
           .invoice-content .bg-gray-100 { 
             background-color: #f3f4f6 !important;
-            font-size: 10pt !important;
+            font-size: 8pt !important;
+            padding: 3px 6px !important;
           }
           
-          /* Totals section - Prominent */
-          .invoice-content .space-y-2 { font-size: 11pt !important; }
+          /* Totals section - Compact but prominent */
+          .invoice-content .space-y-2 { font-size: 9pt !important; }
           .invoice-content .space-y-2 .text-base { 
-            font-size: 14pt !important; 
+            font-size: 12pt !important; 
             font-weight: bold !important; 
           }
-          .invoice-content .space-y-2 .text-sm { font-size: 12pt !important; font-weight: bold !important; }
-          .invoice-content .space-y-2 .text-xs { font-size: 11pt !important; }
+          .invoice-content .space-y-2 .text-sm { font-size: 9.5pt !important; font-weight: bold !important; }
+          .invoice-content .space-y-2 .text-xs { font-size: 9pt !important; }
           
-          /* Terms section */
-          .invoice-content .bg-blue-50 p { font-size: 9pt !important; }
-          .invoice-content .bg-blue-50 li { font-size: 9pt !important; }
+          /* Terms section - Compact */
+          .invoice-content .bg-blue-50 { padding: 0.15cm !important; }
+          .invoice-content .bg-blue-50 p { font-size: 7.5pt !important; }
+          .invoice-content .bg-blue-50 li { font-size: 7.5pt !important; }
           
-          /* Signature section */
-          .invoice-content .h-10 { height: 35px !important; }
-          .invoice-content .w-40 { width: 130px !important; }
-          .invoice-content .text-center .text-xs { font-size: 11pt !important; }
+          /* Signature section - Compact */
+          .invoice-content .h-10 { height: 25px !important; }
+          .invoice-content .w-40 { width: 100px !important; }
+          .invoice-content .text-center .text-xs { font-size: 8pt !important; }
           
-          /* Footer section */
+          /* Footer section - Compact */
           .invoice-content footer { 
-            margin-top: 0.3cm !important;
-            padding-top: 0.25cm !important;
+            margin-top: 0.2cm !important;
+            padding-top: 0.15cm !important;
           }
-          .invoice-content footer .text-xs { font-size: 10pt !important; }
-          .invoice-content footer .text-\\[10px\\] { font-size: 9pt !important; }
+          .invoice-content footer .text-xs { font-size: 8pt !important; }
+          .invoice-content footer .text-\\[10px\\] { font-size: 8pt !important; }
           
           /* Colors - ensure they print */
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -536,7 +545,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           .invoice-content { page-break-inside: avoid !important; }
           .invoice-content header, .invoice-content section { page-break-inside: avoid !important; }
           * { box-shadow: none !important; }
-          .rounded, .rounded-lg { border-radius: 3px !important; }
+          .rounded, .rounded-lg { border-radius: 2px !important; }
           
           /* Border visibility */
           .border { border-width: 1px !important; }
