@@ -122,22 +122,33 @@ async function authenticate(req, res, next) {
       permissions: user.permissions || [],
     };
 
-    // For SUPER_ADMIN with no shopId, auto-assign the first active shop
-    // so all shop-scoped routes work without special-casing
+    // For SUPER_ADMIN: resolve shopId from request context (query/body/header).
+    // This ensures a Super Admin sees the correct shop's data when switching shops,
+    // instead of always being locked to the first shop.
     if (req.user.role === "SUPER_ADMIN" && !req.user.shopId) {
-      try {
-        const systemDb = getSystemDatabase();
-        const firstShop = await systemDb
-          .collection("shops")
-          .findOne({ status: "Active" }, { sort: { createdAt: 1 } });
-        if (firstShop) {
-          req.user.shopId = firstShop.shopId;
+      const requestedShopId =
+        req.query.shopId ||
+        req.body?.shopId ||
+        req.headers["x-shop-id"] ||
+        null;
+
+      if (requestedShopId) {
+        req.user.shopId = requestedShopId;
+      } else {
+        // Fallback: assign first active shop only as a last resort
+        try {
+          const systemDb = getSystemDatabase();
+          const firstShop = await systemDb
+            .collection("shops")
+            .findOne({ status: "Active" }, { sort: { createdAt: 1 } });
+          if (firstShop) {
+            req.user.shopId = firstShop.shopId;
+          }
+        } catch (shopErr) {
+          logger.warn("Could not resolve shopId for SUPER_ADMIN", {
+            error: shopErr.message,
+          });
         }
-      } catch (shopErr) {
-        // Non-fatal — routes that need shopId will handle missing value
-        logger.warn("Could not auto-assign shopId for SUPER_ADMIN", {
-          error: shopErr.message,
-        });
       }
     }
 
