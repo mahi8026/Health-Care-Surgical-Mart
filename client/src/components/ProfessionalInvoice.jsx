@@ -101,7 +101,9 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                   Address
                 </label>
                 <div className="text-gray-700 text-xs">
-                  {sale?.customer?.address || "N/A"}
+                  {sale?.customer?.address || 
+                   sale?.customerAddress || 
+                   (sale?.customer?.name && sale?.customer?.name !== "Cash Customer" ? "" : "")}
                 </div>
               </div>
               <div>
@@ -109,7 +111,11 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                   Phone
                 </label>
                 <div className="text-gray-700 text-xs">
-                  {sale?.customer?.phone || "N/A"}
+                  {sale?.customer?.phone || 
+                   sale?.customer?.mobile || 
+                   sale?.customerPhone || 
+                   sale?.customerMobile || 
+                   (sale?.customer?.name && sale?.customer?.name !== "Cash Customer" ? "" : "")}
                 </div>
               </div>
             </div>

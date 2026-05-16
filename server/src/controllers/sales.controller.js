@@ -412,6 +412,8 @@ class SalesController {
       invoiceNo,
       customerId: customer?.id ? new ObjectId(customer.id) : null,
       customerName: customer?.name || "Cash Customer",
+      customerPhone: customer?.phone || customer?.mobile || null,
+      customerAddress: customer?.address || null,
       customerType: customerType || "Walk-in",
       items: enrichedItems,
       subtotal: parsedSubtotal,
