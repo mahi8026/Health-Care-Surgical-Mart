@@ -36,6 +36,7 @@ const {
 const {
   startRecurringExpenseScheduler,
 } = require("./services/recurring-expense-scheduler");
+const { startKeepAlive, stopKeepAlive } = require("./services/keep-alive.service");
 const {
   initializeSentry,
   setupSentryRequestHandler,
@@ -297,6 +298,9 @@ const gracefulShutdown = async (signal) => {
   logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
   try {
+    // Stop keep-alive cron
+    stopKeepAlive();
+
     // Flush Sentry events
     await flushSentry(2000);
     
@@ -382,6 +386,9 @@ const startServer = async () => {
     // Start recurring expense scheduler only after DB is ready
     startRecurringExpenseScheduler();
     logger.info("Recurring expense scheduler initialized");
+
+    // Start keep-alive cron to prevent Render free-tier cold starts
+    startKeepAlive();
   } catch (error) {
     if (process.env.NODE_ENV === "production") {
       logger.error("Database connection failed in production — shutting down:", error.message);

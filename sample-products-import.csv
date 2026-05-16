@@ -1,0 +1,6 @@
+name,category,brand,sku,purchasePrice,sellingPrice,unit,minStockLevel,description,reorderPoint,maxStock,batchNo,lotNo,expiryDate
+Paracetamol 500mg,Medicines,Square,MED-001,5.00,8.00,strip,10,Paracetamol 500mg tablet for fever and pain relief,20,500,BATCH-001,LOT-001,2027-12-31
+Amoxicillin 250mg,Medicines,Renata,MED-002,12.00,18.00,capsule,15,Amoxicillin antibiotic capsule 250mg,30,300,BATCH-002,LOT-002,2027-06-30
+Surgical Gloves (M),Surgical Supplies,Meditex,SUP-001,25.00,40.00,box,5,Medium size latex surgical gloves - 100 pcs per box,10,100,BATCH-003,LOT-003,2028-01-01
+Normal Saline 0.9%,IV Fluids,Orion,IVF-001,35.00,55.00,bottle,10,Normal saline solution 500ml for IV infusion,20,200,BATCH-004,LOT-004,2027-09-30
+Betadine Solution,Antiseptics,Win-Medicare,ANT-001,45.00,70.00,bottle,8,Povidone Iodine solution 100ml antiseptic,15,150,BATCH-005,LOT-005,2027-12-31
