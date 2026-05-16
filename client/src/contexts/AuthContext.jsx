@@ -28,32 +28,35 @@ export const AuthProvider = ({ children }) => {
       setFirebaseUser(currentUser);
 
       if (currentUser) {
-        // User is signed in with Firebase
-        // Get Firebase ID token
-        try {
-          const idToken = await currentUser.getIdToken();
+        // Check if we already have a valid session in localStorage (e.g. after a page reload).
+        // If so, restore from it instead of hitting the backend again — the JWT is still valid.
+        const storedToken = localStorage.getItem("token");
+        const storedUser = localStorage.getItem("user");
 
-          // Verify with backend and get MongoDB user data
-          const response = await api.post("/auth/firebase-login", {
-            firebaseToken: idToken,
-            email: currentUser.email,
-          });
-
-          if (response.success && response.data) {
-            localStorage.setItem("token", response.data.token);
-            localStorage.setItem("user", JSON.stringify(response.data.user));
-            setToken(response.data.token);
-            setMongoUser(response.data.user);
-            
-            // Set user context in Sentry
-            setUserContext(response.data.user);
+        if (storedToken && storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setToken(storedToken);
+            setMongoUser(parsedUser);
+            setUserContext(parsedUser);
+            setLoading(false);
+            return;
+          } catch {
+            // Stored data is corrupt — clear it and sign out Firebase too
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
           }
-        } catch (error) {
-          if (import.meta.env.DEV) {
-            console.error("Error verifying Firebase token:", error);
-          }
-          setError("Failed to verify authentication");
         }
+
+        // No stored session but Firebase still has the user (e.g. localStorage was cleared
+        // while Firebase persisted the session). Sign out of Firebase silently so the user
+        // goes through the normal login form — which collects shopId and credentials properly.
+        try {
+          await signOutUser();
+        } catch {
+          // ignore sign-out errors
+        }
+        setFirebaseUser(null);
       } else {
         // User is signed out
         localStorage.removeItem("token");
