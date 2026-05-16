@@ -636,8 +636,8 @@ const CustomerFormModal = ({
 }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white max-w-md w-full rounded-lg shadow-2xl">
-        <div className="p-6 border-b border-gray-200">
+      <div className="bg-white max-w-md w-full rounded-lg shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
             <button
@@ -649,7 +649,7 @@ const CustomerFormModal = ({
           </div>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Customer Name *
@@ -765,7 +765,7 @@ const CustomerFormModal = ({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3 flex-shrink-0">
           <button onClick={onClose} className="btn-secondary">
             Cancel
           </button>
