@@ -339,6 +339,10 @@ router.post(
       throw createError.badRequest("Name, email, and password are required");
     }
 
+    if (password.length < 6) {
+      throw createError.badRequest("Password must be at least 6 characters");
+    }
+
     // Validate role
     const allowedRoles = ["STAFF"];
     if (req.user.role === "SHOP_ADMIN") {
@@ -349,7 +353,7 @@ router.post(
       throw createError.forbidden("You cannot create users with this role");
     }
 
-    // Check if email already exists
+    // Check if email already exists in MongoDB
     const existingUser = await shopDb
       .collection("users")
       .findOne({ email: email.toLowerCase() });
@@ -358,21 +362,44 @@ router.post(
       throw createError.conflict("User with this email already exists");
     }
 
-    // Hash password
+    // ── Step 1: Create in Firebase Auth ──────────────────────────────────
+    let firebaseUid = null;
+    try {
+      const admin = require("../config/firebase-admin");
+      const firebaseUser = await admin.auth().createUser({
+        email: email.toLowerCase().trim(),
+        password,
+        displayName: name.trim(),
+        disabled: !isActive,
+      });
+      firebaseUid = firebaseUser.uid;
+      logger.info(`Firebase user created: ${firebaseUid} (${email})`);
+    } catch (firebaseErr) {
+      // If Firebase user already exists, that's OK — just log it
+      if (firebaseErr.code === "auth/email-already-exists") {
+        logger.warn(`Firebase user already exists for ${email} — linking to MongoDB only`);
+      } else {
+        logger.error("Failed to create Firebase user:", firebaseErr.message);
+        throw createError.internal(`Failed to create user in auth system: ${firebaseErr.message}`);
+      }
+    }
+
+    // ── Step 2: Create in MongoDB ─────────────────────────────────────────
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const userData = {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
+      firebaseUid,
       role,
       isActive: Boolean(isActive),
       shopId: req.user.shopId,
-      permissions: [], // Custom permissions can be added later
+      permissions: [],
       lastLogin: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-      createdBy: req.user.id,
+      createdBy: req.user._id,
     };
 
     const result = await shopDb.collection("users").insertOne(userData);
@@ -381,7 +408,7 @@ router.post(
     const { password: _, ...userResponse } = userData;
     userResponse._id = result.insertedId;
 
-    // Audit: user created
+    // Audit log
     auditLog.log(req, AUDIT_ACTIONS.USER_CREATED, "user", result.insertedId.toString(),
       `Created user ${email} with role ${role}`,
       { after: { name, email, role, shopId: req.user.shopId } }
@@ -394,6 +421,7 @@ router.post(
     });
   }),
 );
+
 
 /**
  * PUT /api/users/:id
@@ -497,12 +525,10 @@ router.delete(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    // Prevent users from deleting themselves
     if (req.params.id === req.user.id) {
       throw createError.forbidden("You cannot delete your own account");
     }
 
-    // Check if user exists
     const user = await shopDb
       .collection("users")
       .findOne({ _id: new ObjectId(req.params.id) });
@@ -511,7 +537,6 @@ router.delete(
       throw createError.notFound("User not found");
     }
 
-    // Check if user has any associated records (sales, etc.)
     const salesCount = await shopDb
       .collection("sales")
       .countDocuments({ createdBy: req.params.id });
@@ -522,25 +547,31 @@ router.delete(
       );
     }
 
-    await shopDb
-      .collection("users")
-      .deleteOne({ _id: new ObjectId(req.params.id) });
+    // Remove from Firebase Auth
+    if (user.firebaseUid) {
+      try {
+        const admin = require("../config/firebase-admin");
+        await admin.auth().deleteUser(user.firebaseUid);
+        logger.info(`Firebase user deleted: ${user.firebaseUid}`);
+      } catch (firebaseErr) {
+        logger.warn(`Could not delete Firebase user ${user.firebaseUid}: ${firebaseErr.message}`);
+        // Non-fatal — still delete from MongoDB
+      }
+    }
 
-    // Audit: user deleted
+    await shopDb.collection("users").deleteOne({ _id: new ObjectId(req.params.id) });
+
     auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, "user", req.params.id,
       `Deleted user ${user.email}`,
       { before: { name: user.name, email: user.email, role: user.role } }
     );
 
-    // Invalidate this user's permissions cache
     cacheService.invalidateShopCache(req.user.shopId, "permissions", req.params.id);
 
-    res.json({
-      success: true,
-      message: "User deleted successfully",
-    });
+    res.json({ success: true, message: "User deleted successfully" });
   }),
 );
+
 
 /**
  * PUT /api/users/:id/password
@@ -553,60 +584,50 @@ router.put(
     const shopDb = getShopDatabase(req.user.shopId);
     const { currentPassword, newPassword } = req.body;
 
-    // Users can only change their own password, or admins can change any password
-    if (req.params.id !== req.user.id && req.user.role !== "SHOP_ADMIN") {
+    if (req.params.id !== req.user._id?.toString() && req.user.role !== "SHOP_ADMIN") {
       throw createError.forbidden("You can only change your own password");
     }
 
     if (!newPassword || newPassword.length < 6) {
-      throw createError.badRequest(
-        "New password must be at least 6 characters",
-      );
+      throw createError.badRequest("New password must be at least 6 characters");
     }
 
     const user = await shopDb
       .collection("users")
       .findOne({ _id: new ObjectId(req.params.id) });
 
-    if (!user) {
-      throw createError.notFound("User not found");
+    if (!user) throw createError.notFound("User not found");
+
+    if (req.params.id === req.user._id?.toString()) {
+      if (!currentPassword) throw createError.badRequest("Current password is required");
+      const isValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isValid) throw createError.unauthorized("Current password is incorrect");
     }
 
-    // If changing own password, verify current password
-    if (req.params.id === req.user.id) {
-      if (!currentPassword) {
-        throw createError.badRequest("Current password is required");
-      }
-
-      const isValidPassword = await bcrypt.compare(
-        currentPassword,
-        user.password,
-      );
-      if (!isValidPassword) {
-        throw createError.unauthorized("Current password is incorrect");
-      }
-    }
-
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
+    // Update MongoDB
     await shopDb.collection("users").updateOne(
       { _id: new ObjectId(req.params.id) },
-      {
-        $set: {
-          password: hashedPassword,
-          updatedAt: new Date(),
-          updatedBy: req.user.id,
-        },
-      },
+      { $set: { password: hashedPassword, updatedAt: new Date(), updatedBy: req.user._id } }
     );
 
-    res.json({
-      success: true,
-      message: "Password updated successfully",
-    });
+    // Update Firebase Auth
+    if (user.firebaseUid) {
+      try {
+        const admin = require("../config/firebase-admin");
+        await admin.auth().updateUser(user.firebaseUid, { password: newPassword });
+        logger.info(`Firebase password updated for ${user.email}`);
+      } catch (firebaseErr) {
+        logger.warn(`Firebase password update failed for ${user.email}: ${firebaseErr.message}`);
+        // Non-fatal — MongoDB password already updated
+      }
+    }
+
+    res.json({ success: true, message: "Password updated successfully" });
   }),
 );
+
 
 /**
  * GET /api/users/profile/me
