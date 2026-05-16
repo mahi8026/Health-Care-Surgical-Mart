@@ -26,7 +26,7 @@ let useGCS = false;
  */
 function initializeGCS() {
   try {
-    const admin = require('./firebase-admin');
+    const admin = require('../config/firebase-admin');
 
     // Firebase Admin must be initialized with storageBucket
     if (!admin.apps || admin.apps.length === 0) {
