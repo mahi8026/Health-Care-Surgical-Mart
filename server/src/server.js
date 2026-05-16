@@ -140,7 +140,7 @@ app.use("/api/", limiter);
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    // Allow requests with no origin (like mobile apps, Postman, file:// URLs, etc.)
     if (!origin) {
       return callback(null, true);
     }
@@ -152,10 +152,10 @@ const corsOptions = {
       "http://localhost:5173", // Vite default port
     ];
 
-    // In development, allow all localhost origins
+    // In development, allow all localhost origins and null origin (file://)
     if (process.env.NODE_ENV === "development") {
       const isLocalhost =
-        origin.includes("localhost") || origin.includes("127.0.0.1");
+        origin.includes("localhost") || origin.includes("127.0.0.1") || origin === "null";
       if (isLocalhost) {
         return callback(null, true);
       }
