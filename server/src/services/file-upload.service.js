@@ -220,9 +220,15 @@ async function uploadBufferToGCS(buffer, gcsFolder, shopId, filename) {
   return new Promise((resolve, reject) => {
     const folder = `health-care-surgical-mart/${shopId}/${gcsFolder}`;
     const publicId = filename.replace(/\.[^.]+$/, ""); // strip extension
+    const isPdf = filename.toLowerCase().endsWith(".pdf");
 
     const uploadStream = cloudinaryInstance.uploader.upload_stream(
-      { folder, public_id: publicId, resource_type: "auto" },
+      {
+        folder,
+        public_id: publicId,
+        // PDFs must use "raw" — "auto" wrongly classifies them as images
+        resource_type: isPdf ? "raw" : "auto",
+      },
       (error, result) => {
         if (error) return reject(error);
         logger.info(`Buffer uploaded to Cloudinary: ${result.public_id}`);

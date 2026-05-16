@@ -1339,18 +1339,32 @@ const Sales = () => {
           onClose={() => setShowInvoiceModal(false)}
           onDownload={async (saleId, invoiceNo) => {
             try {
-              const response = await api.post(`/sales/${saleId}/send-invoice`);
-              if (response.success && response.invoiceUrl) {
-                window.open(response.invoiceUrl, "_blank");
-                alert(
-                  response.emailSent
-                    ? "Invoice downloaded and sent to customer email"
-                    : "Invoice downloaded successfully"
-                );
+              // Stream PDF directly from backend — no Cloudinary dependency
+              const token = localStorage.getItem("token");
+              const apiUrl = import.meta.env.VITE_API_URL || "/api";
+              const response = await fetch(
+                `${apiUrl}/sales/${saleId}/download-invoice`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.message || "Failed to generate invoice");
               }
+              const blob = await response.blob();
+              const objectUrl = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = objectUrl;
+              a.download = `invoice-${invoiceNo || saleId}.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(objectUrl);
+
+              // Also send email if customer has email (non-blocking)
+              api.post(`/sales/${saleId}/send-invoice`).catch(() => {});
             } catch (err) {
               console.error("Download error:", err);
-              alert("Failed to download invoice");
+              alert(err.message || "Failed to download invoice");
             }
           }}
         />
