@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ProfessionalInvoice from "../components/ProfessionalInvoice";
@@ -701,6 +701,32 @@ const Sales = () => {
                 autoFocus={false}
               />
             </div>
+
+            {/* Purchase Price Info — shown when a product is selected */}
+            {posData.selectedProduct && (() => {
+              const selProd = products.find(p => p._id === posData.selectedProduct);
+              if (!selProd) return null;
+              const purchasePrice = selProd.purchasePrice ?? selProd.costPrice ?? selProd.purchase_price ?? null;
+              const saleRate = parseFloat(posData.saleRate) || selProd.sellingPrice || 0;
+              const margin = purchasePrice && saleRate
+                ? (((saleRate - purchasePrice) / saleRate) * 100).toFixed(1)
+                : null;
+              return purchasePrice != null ? (
+                <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm">
+                  <div className="flex items-center gap-1 text-amber-800">
+                    <i className="fas fa-tag text-amber-500"></i>
+                    <span className="font-medium">Purchase Price:</span>
+                    <span className="font-bold text-amber-900">৳{purchasePrice.toFixed(2)}</span>
+                  </div>
+                  {margin !== null && (
+                    <div className={`flex items-center gap-1 ml-auto font-semibold ${parseFloat(margin) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                      <i className={`fas fa-chart-line ${parseFloat(margin) >= 0 ? 'text-green-500' : 'text-red-500'}`}></i>
+                      Margin: {margin}%
+                    </div>
+                  )}
+                </div>
+              ) : null;
+            })()}
 
             <div className="grid grid-cols-3 gap-3">
               <div>
