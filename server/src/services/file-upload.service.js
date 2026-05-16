@@ -13,38 +13,40 @@ const { logger } = require("../config/logging");
 const { createError } = require("../config/error-handling");
 
 // ============================================
-// Firebase Storage Configuration (Free on Spark Plan)
+// Cloudinary Configuration (Free tier: 25GB storage, 25GB bandwidth)
+// Sign up free at: https://cloudinary.com
+// Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in env
 // ============================================
 
-let firebaseBucket = null;
+let cloudinaryInstance = null;
 let useGCS = false;
 
 /**
- * Initialize Firebase Storage via firebase-admin SDK.
- * Uses the same service account as Firebase Auth — no extra billing required.
- * Free tier: 5 GB storage, 1 GB/day downloads (Firebase Spark plan).
+ * Initialize Cloudinary for persistent cloud file storage.
+ * Free tier: 25 GB storage + 25 GB bandwidth/month — no credit card required.
  */
 function initializeGCS() {
   try {
-    const admin = require('../config/firebase-admin');
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey    = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-    // Firebase Admin must be initialized with storageBucket
-    if (!admin.apps || admin.apps.length === 0) {
-      logger.warn('Firebase Admin not initialized — file uploads will use local storage');
+    if (!cloudName || !apiKey || !apiSecret) {
+      logger.warn(
+        "Cloudinary not configured — using local storage fallback. " +
+        "Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to enable persistent cloud storage."
+      );
       return false;
     }
 
-    firebaseBucket = admin.storage().bucket();
+    const { v2: cloudinary } = require("cloudinary");
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+    cloudinaryInstance = cloudinary;
 
-    if (!firebaseBucket) {
-      logger.warn('Firebase Storage bucket not available — falling back to local storage');
-      return false;
-    }
-
-    logger.info(`Firebase Storage initialized → bucket: ${firebaseBucket.name}`);
+    logger.info(`Cloudinary initialized → cloud: ${cloudName}`);
     return true;
   } catch (error) {
-    logger.warn(`Firebase Storage unavailable (${error.message}) — using local storage fallback`);
+    logger.warn(`Cloudinary unavailable (${error.message}) — using local storage fallback`);
     return false;
   }
 }
@@ -211,25 +213,24 @@ const productImageUpload = multer({
  * @returns {Promise<string>} Public URL of uploaded file
  */
 async function uploadBufferToGCS(buffer, gcsFolder, shopId, filename) {
-  if (!useGCS || !firebaseBucket) {
-    throw new Error("Firebase Storage is not initialized");
+  if (!useGCS || !cloudinaryInstance) {
+    throw new Error("Cloudinary is not initialized");
   }
 
-  const gcsPath = `${gcsFolder}/${shopId}/${filename}`;
-  const file = firebaseBucket.file(gcsPath);
+  return new Promise((resolve, reject) => {
+    const folder = `health-care-surgical-mart/${shopId}/${gcsFolder}`;
+    const publicId = filename.replace(/\.[^.]+$/, ""); // strip extension
 
-  await file.save(buffer, {
-    metadata: {
-      contentType: "application/pdf",
-      cacheControl: "public, max-age=31536000",
-    },
+    const uploadStream = cloudinaryInstance.uploader.upload_stream(
+      { folder, public_id: publicId, resource_type: "auto" },
+      (error, result) => {
+        if (error) return reject(error);
+        logger.info(`Buffer uploaded to Cloudinary: ${result.public_id}`);
+        resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(buffer);
   });
-
-  await file.makePublic();
-
-  const publicUrl = `https://storage.googleapis.com/${firebaseBucket.name}/${gcsPath}`;
-  logger.info(`Buffer uploaded to Firebase Storage: ${gcsPath}`);
-  return publicUrl;
 }
 
 /**
@@ -299,28 +300,22 @@ async function uploadInvoicePDF(pdfBuffer, shopId, saleId) {
  * @returns {Promise<string>} Public URL of uploaded file
  */
 async function uploadToGCS(localFilePath, gcsFolder, shopId, filename) {
-  if (!useGCS || !firebaseBucket) {
-    throw new Error("Firebase Storage is not initialized");
+  if (!useGCS || !cloudinaryInstance) {
+    throw new Error("Cloudinary is not initialized");
   }
 
   try {
-    const gcsPath = `${gcsFolder}/${shopId}/${filename}`;
-
-    await firebaseBucket.upload(localFilePath, {
-      destination: gcsPath,
-      metadata: {
-        cacheControl: "public, max-age=31536000",
-      },
+    const folder = `health-care-surgical-mart/${shopId}/${gcsFolder}`;
+    const publicId = filename.replace(/\.[^.]+$/, "");
+    const result = await cloudinaryInstance.uploader.upload(localFilePath, {
+      folder,
+      public_id: publicId,
+      resource_type: "auto",
     });
-
-    const file = firebaseBucket.file(gcsPath);
-    await file.makePublic();
-
-    const publicUrl = `https://storage.googleapis.com/${firebaseBucket.name}/${gcsPath}`;
-    logger.info(`File uploaded to Firebase Storage: ${gcsPath}`);
-    return publicUrl;
+    logger.info(`File uploaded to Cloudinary: ${result.public_id}`);
+    return result.secure_url;
   } catch (error) {
-    logger.error(`Failed to upload file to Firebase Storage: ${error.message}`);
+    logger.error(`Failed to upload file to Cloudinary: ${error.message}`);
     throw error;
   }
 }
@@ -333,22 +328,17 @@ async function uploadToGCS(localFilePath, gcsFolder, shopId, filename) {
  * @returns {Promise<boolean>} Success status
  */
 async function deleteFromGCS(gcsFolder, shopId, filename) {
-  if (!useGCS || !firebaseBucket) {
+  if (!useGCS || !cloudinaryInstance) {
     return false;
   }
 
   try {
-    const gcsPath = `${gcsFolder}/${shopId}/${filename}`;
-    const file = firebaseBucket.file(gcsPath);
-    await file.delete();
-    logger.info(`File deleted from Firebase Storage: ${gcsPath}`);
+    const publicId = `health-care-surgical-mart/${shopId}/${gcsFolder}/${filename.replace(/\.[^.]+$/, "")}`;
+    await cloudinaryInstance.uploader.destroy(publicId, { resource_type: "auto" });
+    logger.info(`File deleted from Cloudinary: ${publicId}`);
     return true;
   } catch (error) {
-    if (error.code === 404) {
-      logger.warn(`File not found in Firebase Storage: ${gcsFolder}/${shopId}/${filename}`);
-      return false;
-    }
-    logger.error(`Failed to delete file from Firebase Storage: ${error.message}`);
+    logger.error(`Failed to delete file from Cloudinary: ${error.message}`);
     return false;
   }
 }
@@ -667,8 +657,8 @@ async function cleanupOldFiles(daysOld = 365, folder = null) {
 function getStorageStatus() {
   return {
     useGCS,
-    storage: useGCS ? 'firebase' : 'local',
-    bucketName: useGCS ? firebaseBucket?.name : null,
+    storage: useGCS ? 'cloudinary' : 'local',
+    cloudName: useGCS ? process.env.CLOUDINARY_CLOUD_NAME : null,
     fallbackToLocal: !useGCS,
   };
 }
