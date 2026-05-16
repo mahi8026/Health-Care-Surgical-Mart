@@ -44,8 +44,11 @@ function App() {
 
   // Keep Render backend alive — ping every 14 minutes to prevent cold starts
   useEffect(() => {
+    // VITE_API_URL ends with '/api', but /health is a root-level route (not under /api)
+    // Strip the '/api' suffix to get the base server URL
     const apiUrl = import.meta.env.VITE_API_URL || '/api';
-    const ping = () => fetch(`${apiUrl}/health`, { method: 'GET' }).catch(() => {});
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+    const ping = () => fetch(`${baseUrl}/health`, { method: 'GET' }).catch(() => {});
     ping(); // ping immediately on load
     const interval = setInterval(ping, 14 * 60 * 1000); // every 14 minutes
     return () => clearInterval(interval);
