@@ -9,70 +9,49 @@
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { Storage } = require("@google-cloud/storage");
 const { logger } = require("../config/logging");
 const { createError } = require("../config/error-handling");
 
 // ============================================
-// GCS Configuration
+// Firebase Storage Configuration (Free on Spark Plan)
 // ============================================
 
-let gcsStorage = null;
-let gcsBucket = null;
+let firebaseBucket = null;
 let useGCS = false;
 
 /**
- * Initialize Google Cloud Storage
+ * Initialize Firebase Storage via firebase-admin SDK.
+ * Uses the same service account as Firebase Auth — no extra billing required.
+ * Free tier: 5 GB storage, 1 GB/day downloads (Firebase Spark plan).
  */
 function initializeGCS() {
   try {
-    const bucketName = process.env.GCS_BUCKET_NAME;
-    const projectId = process.env.GCS_PROJECT_ID;
-    const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+    const admin = require('./firebase-admin');
 
-    // Check if all GCS variables are present
-    if (!bucketName || !projectId || !credentialsJson) {
-      logger.warn(
-        "GCS configuration incomplete - falling back to local storage. " +
-        "Set GCS_BUCKET_NAME, GCS_PROJECT_ID, and GOOGLE_APPLICATION_CREDENTIALS_JSON to enable cloud storage."
-      );
+    // Firebase Admin must be initialized with storageBucket
+    if (!admin.apps || admin.apps.length === 0) {
+      logger.warn('Firebase Admin not initialized — file uploads will use local storage');
       return false;
     }
 
-    // Decode base64 credentials
-    let credentials;
-    try {
-      const decodedCredentials = Buffer.from(credentialsJson, "base64").toString("utf-8");
-      credentials = JSON.parse(decodedCredentials);
-    } catch (error) {
-      logger.error("Failed to decode GCS credentials:", error);
-      logger.warn("Falling back to local storage");
+    firebaseBucket = admin.storage().bucket();
+
+    if (!firebaseBucket) {
+      logger.warn('Firebase Storage bucket not available — falling back to local storage');
       return false;
     }
 
-    // Initialize GCS client
-    gcsStorage = new Storage({
-      projectId,
-      credentials,
-    });
-
-    gcsBucket = gcsStorage.bucket(bucketName);
-
-    logger.info(`Google Cloud Storage initialized successfully`, {
-      bucket: bucketName,
-      project: projectId,
-    });
-
+    logger.info(`Firebase Storage initialized → bucket: ${firebaseBucket.name}`);
     return true;
   } catch (error) {
-    logger.error("Failed to initialize Google Cloud Storage:", error);
-    logger.warn("Falling back to local storage");
+    logger.warn(`Firebase Storage unavailable (${error.message}) — using local storage fallback`);
     return false;
   }
 }
 
-// Initialize GCS on module load
+// Initialize on module load
 useGCS = initializeGCS();
+
 
 // ============================================
 // Local Storage Configuration (Fallback)
@@ -232,12 +211,12 @@ const productImageUpload = multer({
  * @returns {Promise<string>} Public URL of uploaded file
  */
 async function uploadBufferToGCS(buffer, gcsFolder, shopId, filename) {
-  if (!useGCS || !gcsBucket) {
-    throw new Error("GCS is not initialized");
+  if (!useGCS || !firebaseBucket) {
+    throw new Error("Firebase Storage is not initialized");
   }
 
   const gcsPath = `${gcsFolder}/${shopId}/${filename}`;
-  const file = gcsBucket.file(gcsPath);
+  const file = firebaseBucket.file(gcsPath);
 
   await file.save(buffer, {
     metadata: {
@@ -248,8 +227,8 @@ async function uploadBufferToGCS(buffer, gcsFolder, shopId, filename) {
 
   await file.makePublic();
 
-  const publicUrl = `https://storage.googleapis.com/${gcsBucket.name}/${gcsPath}`;
-  logger.info(`Buffer uploaded to GCS: ${gcsPath}`);
+  const publicUrl = `https://storage.googleapis.com/${firebaseBucket.name}/${gcsPath}`;
+  logger.info(`Buffer uploaded to Firebase Storage: ${gcsPath}`);
   return publicUrl;
 }
 
@@ -320,34 +299,28 @@ async function uploadInvoicePDF(pdfBuffer, shopId, saleId) {
  * @returns {Promise<string>} Public URL of uploaded file
  */
 async function uploadToGCS(localFilePath, gcsFolder, shopId, filename) {
-  if (!useGCS || !gcsBucket) {
-    throw new Error("GCS is not initialized");
+  if (!useGCS || !firebaseBucket) {
+    throw new Error("Firebase Storage is not initialized");
   }
 
   try {
-    // Construct GCS path: folder/shopId/filename
     const gcsPath = `${gcsFolder}/${shopId}/${filename}`;
 
-    // Upload file to GCS
-    await gcsBucket.upload(localFilePath, {
+    await firebaseBucket.upload(localFilePath, {
       destination: gcsPath,
       metadata: {
-        cacheControl: "public, max-age=31536000", // Cache for 1 year
+        cacheControl: "public, max-age=31536000",
       },
     });
 
-    // Make file publicly accessible
-    const file = gcsBucket.file(gcsPath);
+    const file = firebaseBucket.file(gcsPath);
     await file.makePublic();
 
-    // Get public URL
-    const publicUrl = `https://storage.googleapis.com/${gcsBucket.name}/${gcsPath}`;
-
-    logger.info(`File uploaded to GCS: ${gcsPath}`);
-
+    const publicUrl = `https://storage.googleapis.com/${firebaseBucket.name}/${gcsPath}`;
+    logger.info(`File uploaded to Firebase Storage: ${gcsPath}`);
     return publicUrl;
   } catch (error) {
-    logger.error(`Failed to upload file to GCS: ${error.message}`);
+    logger.error(`Failed to upload file to Firebase Storage: ${error.message}`);
     throw error;
   }
 }
@@ -360,24 +333,22 @@ async function uploadToGCS(localFilePath, gcsFolder, shopId, filename) {
  * @returns {Promise<boolean>} Success status
  */
 async function deleteFromGCS(gcsFolder, shopId, filename) {
-  if (!useGCS || !gcsBucket) {
+  if (!useGCS || !firebaseBucket) {
     return false;
   }
 
   try {
     const gcsPath = `${gcsFolder}/${shopId}/${filename}`;
-    const file = gcsBucket.file(gcsPath);
-
+    const file = firebaseBucket.file(gcsPath);
     await file.delete();
-
-    logger.info(`File deleted from GCS: ${gcsPath}`);
+    logger.info(`File deleted from Firebase Storage: ${gcsPath}`);
     return true;
   } catch (error) {
     if (error.code === 404) {
-      logger.warn(`File not found in GCS: ${gcsFolder}/${shopId}/${filename}`);
+      logger.warn(`File not found in Firebase Storage: ${gcsFolder}/${shopId}/${filename}`);
       return false;
     }
-    logger.error(`Failed to delete file from GCS: ${error.message}`);
+    logger.error(`Failed to delete file from Firebase Storage: ${error.message}`);
     return false;
   }
 }
@@ -696,8 +667,8 @@ async function cleanupOldFiles(daysOld = 365, folder = null) {
 function getStorageStatus() {
   return {
     useGCS,
-    bucketName: useGCS ? process.env.GCS_BUCKET_NAME : null,
-    projectId: useGCS ? process.env.GCS_PROJECT_ID : null,
+    storage: useGCS ? 'firebase' : 'local',
+    bucketName: useGCS ? firebaseBucket?.name : null,
     fallbackToLocal: !useGCS,
   };
 }

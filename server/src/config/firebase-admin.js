@@ -17,8 +17,10 @@ if (!admin.apps.length) {
         const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf-8');
         const serviceAccount = JSON.parse(serviceAccountJson);
         
+        const projectId = serviceAccount.project_id;
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
+          storageBucket: `${projectId}.appspot.com`,
         });
         logger.info('Firebase Admin SDK initialized successfully (base64 method)');
       } catch (parseError) {
