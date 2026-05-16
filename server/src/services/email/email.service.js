@@ -332,7 +332,7 @@ class EmailService {
         doc.fillColor('black');
         doc.text(String(i + 1),                col.sl,   y + 4, { width: 20 });
         doc.text(name,                          col.name, y + 4, { width: 270 });
-        doc.text(String(qty),                   col.qty,  y + 4, { width: 55, align: 'right' });
+        doc.text(item.unit ? `${qty} ${item.unit}` : String(qty), col.qty,  y + 4, { width: 55, align: 'right' });
         doc.text(`${currency}${Number(rate).toFixed(2)}`,  col.rate,  y + 4, { width: 75, align: 'right' });
         doc.text(`${currency}${Number(total).toFixed(2)}`, col.total, y + 4, { width: 75, align: 'right' });
         y += rowH;

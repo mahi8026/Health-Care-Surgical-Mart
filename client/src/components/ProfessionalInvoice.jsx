@@ -189,6 +189,11 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                   </td>
                   <td className="px-2 py-2 text-right text-gray-700">
                     {item.quantity || item.qty}
+                    {item.unit && (
+                      <span className="text-[10px] text-gray-500 ml-0.5">
+                        {item.unit}
+                      </span>
+                    )}
                   </td>
                   <td className="px-2 py-2 text-right text-gray-700">
                     {formatCurrency(
