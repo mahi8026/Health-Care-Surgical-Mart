@@ -124,19 +124,19 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
               <div className="flex justify-between mb-1">
                 <span className="text-xs text-gray-500">Invoice No:</span>
                 <span className="font-mono font-bold text-gray-900 text-xs">
-                  {sale?.invoiceNo || sale?.invoiceNumber || "N/A"}
+                  {sale?.invoiceNo || sale?.invoiceNumber || sale?._id?.toString()?.slice(-8) || "N/A"}
                 </span>
               </div>
               <div className="flex justify-between mb-1">
                 <span className="text-xs text-gray-500">Date:</span>
                 <span className="font-medium text-gray-900 text-xs">
-                  {formatDate(sale?.saleDate)}
+                  {formatDate(sale?.saleDate || sale?.createdAt || sale?.date)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-gray-500">Sale Type:</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
-                  Retail
+                  {sale?.salesType || sale?.saleType || sale?.customerType || "Retail"}
                 </span>
               </div>
             </div>
@@ -196,6 +196,28 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* Payment Information Strip */}
+      <section className="mb-3">
+        <div className="bg-gray-100 border border-gray-300 rounded p-2 text-xs">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-700">
+              <strong>Payment Method:</strong> {sale?.paymentMethod || "Cash"}
+            </span>
+            <span className="text-gray-700">
+              <strong>Cash Paid:</strong> ৳{formatCurrency(sale?.cashPaid || 0)}
+            </span>
+            <span className="text-gray-700">
+              <strong>Bank Paid:</strong> ৳{formatCurrency(sale?.bankPaid || 0)}
+            </span>
+            {(sale?.changeAmount > 0 || sale?.returnAmount > 0 || returnAmount > 0) && (
+              <span className="text-gray-700">
+                <strong>Change:</strong> ৳{formatCurrency(sale?.changeAmount || sale?.returnAmount || returnAmount)}
+              </span>
+            )}
+          </div>
         </div>
       </section>
 
@@ -336,17 +358,29 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           </div>
         </div>
       </section>
+
+      {/* Shop Contact Footer */}
+      <footer className="mt-4 pt-3 border-t border-gray-300 text-center">
+        <div className="text-xs text-gray-600">
+          <p className="mb-1">
+            <strong>Contact:</strong> Phone: +880-1234-567890 | Email: info@healthcaresurgicalmart.com
+          </p>
+          <p className="text-[10px] text-gray-500 italic">
+            Thank you for your business! This is a computer generated invoice — no signature required.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 
   return (
     <>
-      {/* Print Styles - Optimized for A4 with Readable Text */}
+      {/* Print Styles - Optimized for A4 with Readable Text and Full Page Usage */}
       <style>{`
         @media print {
           @page {
             size: A4 portrait;
-            margin: 1cm 1.5cm;
+            margin: 1.5cm 1.5cm 1.5cm 1.5cm;
           }
           
           body * { visibility: hidden; }
@@ -362,86 +396,126 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           }
           .print-hide { display: none !important; }
           
-          /* Readable spacing */
-          .invoice-content header { margin-bottom: 0.4cm !important; }
-          .invoice-content section { margin-bottom: 0.5cm !important; }
-          .invoice-content .mb-4 { margin-bottom: 0.4cm !important; }
-          .invoice-content .mb-3 { margin-bottom: 0.3cm !important; }
+          /* Optimized spacing to fill page */
+          .invoice-content header { margin-bottom: 0.5cm !important; }
+          .invoice-content section { margin-bottom: 0.4cm !important; }
+          .invoice-content .mb-4 { margin-bottom: 0.35cm !important; }
+          .invoice-content .mb-3 { margin-bottom: 0.25cm !important; }
           .invoice-content .mb-2 { margin-bottom: 0.2cm !important; }
           .invoice-content .mb-1 { margin-bottom: 0.1cm !important; }
-          .invoice-content .mt-8 { margin-top: 0.6cm !important; }
-          .invoice-content .mt-5 { margin-top: 0.3cm !important; }
+          .invoice-content .mt-8 { margin-top: 0.5cm !important; }
+          .invoice-content .mt-5 { margin-top: 0.15cm !important; }
+          .invoice-content .mt-4 { margin-top: 0.3cm !important; }
           .invoice-content .mt-3 { margin-top: 0.2cm !important; }
-          .invoice-content .mt-2 { margin-top: 0.15cm !important; }
+          .invoice-content .mt-2 { margin-bottom: 0.15cm !important; }
           .invoice-content .mt-1 { margin-top: 0.1cm !important; }
+          .invoice-content .pt-3 { padding-top: 0.25cm !important; }
           
-          /* Readable padding */
-          .invoice-content .p-6 { padding: 0.3cm !important; }
-          .invoice-content .p-4 { padding: 0.25cm !important; }
-          .invoice-content .p-3 { padding: 0.2cm !important; }
+          /* Optimized padding */
+          .invoice-content .p-6 { padding: 0.35cm !important; }
+          .invoice-content .p-4 { padding: 0.3cm !important; }
+          .invoice-content .p-3 { padding: 0.25cm !important; }
+          .invoice-content .p-2 { padding: 0.15cm !important; }
           .invoice-content .py-2 { padding-top: 0.15cm !important; padding-bottom: 0.15cm !important; }
           .invoice-content .py-1 { padding-top: 0.1cm !important; padding-bottom: 0.1cm !important; }
-          .invoice-content .px-4 { padding-left: 0.25cm !important; padding-right: 0.25cm !important; }
-          .invoice-content .px-2 { padding-left: 0.15cm !important; padding-right: 0.15cm !important; }
+          .invoice-content .px-4 { padding-left: 0.3cm !important; padding-right: 0.3cm !important; }
+          .invoice-content .px-2 { padding-left: 0.2cm !important; padding-right: 0.2cm !important; }
           
-          /* Readable gaps */
-          .invoice-content .gap-6 { gap: 0.4cm !important; }
-          .invoice-content .gap-4 { gap: 0.3cm !important; }
+          /* Optimized gaps */
+          .invoice-content .gap-6 { gap: 0.5cm !important; }
+          .invoice-content .gap-4 { gap: 0.35cm !important; }
           .invoice-content .gap-1 { gap: 0.1cm !important; }
           .invoice-content .space-y-2 > * + * { margin-top: 0.15cm !important; }
           .invoice-content .space-y-0\\.5 > * + * { margin-top: 0.08cm !important; }
           
-          /* Readable header */
-          .invoice-content header img { width: 80px !important; height: 60px !important; }
-          .invoice-content header h1 { font-size: 22pt !important; line-height: 1.2 !important; font-weight: bold !important; }
-          .invoice-content header .text-\\[15px\\] { font-size: 9pt !important; line-height: 1.3 !important; }
-          .invoice-content .inline-block { padding: 0.1cm 0.3cm !important; font-size: 8pt !important; }
+          /* Header - Readable sizes */
+          .invoice-content header img { width: 90px !important; height: 65px !important; }
+          .invoice-content header h1 { font-size: 26pt !important; line-height: 1.2 !important; font-weight: bold !important; }
+          .invoice-content header .text-sm { font-size: 9pt !important; line-height: 1.3 !important; }
+          .invoice-content .inline-block { padding: 0.1cm 0.3cm !important; font-size: 10pt !important; }
           
-          /* Readable fonts - Using pt (points) for better print clarity */
-          .invoice-content .text-4xl { font-size: 22pt !important; line-height: 1.2 !important; }
-          .invoice-content .text-sm { font-size: 10pt !important; line-height: 1.3 !important; }
-          .invoice-content .text-xs { font-size: 9pt !important; line-height: 1.3 !important; }
-          .invoice-content .text-\\[10px\\] { font-size: 8pt !important; line-height: 1.3 !important; }
-          .invoice-content .text-base { font-size: 11pt !important; line-height: 1.3 !important; }
+          /* All font sizes - READABLE */
+          .invoice-content .text-4xl { font-size: 26pt !important; line-height: 1.2 !important; }
+          .invoice-content .text-base { font-size: 14pt !important; line-height: 1.3 !important; }
+          .invoice-content .text-sm { font-size: 11pt !important; line-height: 1.3 !important; }
+          .invoice-content .text-xs { font-size: 11pt !important; line-height: 1.3 !important; }
+          .invoice-content .text-\\[10px\\] { font-size: 9pt !important; line-height: 1.3 !important; }
           
-          /* Readable table */
-          .invoice-content table { font-size: 10pt !important; }
+          /* Bill To and Invoice Details sections */
+          .invoice-content .w-1\\/2 h3 { 
+            font-size: 11pt !important; 
+            font-weight: bold !important; 
+            margin-bottom: 0.15cm !important;
+          }
+          .invoice-content .w-1\\/2 label { 
+            font-size: 9pt !important; 
+            font-weight: bold !important;
+          }
+          .invoice-content .w-1\\/2 .font-semibold { font-size: 11pt !important; }
+          .invoice-content .w-1\\/2 .font-bold { font-size: 11pt !important; }
+          .invoice-content .w-1\\/2 .font-medium { font-size: 11pt !important; }
+          .invoice-content .w-1\\/2 .text-gray-700 { font-size: 11pt !important; }
+          .invoice-content .w-1\\/2 .text-gray-900 { font-size: 11pt !important; }
+          .invoice-content .w-1\\/2 .text-xs { font-size: 11pt !important; }
+          
+          /* Table - Readable */
+          .invoice-content table { font-size: 11pt !important; }
           .invoice-content thead th { 
-            padding: 0.2cm 0.15cm !important; 
-            font-size: 10pt !important; 
+            padding: 6px 8px !important; 
+            font-size: 11pt !important; 
             font-weight: bold !important;
           }
           .invoice-content tbody td { 
-            padding: 0.15cm 0.15cm !important; 
-            font-size: 10pt !important; 
+            padding: 5px 8px !important; 
+            font-size: 11pt !important; 
             line-height: 1.3 !important; 
           }
+          .invoice-content tbody td .font-medium { 
+            font-size: 11pt !important; 
+            font-weight: 600 !important;
+          }
+          .invoice-content tbody td .text-\\[10px\\] { 
+            font-size: 9pt !important;
+          }
           
-          /* Bill To and Invoice Details sections */
-          .invoice-content .w-1\\/2 h3 { font-size: 10pt !important; font-weight: bold !important; }
-          .invoice-content .w-1\\/2 label { font-size: 8pt !important; }
-          .invoice-content .w-1\\/2 .font-semibold { font-size: 10pt !important; }
-          .invoice-content .w-1\\/2 .text-gray-700 { font-size: 9pt !important; }
+          /* Payment Information Strip */
+          .invoice-content .bg-gray-100 { 
+            background-color: #f3f4f6 !important;
+            font-size: 10pt !important;
+          }
           
-          /* Totals section - make it more prominent */
+          /* Totals section - Prominent */
           .invoice-content .space-y-2 { font-size: 11pt !important; }
-          .invoice-content .space-y-2 .text-base { font-size: 13pt !important; font-weight: bold !important; }
-          .invoice-content .space-y-2 .text-xs { font-size: 10pt !important; }
+          .invoice-content .space-y-2 .text-base { 
+            font-size: 14pt !important; 
+            font-weight: bold !important; 
+          }
+          .invoice-content .space-y-2 .text-sm { font-size: 12pt !important; font-weight: bold !important; }
+          .invoice-content .space-y-2 .text-xs { font-size: 11pt !important; }
           
           /* Terms section */
-          .invoice-content .bg-blue-50 p { font-size: 8pt !important; }
-          .invoice-content .bg-blue-50 li { font-size: 8pt !important; }
+          .invoice-content .bg-blue-50 p { font-size: 9pt !important; }
+          .invoice-content .bg-blue-50 li { font-size: 9pt !important; }
           
           /* Signature section */
-          .invoice-content .h-10 { height: 30px !important; }
-          .invoice-content .w-40 { width: 120px !important; }
-          .invoice-content .text-center .text-xs { font-size: 10pt !important; }
+          .invoice-content .h-10 { height: 35px !important; }
+          .invoice-content .w-40 { width: 130px !important; }
+          .invoice-content .text-center .text-xs { font-size: 11pt !important; }
+          
+          /* Footer section */
+          .invoice-content footer { 
+            margin-top: 0.3cm !important;
+            padding-top: 0.25cm !important;
+          }
+          .invoice-content footer .text-xs { font-size: 10pt !important; }
+          .invoice-content footer .text-\\[10px\\] { font-size: 9pt !important; }
           
           /* Colors - ensure they print */
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .bg-green-600 { background-color: #16a34a !important; color: white !important; }
           .bg-orange-500 { background-color: #f97316 !important; color: white !important; }
           .bg-gray-50 { background-color: #f9fafb !important; }
+          .bg-gray-100 { background-color: #f3f4f6 !important; }
           .bg-blue-50 { background-color: #eff6ff !important; }
           .bg-green-100 { background-color: #dcfce7 !important; }
           .text-green-600 { color: #16a34a !important; }
@@ -467,10 +541,13 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           /* Border visibility */
           .border { border-width: 1px !important; }
           .border-b { border-bottom-width: 1px !important; }
+          .border-b-2 { border-bottom-width: 2px !important; }
           .border-t { border-top-width: 1px !important; }
           .border-gray-200 { border-color: #e5e7eb !important; }
           .border-gray-300 { border-color: #d1d5db !important; }
+          .border-gray-400 { border-color: #9ca3af !important; }
           .border-red-200 { border-color: #fecaca !important; }
+          .border-blue-100 { border-color: #dbeafe !important; }
         }
       `}</style>
 
