@@ -281,6 +281,99 @@ router.get(
 );
 
 /**
+ * PATCH /api/sales/:id/previous-due
+ * Edit the previousDue amount recorded on a sale and recalculate totalOutstanding
+ */
+router.patch(
+  "/:id/previous-due",
+  requirePermission(PERMISSIONS.MANAGE_SALES),
+  async (req, res) => {
+    try {
+      const { ObjectId } = require("mongodb");
+      const { logger } = require("../config/logging");
+
+      const { previousDue } = req.body;
+
+      if (previousDue === undefined || previousDue === null || previousDue === "") {
+        return res.status(400).json({ success: false, message: "previousDue is required" });
+      }
+
+      const parsedPreviousDue = parseFloat(previousDue);
+      if (isNaN(parsedPreviousDue) || parsedPreviousDue < 0) {
+        return res.status(400).json({ success: false, message: "previousDue must be a non-negative number" });
+      }
+
+      let saleId;
+      try {
+        saleId = new ObjectId(req.params.id);
+      } catch {
+        return res.status(400).json({ success: false, message: "Invalid sale ID" });
+      }
+
+      const sale = await req.shopDb.collection("sales").findOne({ _id: saleId });
+      if (!sale) {
+        return res.status(404).json({ success: false, message: "Sale not found" });
+      }
+
+      const dueAmount = sale.dueAmount || 0;
+      const newTotalOutstanding = parsedPreviousDue + dueAmount;
+
+      await req.shopDb.collection("sales").updateOne(
+        { _id: saleId },
+        {
+          $set: {
+            previousDue: parsedPreviousDue,
+            totalOutstanding: newTotalOutstanding,
+            updatedAt: new Date(),
+            previousDueEditedBy: req.user.name || req.user._id,
+            previousDueEditedAt: new Date(),
+          },
+        }
+      );
+
+      // Audit log
+      try {
+        auditLog.log(
+          req,
+          AUDIT_ACTIONS.SALE_UPDATED || "SALE_UPDATED",
+          "sale",
+          req.params.id,
+          `Previous due updated on sale ${sale.invoiceNo}: ৳${sale.previousDue || 0} → ৳${parsedPreviousDue}`,
+          {
+            before: { previousDue: sale.previousDue || 0, totalOutstanding: sale.totalOutstanding || 0 },
+            after: { previousDue: parsedPreviousDue, totalOutstanding: newTotalOutstanding },
+          }
+        );
+      } catch (_) { /* non-blocking */ }
+
+      logger.info(`Previous due updated for sale ${sale.invoiceNo}`, {
+        saleId: req.params.id,
+        oldPreviousDue: sale.previousDue || 0,
+        newPreviousDue: parsedPreviousDue,
+        newTotalOutstanding,
+        updatedBy: req.user.name,
+      });
+
+      return res.json({
+        success: true,
+        message: "Previous due updated successfully",
+        data: {
+          _id: sale._id,
+          invoiceNo: sale.invoiceNo,
+          previousDue: parsedPreviousDue,
+          dueAmount,
+          totalOutstanding: newTotalOutstanding,
+        },
+      });
+    } catch (error) {
+      const { logger } = require("../config/logging");
+      logger.error("Update previous due error:", { error: error.message, saleId: req.params.id });
+      return res.status(500).json({ success: false, message: "Failed to update previous due" });
+    }
+  }
+);
+
+/**
  * GET /api/sales/:id/download-invoice
  * Generate PDF invoice and stream directly to browser (no storage needed)
  */

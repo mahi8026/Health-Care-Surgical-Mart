@@ -40,6 +40,7 @@ const Sales = () => {
     vatPercent: 0,
     cashPaid: 0,
     bankPaid: 0,
+    previousDue: 0,
   });
 
   // Custom Item State
@@ -258,6 +259,7 @@ const Sales = () => {
         cashPaid: parseFloat(posData.cashPaid) || 0,
         bankPaid: parseFloat(posData.bankPaid) || 0,
         dueAmount: dueAmount,
+        previousDue: parseFloat(posData.previousDue) || 0,
         paymentStatus: dueAmount > 0 ? "Partial" : "Paid",
         notes: posData.reference,
       };
@@ -308,6 +310,7 @@ const Sales = () => {
         clearSale();
         setError("");
         setShowInvoiceModal(true);
+        // Note: previousDue is included in saleForInvoice via response.data.previousDue
 
         // Refresh products to update stock
         fetchProducts();
@@ -344,6 +347,7 @@ const Sales = () => {
       vatPercent: 0,
       cashPaid: 0,
       bankPaid: 0,
+      previousDue: 0,
     });
     setCustomItem({
       name: "",
@@ -598,6 +602,7 @@ const Sales = () => {
                     if (e.target.value === "cash") {
                       setSelectedCustomer(null);
                       handlePosDataChange("customerName", "Cash Customer");
+                      handlePosDataChange("previousDue", 0);
                     } else {
                       const customer = customers.find(
                         (c) => c._id === e.target.value,
@@ -612,6 +617,7 @@ const Sales = () => {
                         "customerAddress",
                         customer?.address || "",
                       );
+                      handlePosDataChange("previousDue", customer?.currentDue || 0);
                     }
                   }}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1123,6 +1129,39 @@ const Sales = () => {
               />
             </div>
 
+            {/* Previous Due (editable) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+                <span>Previous Due</span>
+                {selectedCustomer && (
+                  <span className="text-xs text-blue-500 font-normal">
+                    Auto-filled from customer
+                  </span>
+                )}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={posData.previousDue}
+                onChange={(e) =>
+                  handlePosDataChange("previousDue", parseFloat(e.target.value) || 0)
+                }
+                className="w-full px-3 py-2 border border-orange-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-400 font-medium text-orange-700 bg-orange-50"
+                placeholder="0.00"
+              />
+            </div>
+
+            {/* Total Outstanding preview */}
+            {(parseFloat(posData.previousDue) > 0 || dueAmount > 0) && (
+              <div className="bg-red-50 border border-red-200 rounded p-2 flex justify-between text-sm">
+                <span className="text-red-700 font-medium">Total Outstanding</span>
+                <span className="text-red-800 font-bold">
+                  ৳{((parseFloat(posData.previousDue) || 0) + dueAmount).toFixed(2)}
+                </span>
+              </div>
+            )}
+
             {/* Payment Status Indicator */}
             <div className="bg-gray-50 p-3 rounded border">
               <div className="flex justify-between text-sm mb-1">
@@ -1306,6 +1345,9 @@ const Sales = () => {
               handlePosDataChange("customerName", customer.name);
               handlePosDataChange("customerMobile", customer.phone || "");
               handlePosDataChange("customerAddress", customer.address || "");
+              handlePosDataChange("previousDue", customer.currentDue || 0);
+            } else {
+              handlePosDataChange("previousDue", 0);
             }
             setShowCustomerModal(false);
           }}

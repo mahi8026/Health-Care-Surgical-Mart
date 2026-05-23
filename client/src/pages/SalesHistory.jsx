@@ -11,6 +11,12 @@ const SalesHistory = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
 
+  // Edit Previous Due state
+  const [editDueSale, setEditDueSale] = useState(null);
+  const [editDueValue, setEditDueValue] = useState("");
+  const [editDueLoading, setEditDueLoading] = useState(false);
+  const [editDueError, setEditDueError] = useState("");
+
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
@@ -128,6 +134,47 @@ const SalesHistory = () => {
   const printInvoice = (sale) => {
     setSelectedSale(sale);
     setShowInvoiceModal(true);
+  };
+
+  const openEditDue = (sale) => {
+    setEditDueSale(sale);
+    setEditDueValue((sale.previousDue || 0).toString());
+    setEditDueError("");
+  };
+
+  const closeEditDue = () => {
+    setEditDueSale(null);
+    setEditDueValue("");
+    setEditDueError("");
+  };
+
+  const submitEditDue = async () => {
+    const val = parseFloat(editDueValue);
+    if (isNaN(val) || val < 0) {
+      setEditDueError("Please enter a valid non-negative amount");
+      return;
+    }
+    setEditDueLoading(true);
+    setEditDueError("");
+    try {
+      const response = await api.patch(`/sales/${editDueSale._id}/previous-due`, { previousDue: val });
+      if (response.success) {
+        setSales((prev) =>
+          prev.map((s) =>
+            s._id === editDueSale._id
+              ? { ...s, previousDue: val, totalOutstanding: val + (s.dueAmount || 0) }
+              : s
+          )
+        );
+        closeEditDue();
+      } else {
+        setEditDueError(response.message || "Failed to update");
+      }
+    } catch (err) {
+      setEditDueError(err?.message || "Failed to update previous due");
+    } finally {
+      setEditDueLoading(false);
+    }
   };
 
   const formatCurrency = (amount) => `৳${Number(amount || 0).toFixed(2)}`;
@@ -329,6 +376,13 @@ const SalesHistory = () => {
                               : <i className="fas fa-download"></i>
                             }
                           </button>
+                          <button
+                            onClick={() => openEditDue(sale)}
+                            className="text-orange-500 hover:text-orange-700 transition-colors"
+                            title="Edit Previous Due"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -372,6 +426,102 @@ const SalesHistory = () => {
           onClose={() => { setShowInvoiceModal(false); setSelectedSale(null); }}
           onDownload={downloadInvoice}
         />
+      )}
+
+      {/* Edit Previous Due Modal */}
+      {editDueSale && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-bold text-lg">Edit Previous Due</h3>
+                <p className="text-orange-100 text-xs mt-0.5">Invoice: {editDueSale.invoiceNo}</p>
+              </div>
+              <button
+                onClick={closeEditDue}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <i className="fas fa-times text-lg"></i>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Info cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-gray-500 mb-1">Customer</p>
+                  <p className="text-sm font-semibold text-gray-800 truncate">{editDueSale.customerName || "Cash"}</p>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-orange-600 mb-1">Current Previous Due</p>
+                  <p className="text-sm font-bold text-orange-700">৳{Number(editDueSale.previousDue || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-red-500 mb-1">Sale Due</p>
+                  <p className="text-sm font-bold text-red-700">৳{Number(editDueSale.dueAmount || 0).toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Previous Due Amount (৳)
+                </label>
+                <input
+                  id="edit-previous-due-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editDueValue}
+                  onChange={(e) => { setEditDueValue(e.target.value); setEditDueError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && submitEditDue()}
+                  className="w-full px-4 py-2.5 border-2 border-orange-200 focus:border-orange-400 rounded-lg focus:outline-none text-lg font-semibold text-gray-800"
+                  placeholder="0.00"
+                  autoFocus
+                />
+                {editDueError && (
+                  <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                    <i className="fas fa-exclamation-circle"></i> {editDueError}
+                  </p>
+                )}
+              </div>
+
+              {/* Preview of new outstanding */}
+              {editDueValue !== "" && !isNaN(parseFloat(editDueValue)) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex justify-between items-center">
+                  <span className="text-sm text-blue-700">New Total Outstanding</span>
+                  <span className="font-bold text-blue-800 text-base">
+                    ৳{(parseFloat(editDueValue || 0) + (editDueSale.dueAmount || 0)).toFixed(2)}
+                  </span>
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={closeEditDue}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                  disabled={editDueLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitEditDue}
+                  disabled={editDueLoading}
+                  className="flex-1 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  {editDueLoading ? (
+                    <><i className="fas fa-spinner fa-spin"></i> Saving...</>
+                  ) : (
+                    <><i className="fas fa-save"></i> Save Changes</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
