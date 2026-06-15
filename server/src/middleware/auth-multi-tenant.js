@@ -25,20 +25,27 @@ function getJWTSecret() {
 
 /**
  * Authenticate user and attach to request
+ * Reads JWT from httpOnly cookie (secure) or Authorization header (backward compatibility)
  */
 async function authenticate(req, res, next) {
   try {
-    // Get token from header
-    const authHeader = req.headers.authorization;
+    let token;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // Try to get token from httpOnly cookie first (preferred, more secure)
+    if (req.cookies?.jwt) {
+      token = req.cookies.jwt;
+    } 
+    // Fallback: Authorization header (for backward compatibility with mobile apps, etc.)
+    else if (req.headers.authorization?.startsWith("Bearer ")) {
+      token = req.headers.authorization.substring(7);
+    }
+
+    if (!token) {
       return res.status(401).json({
         success: false,
         message: "No token provided",
       });
     }
-
-    const token = authHeader.substring(7);
 
     // Verify token with nested try-catch for JWT-specific errors
     let decoded;

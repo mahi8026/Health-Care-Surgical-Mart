@@ -380,6 +380,15 @@ router.post("/login", bruteForceProtection, async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
+    // Set JWT as httpOnly cookie (secure, XSS-proof)
+    res.cookie('jwt', token, {
+      httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
+      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      sameSite: 'strict',       // CSRF protection
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/',
+    });
+
     // Audit: successful legacy login
     auditLog.log(req, AUDIT_ACTIONS.LOGIN, "auth", user._id?.toString(),
       `User ${user.email} logged in (password)`, {
@@ -390,11 +399,11 @@ router.post("/login", bruteForceProtection, async (req, res) => {
       }
     );
 
+    // Return user data only (NOT the token - it's in the cookie)
     res.json({
       success: true,
       message: "Login successful",
       data: {
-        token,
         user: {
           _id: user._id,
           name: user.name,
@@ -693,6 +702,15 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
     // Generate token
     const token = generateToken(user);
     
+    // Set JWT as httpOnly cookie (secure, XSS-proof)
+    res.cookie('jwt', token, {
+      httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
+      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      sameSite: 'strict',       // CSRF protection
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/',
+    });
+    
     logger.info('[LOGIN] Firebase login successful', { 
       email: user.email, 
       role: user.role, 
@@ -710,11 +728,11 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
       }
     );
 
+    // Return user data only (NOT the token - it's in the cookie)
     res.json({
       success: true,
       message: "Login successful",
       data: {
-        token,
         user: {
           _id: user._id,
           name: user.name,
@@ -734,6 +752,130 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Login failed",
+    });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Logout user by clearing the JWT cookie
+ */
+router.post("/logout", (req, res) => {
+  try {
+    // Clear the JWT cookie
+    res.clearCookie('jwt', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    logger.info('[LOGOUT] User logged out successfully');
+
+    res.json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    logger.error("Logout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Logout failed",
+    });
+  }
+});
+
+/**
+ * GET /api/auth/me
+ * Get current user from JWT cookie (for page refresh/session restore)
+ */
+router.get("/me", async (req, res) => {
+  try {
+    // Get JWT from cookie
+    const token = req.cookies?.jwt;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    // Verify token
+    const jwt = require('jsonwebtoken');
+    let decoded;
+    
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      // Token invalid or expired
+      res.clearCookie('jwt', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
+      
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
+
+    // Get fresh user data from database
+    let user;
+    const systemDb = getSystemDatabase();
+
+    if (decoded.role === 'SUPER_ADMIN') {
+      user = await systemDb
+        .collection("system_users")
+        .findOne({ _id: require('mongodb').ObjectId(decoded.userId) });
+    } else {
+      if (!decoded.shopId) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid token: missing shopId",
+        });
+      }
+
+      const shopDb = getShopDatabase(decoded.shopId);
+      user = await shopDb
+        .collection("users")
+        .findOne({ _id: require('mongodb').ObjectId(decoded.userId) });
+    }
+
+    if (!user || !user.isActive) {
+      res.clearCookie('jwt', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
+      
+      return res.status(401).json({
+        success: false,
+        message: "User not found or inactive",
+      });
+    }
+
+    // Return user data
+    res.json({
+      success: true,
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          shopId: user.shopId || null,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error("Get current user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get user data",
     });
   }
 });

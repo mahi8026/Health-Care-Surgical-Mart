@@ -18,15 +18,15 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // CRITICAL: Send cookies with requests (for httpOnly JWT)
 });
 
-// Request interceptor to add auth token
+// Request interceptor - NO LONGER NEEDED to add Bearer token
+// The JWT is sent automatically as an httpOnly cookie
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    // No need to manually add Authorization header
+    // The browser automatically sends the httpOnly cookie
     return config;
   },
   (error) => {
@@ -44,8 +44,8 @@ api.interceptors.response.use(
   (error) => {
     // Handle common errors
     if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      localStorage.removeItem("token");
+      // Unauthorized - clear user state and redirect to login
+      // The cookie will be cleared by the backend on logout
       localStorage.removeItem("user");
       window.location.href = "/login";
     }

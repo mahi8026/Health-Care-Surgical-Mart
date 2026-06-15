@@ -19,7 +19,6 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [mongoUser, setMongoUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -42,15 +41,16 @@ export const AuthProvider = ({ children }) => {
           }
           const newIdToken = await firebaseUser.getIdToken(true); // Force refresh
           
-          // Re-authenticate with backend to get new JWT
+          // Re-authenticate with backend to refresh JWT cookie
           const response = await api.post("/auth/firebase-login", {
             firebaseToken: newIdToken,
             email: firebaseUser.email,
           });
 
-          if (response.success && response.data) {
-            localStorage.setItem("token", response.data.token);
-            setToken(response.data.token);
+          if (response.success && response.data?.user) {
+            // Update user state (cookie is automatically updated by backend)
+            setMongoUser(response.data.user);
+            localStorage.setItem("user", JSON.stringify(response.data.user));
             
             if (import.meta.env.DEV) {
               console.log('[AUTH] Token refreshed successfully');
@@ -77,29 +77,31 @@ export const AuthProvider = ({ children }) => {
       setFirebaseUser(currentUser);
 
       if (currentUser) {
-        // Check if we already have a valid session in localStorage (e.g. after a page reload).
-        // If so, restore from it instead of hitting the backend again — the JWT is still valid.
-        const storedToken = localStorage.getItem("token");
+        // Check if we already have a valid session (from httpOnly cookie)
+        // Try to restore user from /api/auth/me endpoint
         const storedUser = localStorage.getItem("user");
 
-        if (storedToken && storedUser) {
+        if (storedUser) {
           try {
             const parsedUser = JSON.parse(storedUser);
-            setToken(storedToken);
-            setMongoUser(parsedUser);
-            setUserContext(parsedUser);
-            setLoading(false);
-            return;
+            
+            // Verify session is still valid by calling /me endpoint
+            const response = await api.get("/auth/me");
+            
+            if (response.success && response.data?.user) {
+              setMongoUser(response.data.user);
+              localStorage.setItem("user", JSON.stringify(response.data.user));
+              setUserContext(response.data.user);
+              setLoading(false);
+              return;
+            }
           } catch {
-            // Stored data is corrupt — clear it and sign out Firebase too
-            localStorage.removeItem("token");
+            // Session expired or invalid - clear stored data
             localStorage.removeItem("user");
           }
         }
 
-        // No stored session but Firebase still has the user (e.g. localStorage was cleared
-        // while Firebase persisted the session). Sign out of Firebase silently so the user
-        // goes through the normal login form — which collects shopId and credentials properly.
+        // No valid session - sign out of Firebase so user goes through login form
         try {
           await signOutUser();
         } catch {
@@ -108,9 +110,7 @@ export const AuthProvider = ({ children }) => {
         setFirebaseUser(null);
       } else {
         // User is signed out
-        localStorage.removeItem("token");
         localStorage.removeItem("user");
-        setToken(null);
         setMongoUser(null);
         
         // Clear user context in Sentry
@@ -143,6 +143,7 @@ export const AuthProvider = ({ children }) => {
       const idToken = await firebaseResult.user.getIdToken();
 
       // Verify with backend and get MongoDB user data
+      // Backend will set httpOnly cookie with JWT
       const body = {
         firebaseToken: idToken,
         email: email,
@@ -154,10 +155,9 @@ export const AuthProvider = ({ children }) => {
 
       const response = await api.post("/auth/firebase-login", body);
 
-      if (response.success && response.data) {
-        localStorage.setItem("token", response.data.token);
+      if (response.success && response.data?.user) {
+        // Store ONLY user data (NOT token - it's in httpOnly cookie)
         localStorage.setItem("user", JSON.stringify(response.data.user));
-        setToken(response.data.token);
         setMongoUser(response.data.user);
         
         // Set user context in Sentry
@@ -194,10 +194,14 @@ export const AuthProvider = ({ children }) => {
         tokenRefreshInterval.current = null;
       }
       
+      // Call backend to clear httpOnly cookie
+      await api.post("/auth/logout");
+      
+      // Sign out from Firebase
       await signOutUser();
-      localStorage.removeItem("token");
+      
+      // Clear local state
       localStorage.removeItem("user");
-      setToken(null);
       setMongoUser(null);
       setFirebaseUser(null);
       
@@ -219,7 +223,6 @@ export const AuthProvider = ({ children }) => {
   const value = {
     firebaseUser,
     user: mongoUser,
-    token,
     login,
     logout,
     loading,

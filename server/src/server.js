@@ -14,6 +14,7 @@ const rateLimit = require("express-rate-limit");
 const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
+const cookieParser = require("cookie-parser");
 
 // Load environment configuration
 require("dotenv").config();
@@ -200,6 +201,9 @@ app.use(
   }),
 );
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Cookie parser middleware (for httpOnly JWT cookies)
+app.use(cookieParser());
 
 // Static file serving with caching (only in production with built client)
 if (process.env.NODE_ENV === "production") {
