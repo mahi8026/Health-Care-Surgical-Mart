@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../config/firebase";
 import { signInWithEmail, signOutUser } from "../services/firebaseAuthService";
 import api from "../config/api";
 import { setUserContext, clearUserContext } from "../config/sentry";
+import { hasPermission as checkPermission } from "../utils/permissions";
 
 const AuthContext = createContext();
 
@@ -21,6 +22,54 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Token refresh interval ref
+  const tokenRefreshInterval = useRef(null);
+
+  // Setup Firebase token refresh (every 50 minutes, before 1-hour expiry)
+  useEffect(() => {
+    if (firebaseUser) {
+      // Clear any existing interval
+      if (tokenRefreshInterval.current) {
+        clearInterval(tokenRefreshInterval.current);
+      }
+
+      // Refresh Firebase token every 50 minutes
+      tokenRefreshInterval.current = setInterval(async () => {
+        try {
+          if (import.meta.env.DEV) {
+            console.log('[AUTH] Refreshing Firebase token...');
+          }
+          const newIdToken = await firebaseUser.getIdToken(true); // Force refresh
+          
+          // Re-authenticate with backend to get new JWT
+          const response = await api.post("/auth/firebase-login", {
+            firebaseToken: newIdToken,
+            email: firebaseUser.email,
+          });
+
+          if (response.success && response.data) {
+            localStorage.setItem("token", response.data.token);
+            setToken(response.data.token);
+            
+            if (import.meta.env.DEV) {
+              console.log('[AUTH] Token refreshed successfully');
+            }
+          }
+        } catch (error) {
+          console.error('[AUTH] Token refresh failed:', error);
+          // If refresh fails, let the user continue until next interval
+          // or until a 401 forces logout
+        }
+      }, 50 * 60 * 1000); // 50 minutes
+    }
+
+    return () => {
+      if (tokenRefreshInterval.current) {
+        clearInterval(tokenRefreshInterval.current);
+      }
+    };
+  }, [firebaseUser]);
 
   // Listen to Firebase auth state changes
   useEffect(() => {
@@ -139,6 +188,12 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      // Clear token refresh interval
+      if (tokenRefreshInterval.current) {
+        clearInterval(tokenRefreshInterval.current);
+        tokenRefreshInterval.current = null;
+      }
+      
       await signOutUser();
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -172,6 +227,8 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!mongoUser && !!firebaseUser,
     isFirebaseAuthenticated: !!firebaseUser,
     isMongoAuthenticated: !!mongoUser,
+    // Permission helper function
+    hasPermission: (permission) => checkPermission(mongoUser, permission),
   };
 
   return (

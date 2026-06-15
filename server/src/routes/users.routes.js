@@ -343,14 +343,33 @@ router.post(
       throw createError.badRequest("Password must be at least 6 characters");
     }
 
-    // Validate role
-    const allowedRoles = ["STAFF"];
+    // ── RBAC: Prevent SHOP_ADMIN from creating SHOP_ADMIN or SUPER_ADMIN ──
     if (req.user.role === "SHOP_ADMIN") {
-      allowedRoles.push("SHOP_ADMIN");
+      if (role === "SHOP_ADMIN" || role === "SUPER_ADMIN") {
+        throw createError.forbidden(
+          "You do not have permission to create users with SHOP_ADMIN or SUPER_ADMIN role. You can only create STAFF users."
+        );
+      }
+      // Force role to STAFF for SHOP_ADMIN creators
+      if (role !== "STAFF") {
+        throw createError.forbidden("You can only create STAFF users");
+      }
     }
 
-    if (!allowedRoles.includes(role)) {
-      throw createError.forbidden("You cannot create users with this role");
+    // Only SUPER_ADMIN can create SHOP_ADMIN
+    if (role === "SHOP_ADMIN" && req.user.role !== "SUPER_ADMIN") {
+      throw createError.forbidden("Only SUPER_ADMIN can create SHOP_ADMIN users");
+    }
+
+    // Only SUPER_ADMIN can create SUPER_ADMIN (though this should never happen in shop context)
+    if (role === "SUPER_ADMIN") {
+      throw createError.forbidden("Cannot create SUPER_ADMIN users through this endpoint");
+    }
+
+    // Validate role is one of the allowed values
+    const validRoles = ["STAFF", "SHOP_ADMIN"];
+    if (!validRoles.includes(role)) {
+      throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
     }
 
     // Check if email already exists in MongoDB
@@ -443,20 +462,35 @@ router.put(
       throw createError.notFound("User not found");
     }
 
-    // Prevent users from editing themselves (except password)
-    if (req.params.id === req.user.id && (role || isActive !== undefined)) {
+    // Prevent users from editing themselves (except password through dedicated endpoint)
+    if (req.params.id === req.user._id?.toString() && (role || isActive !== undefined)) {
       throw createError.forbidden("You cannot change your own role or status");
+    }
+
+    // ── RBAC: Prevent SHOP_ADMIN from assigning SHOP_ADMIN or SUPER_ADMIN role ──
+    if (role && req.user.role === "SHOP_ADMIN") {
+      if (role === "SHOP_ADMIN" || role === "SUPER_ADMIN") {
+        throw createError.forbidden(
+          "You do not have permission to assign SHOP_ADMIN or SUPER_ADMIN role. You can only assign STAFF role."
+        );
+      }
+    }
+
+    // Only SUPER_ADMIN can assign SHOP_ADMIN role
+    if (role === "SHOP_ADMIN" && req.user.role !== "SUPER_ADMIN") {
+      throw createError.forbidden("Only SUPER_ADMIN can assign SHOP_ADMIN role");
+    }
+
+    // Nobody can assign SUPER_ADMIN through this endpoint
+    if (role === "SUPER_ADMIN") {
+      throw createError.forbidden("Cannot assign SUPER_ADMIN role through this endpoint");
     }
 
     // Validate role if provided
     if (role) {
-      const allowedRoles = ["STAFF"];
-      if (req.user.role === "SHOP_ADMIN") {
-        allowedRoles.push("SHOP_ADMIN");
-      }
-
-      if (!allowedRoles.includes(role)) {
-        throw createError.forbidden("You cannot assign this role");
+      const validRoles = ["STAFF", "SHOP_ADMIN"];
+      if (!validRoles.includes(role)) {
+        throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
       }
     }
 
@@ -474,7 +508,7 @@ router.put(
 
     const updateData = {
       updatedAt: new Date(),
-      updatedBy: req.user.id,
+      updatedBy: req.user._id,
     };
 
     if (name) updateData.name = name.trim();

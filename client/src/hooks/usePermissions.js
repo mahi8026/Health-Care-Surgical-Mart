@@ -1,23 +1,23 @@
 /**
  * usePermissions Hook
- * Custom hook for checking user permissions in components
+ * Provides permission checking functions for the authenticated user
  */
 
 import { useAuth } from "../contexts/AuthContext";
 import {
-  hasPermission as checkPermission,
-  hasAnyPermission as checkAnyPermission,
-  hasAllPermissions as checkAllPermissions,
-  hasRole as checkRole,
-  isAdmin as checkIsAdmin,
-  isSuperAdmin as checkIsSuperAdmin,
-  isStaff as checkIsStaff,
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+  hasRole,
   getUserPermissions,
+  isAdmin,
+  isSuperAdmin,
+  isStaff,
 } from "../utils/permissions";
 
 /**
- * Hook to check user permissions
- * @returns {Object} Permission checking functions
+ * Custom hook to access permission checking functions
+ * @returns {Object} Permission checking utilities
  */
 export const usePermissions = () => {
   const { user } = useAuth();
@@ -28,56 +28,55 @@ export const usePermissions = () => {
      * @param {string} permission - Permission to check
      * @returns {boolean}
      */
-    hasPermission: (permission) => checkPermission(user, permission),
+    hasPermission: (permission) => hasPermission(user, permission),
 
     /**
-     * Check if user has any of the specified permissions
+     * Check if user has any of the specified permissions (OR logic)
      * @param {Array<string>} permissions - Array of permissions
      * @returns {boolean}
      */
-    hasAnyPermission: (permissions) => checkAnyPermission(user, permissions),
+    hasAnyPermission: (permissions) => hasAnyPermission(user, permissions),
 
     /**
-     * Check if user has all of the specified permissions
+     * Check if user has all of the specified permissions (AND logic)
      * @param {Array<string>} permissions - Array of permissions
      * @returns {boolean}
      */
-    hasAllPermissions: (permissions) => checkAllPermissions(user, permissions),
+    hasAllPermissions: (permissions) => hasAllPermissions(user, permissions),
 
     /**
-     * Check if user has a specific role
+     * Check if user has a specific role or any of the specified roles
      * @param {string|Array<string>} roles - Role(s) to check
      * @returns {boolean}
      */
-    hasRole: (roles) => checkRole(user, roles),
+    hasRole: (roles) => hasRole(user, roles),
+
+    /**
+     * Get all permissions for the current user
+     * @returns {Array<string>}
+     */
+    getUserPermissions: () => getUserPermissions(user),
 
     /**
      * Check if user is admin (SUPER_ADMIN or SHOP_ADMIN)
      * @returns {boolean}
      */
-    isAdmin: () => checkIsAdmin(user),
+    isAdmin: () => isAdmin(user),
 
     /**
      * Check if user is super admin
      * @returns {boolean}
      */
-    isSuperAdmin: () => checkIsSuperAdmin(user),
+    isSuperAdmin: () => isSuperAdmin(user),
 
     /**
      * Check if user is staff
      * @returns {boolean}
      */
-    isStaff: () => checkIsStaff(user),
+    isStaff: () => isStaff(user),
 
     /**
-     * Get all permissions for current user
-     * @returns {Array<string>}
-     */
-    getPermissions: () => getUserPermissions(user),
-
-    /**
-     * Get current user
-     * @returns {Object|null}
+     * Current user object
      */
     user,
   };

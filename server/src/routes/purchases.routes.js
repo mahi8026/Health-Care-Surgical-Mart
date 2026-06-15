@@ -249,7 +249,7 @@ router.use(checkShopStatus);
  */
 router.get(
   "/",
-  requirePermission(PERMISSIONS.READ_PURCHASES),
+  requirePermission(PERMISSIONS.VIEW_PURCHASES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const {
@@ -349,7 +349,7 @@ router.get(
  */
 router.get(
   "/:id",
-  requirePermission(PERMISSIONS.READ_PURCHASES),
+  requirePermission(PERMISSIONS.VIEW_PURCHASES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
@@ -407,7 +407,7 @@ router.get(
  */
 router.post(
   "/",
-  requirePermission(PERMISSIONS.CREATE_PURCHASES),
+  requirePermission(PERMISSIONS.CREATE_PURCHASE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const {
@@ -522,7 +522,7 @@ router.post(
  */
 router.put(
   "/:id/receive",
-  requirePermission(PERMISSIONS.UPDATE_PURCHASES),
+  requirePermission(PERMISSIONS.EDIT_PURCHASE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { receivedItems, notes } = req.body;
@@ -644,7 +644,7 @@ router.put(
  */
 router.put(
   "/:id/cancel",
-  requirePermission(PERMISSIONS.UPDATE_PURCHASES),
+  requirePermission(PERMISSIONS.EDIT_PURCHASE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { reason } = req.body;

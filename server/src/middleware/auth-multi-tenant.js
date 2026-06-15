@@ -194,6 +194,7 @@ async function authenticate(req, res, next) {
 function generateToken(user) {
   const payload = {
     userId: user._id.toString(),
+    uid: user._id.toString(), // Include uid for consistency
     email: user.email,
     role: user.role,
     shopId: user.shopId || null,

@@ -289,7 +289,7 @@ router.use(checkShopStatus);
  */
 router.get(
   "/shop",
-  requirePermission(PERMISSIONS.VIEW_USERS), // Shop admins can view shop settings
+  requirePermission(PERMISSIONS.VIEW_SETTINGS), // Shop admins can view shop settings
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:shop`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -328,7 +328,7 @@ router.get(
  */
 router.put(
   "/shop",
-  requirePermission(PERMISSIONS.EDIT_USER), // Shop admins can edit shop settings
+  requirePermission(PERMISSIONS.EDIT_SETTINGS), // Shop admins can edit shop settings
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const {
@@ -393,7 +393,7 @@ router.put(
  */
 router.get(
   "/tax",
-  requirePermission(PERMISSIONS.VIEW_USERS),
+  requirePermission(PERMISSIONS.VIEW_SETTINGS),
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:tax`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -426,7 +426,7 @@ router.get(
  */
 router.put(
   "/tax",
-  requirePermission(PERMISSIONS.EDIT_USER),
+  requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { defaultTaxRate, enableTax, taxName, taxNumber, taxInclusive } =
@@ -469,7 +469,7 @@ router.put(
  */
 router.get(
   "/system",
-  requirePermission(PERMISSIONS.VIEW_USERS),
+  requirePermission(PERMISSIONS.VIEW_SETTINGS),
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:system`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -508,7 +508,7 @@ router.get(
  */
 router.put(
   "/system",
-  requirePermission(PERMISSIONS.EDIT_USER),
+  requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const {
@@ -568,7 +568,7 @@ router.put(
  */
 router.get(
   "/receipt",
-  requirePermission(PERMISSIONS.VIEW_USERS),
+  requirePermission(PERMISSIONS.VIEW_SETTINGS),
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:receipt`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -604,7 +604,7 @@ router.get(
  */
 router.put(
   "/receipt",
-  requirePermission(PERMISSIONS.EDIT_USER),
+  requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const {
@@ -658,7 +658,7 @@ router.put(
  */
 router.post(
   "/backup/test",
-  requirePermission(PERMISSIONS.EDIT_USER),
+  requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
@@ -698,7 +698,7 @@ router.post(
  */
 router.get(
   "/backup/history",
-  requirePermission(PERMISSIONS.VIEW_USERS),
+  requirePermission(PERMISSIONS.VIEW_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
@@ -722,7 +722,7 @@ router.get(
  */
 router.get(
   "/system-info",
-  requirePermission(PERMISSIONS.VIEW_USERS),
+  requirePermission(PERMISSIONS.VIEW_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 

@@ -41,6 +41,7 @@ export const PERMISSIONS = {
   EDIT_SALE: "edit_sale",
   DELETE_SALE: "delete_sale",
   VIEW_SALES: "view_sales",
+  MANAGE_SALES: "manage_sales",
 
   // Returns
   CREATE_RETURN: "create_return",
@@ -118,6 +119,7 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.EDIT_SALE,
     PERMISSIONS.DELETE_SALE,
     PERMISSIONS.VIEW_SALES,
+    PERMISSIONS.MANAGE_SALES,
 
     // Full returns management
     PERMISSIONS.CREATE_RETURN,
@@ -176,20 +178,20 @@ const ROLE_PERMISSIONS = {
     // View stock only
     PERMISSIONS.VIEW_STOCK,
 
-    // Create sales (POS)
+    // Create and view sales (POS only - no edit/delete)
     PERMISSIONS.CREATE_SALE,
     PERMISSIONS.VIEW_SALES,
 
-    // View returns
+    // View returns only
     PERMISSIONS.VIEW_RETURNS,
 
-    // View purchases
+    // View purchases only
     PERMISSIONS.VIEW_PURCHASES,
 
-    // View suppliers
+    // View suppliers only
     PERMISSIONS.VIEW_SUPPLIERS,
 
-    // View customers
+    // View customers only
     PERMISSIONS.VIEW_CUSTOMERS,
 
     // Limited reports (no profit)
@@ -199,7 +201,7 @@ const ROLE_PERMISSIONS = {
     // View expense categories only
     PERMISSIONS.VIEW_EXPENSE_CATEGORIES,
 
-    // Limited expense access (view only)
+    // View expenses only
     PERMISSIONS.VIEW_EXPENSES,
 
     // View settings only

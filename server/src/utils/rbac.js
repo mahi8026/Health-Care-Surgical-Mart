@@ -39,6 +39,7 @@ const PERMISSIONS = {
   EDIT_SALE: "edit_sale",
   DELETE_SALE: "delete_sale",
   VIEW_SALES: "view_sales",
+  MANAGE_SALES: "manage_sales", // Admin-level sales management (edit, delete, send invoice)
 
   // Returns
   CREATE_RETURN: "create_return",
@@ -48,17 +49,16 @@ const PERMISSIONS = {
   APPROVE_RETURN: "approve_return",
 
   // Purchases
-  CREATE_PURCHASES: "create_purchase",
-  READ_PURCHASES: "view_purchases",
-  UPDATE_PURCHASES: "edit_purchase",
-  DELETE_PURCHASES: "delete_purchase",
+  CREATE_PURCHASE: "create_purchase",
+  EDIT_PURCHASE: "edit_purchase",
+  DELETE_PURCHASE: "delete_purchase",
   VIEW_PURCHASES: "view_purchases",
 
   // Suppliers
-  CREATE_SUPPLIERS: "create_supplier",
-  READ_SUPPLIERS: "view_suppliers",
-  UPDATE_SUPPLIERS: "edit_supplier",
-  DELETE_SUPPLIERS: "delete_supplier",
+  CREATE_SUPPLIER: "create_supplier",
+  EDIT_SUPPLIER: "edit_supplier",
+  DELETE_SUPPLIER: "delete_supplier",
+  VIEW_SUPPLIERS: "view_suppliers",
 
   // Customers
   CREATE_CUSTOMER: "create_customer",
@@ -141,6 +141,7 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.EDIT_SALE,
     PERMISSIONS.DELETE_SALE,
     PERMISSIONS.VIEW_SALES,
+    PERMISSIONS.MANAGE_SALES,
 
     // Full returns management
     PERMISSIONS.CREATE_RETURN,
@@ -150,16 +151,16 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.APPROVE_RETURN,
 
     // Full purchase management
-    PERMISSIONS.CREATE_PURCHASES,
-    PERMISSIONS.UPDATE_PURCHASES,
-    PERMISSIONS.DELETE_PURCHASES,
-    PERMISSIONS.READ_PURCHASES,
+    PERMISSIONS.CREATE_PURCHASE,
+    PERMISSIONS.EDIT_PURCHASE,
+    PERMISSIONS.DELETE_PURCHASE,
+    PERMISSIONS.VIEW_PURCHASES,
 
     // Full supplier management
-    PERMISSIONS.CREATE_SUPPLIERS,
-    PERMISSIONS.UPDATE_SUPPLIERS,
-    PERMISSIONS.DELETE_SUPPLIERS,
-    PERMISSIONS.READ_SUPPLIERS,
+    PERMISSIONS.CREATE_SUPPLIER,
+    PERMISSIONS.EDIT_SUPPLIER,
+    PERMISSIONS.DELETE_SUPPLIER,
+    PERMISSIONS.VIEW_SUPPLIERS,
 
     // Full customer management
     PERMISSIONS.CREATE_CUSTOMER,
@@ -214,10 +215,10 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.VIEW_RETURNS,
 
     // View purchases
-    PERMISSIONS.READ_PURCHASES,
+    PERMISSIONS.VIEW_PURCHASES,
 
     // View suppliers
-    PERMISSIONS.READ_SUPPLIERS,
+    PERMISSIONS.VIEW_SUPPLIERS,
 
     // View customers
     PERMISSIONS.VIEW_CUSTOMERS,

@@ -518,6 +518,7 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
     const firebaseIdToken = idToken || firebaseToken;
 
     if (!email || !firebaseIdToken) {
+      logger.error('[LOGIN] Missing credentials', { email: !!email, token: !!firebaseIdToken });
       return res.status(400).json({
         success: false,
         message: "Email and Firebase ID token are required",
@@ -535,8 +536,13 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
       let decodedToken;
       try {
         decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
+        logger.info('[LOGIN] Firebase token verified successfully', { uid: decodedToken.uid, email: decodedToken.email });
       } catch (error) {
-        logger.error("Firebase token verification failed:", error);
+        logger.error('[LOGIN] Firebase token verification failed', { 
+          code: error.code, 
+          message: error.message,
+          email: email 
+        });
         return res.status(401).json({
           success: false,
           message: "Invalid Firebase token",
@@ -545,7 +551,7 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
 
       // Verify email matches token
       if (decodedToken.email !== email) {
-        logger.warn(`Email mismatch: token email ${decodedToken.email} !== request email ${email}`);
+        logger.warn(`[LOGIN] Email mismatch: token email ${decodedToken.email} !== request email ${email}`);
         return res.status(401).json({
           success: false,
           message: "Email does not match Firebase token",
@@ -553,7 +559,7 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
       }
     } else {
       // Firebase Admin not configured — skip token verification in development
-      logger.warn("Firebase Admin SDK not configured — skipping token verification (dev mode)", {
+      logger.warn("[LOGIN] Firebase Admin SDK not configured — skipping token verification (dev mode)", {
         file: "auth-multi-tenant.routes.js",
         function: "firebase-login",
         email,
@@ -610,6 +616,7 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
         }
 
         if (!targetShopId) {
+          logger.error('[LOGIN] User not found in any shop', { email });
           return res.status(400).json({
             success: false,
             message:
@@ -647,6 +654,7 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
       if (req.incrementLoginAttempts) {
         req.incrementLoginAttempts();
       }
+      logger.error('[LOGIN] User not found in MongoDB', { email });
       return res.status(401).json({
         success: false,
         message: "User not found in system. Please contact administrator.",
@@ -684,6 +692,13 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
 
     // Generate token
     const token = generateToken(user);
+    
+    logger.info('[LOGIN] Firebase login successful', { 
+      email: user.email, 
+      role: user.role, 
+      shopId: user.shopId || 'N/A (SUPER_ADMIN)',
+      userId: user._id.toString()
+    });
 
     // Audit: successful login
     auditLog.log(req, AUDIT_ACTIONS.LOGIN, "auth", user._id?.toString(),
@@ -711,9 +726,94 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
     });
   } catch (error) {
     logger.error("Firebase login error:", error);
+    logger.error('[LOGIN] Unexpected error during Firebase login', { 
+      error: error.message, 
+      stack: error.stack,
+      email: req.body?.email 
+    });
     res.status(500).json({
       success: false,
       message: "Login failed",
+    });
+  }
+});
+
+/**
+ * GET /api/auth/health
+ * Health check endpoint for auth system diagnostics
+ */
+router.get("/health", async (req, res) => {
+  try {
+    const health = {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      checks: {}
+    };
+
+    // Check Firebase Admin SDK
+    try {
+      const admin = require('../config/firebase-admin');
+      if (admin.apps && admin.apps.length > 0) {
+        health.checks.firebaseAdmin = "ok";
+      } else {
+        health.checks.firebaseAdmin = "error: not initialized";
+        health.status = "unhealthy";
+      }
+    } catch (error) {
+      health.checks.firebaseAdmin = `error: ${error.message}`;
+      health.status = "unhealthy";
+    }
+
+    // Check MongoDB connection
+    try {
+      const { getSystemDatabase } = require('../config/database');
+      const systemDb = getSystemDatabase();
+      await systemDb.admin().ping();
+      health.checks.mongodbConnection = "ok";
+    } catch (error) {
+      health.checks.mongodbConnection = `error: ${error.message}`;
+      health.status = "unhealthy";
+    }
+
+    // Check JWT Secret
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (JWT_SECRET && JWT_SECRET.length >= 32) {
+      health.checks.jwtSecret = "set";
+    } else if (JWT_SECRET) {
+      health.checks.jwtSecret = "error: too short (min 32 chars)";
+      health.status = "unhealthy";
+    } else {
+      health.checks.jwtSecret = "missing";
+      health.status = "unhealthy";
+    }
+
+    // Check CORS origins
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+    health.checks.corsOrigins = allowedOrigins.length > 0 
+      ? allowedOrigins 
+      : ["none configured - using defaults"];
+
+    // Check if production URLs are configured
+    const hasProductionUrls = allowedOrigins.some(origin => 
+      origin.includes('health-care-60ee6') || 
+      origin.includes('medical-pos-backend.onrender.com')
+    );
+    
+    if (!hasProductionUrls && process.env.NODE_ENV === 'production') {
+      health.checks.productionCors = "warning: production URLs not in ALLOWED_ORIGINS";
+    } else {
+      health.checks.productionCors = "ok";
+    }
+
+    const statusCode = health.status === "healthy" ? 200 : 503;
+    res.status(statusCode).json(health);
+
+  } catch (error) {
+    logger.error('Auth health check error:', error);
+    res.status(500).json({
+      status: "unhealthy",
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
