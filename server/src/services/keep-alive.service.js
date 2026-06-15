@@ -1,6 +1,6 @@
 /**
  * Keep-Alive Service
- * Pings the server's own health endpoint every 10 minutes to prevent
+ * Pings the server's own health endpoint every 14 minutes to prevent
  * Render free-tier cold starts (service sleeps after 15 min of inactivity).
  */
 
@@ -27,10 +27,10 @@ function startKeepAlive() {
 
   const healthUrl = `${baseUrl}/health`;
 
-  logger.info(`Keep-alive service started → pinging ${healthUrl} every 10 minutes`);
+  logger.info(`Keep-alive service started → pinging ${healthUrl} every 14 minutes`);
 
-  // Run every 10 minutes: at minutes 0, 10, 20, 30, 40, 50 of every hour
-  keepAliveJob = cron.schedule('*/10 * * * *', async () => {
+  // Run every 14 minutes: at minutes 0, 14, 28, 42, 56 of every hour (Render free tier sleeps after 15 min)
+  keepAliveJob = cron.schedule('*/14 * * * *', async () => {
     try {
       const fetch = (...args) =>
         import('node-fetch').then(({ default: f }) => f(...args));

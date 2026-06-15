@@ -210,24 +210,52 @@ function preventSessionFixation(req, res, next) {
 }
 
 /**
- * Brute force protection with exponential backoff
+ * Brute force protection with exponential backoff and account lockout
  */
 const loginAttempts = new Map();
+const ACCOUNT_LOCKOUT_THRESHOLD = 10; // Lock account after 10 failed attempts
+const ACCOUNT_LOCKOUT_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 function bruteForceProtection(req, res, next) {
   const identifier = req.body.email || req.ip;
   const now = Date.now();
   
   if (!loginAttempts.has(identifier)) {
-    loginAttempts.set(identifier, { count: 0, lastAttempt: now });
+    loginAttempts.set(identifier, { count: 0, lastAttempt: now, lockedUntil: null });
     return next();
   }
 
   const attempts = loginAttempts.get(identifier);
+  
+  // Check if account is locked
+  if (attempts.lockedUntil && now < attempts.lockedUntil) {
+    const remainingTime = Math.ceil((attempts.lockedUntil - now) / 1000 / 60); // minutes
+    
+    securityLogger.warn('Account lockout - login attempt during lockout period', {
+      ip: req.ip,
+      identifier,
+      attempts: attempts.count,
+      remainingTime: `${remainingTime} minutes`
+    });
+
+    return res.status(423).json({ // 423 Locked
+      success: false,
+      message: `Account temporarily locked due to too many failed login attempts. Please try again in ${remainingTime} minutes or contact support.`,
+      retryAfter: Math.ceil((attempts.lockedUntil - now) / 1000),
+      lockedUntil: new Date(attempts.lockedUntil).toISOString()
+    });
+  }
+  
+  // If lockout period expired, reset attempts
+  if (attempts.lockedUntil && now >= attempts.lockedUntil) {
+    loginAttempts.set(identifier, { count: 0, lastAttempt: now, lockedUntil: null });
+    return next();
+  }
+  
   const timeSinceLastAttempt = now - attempts.lastAttempt;
   
-  // Exponential backoff: 2^(attempts-5) seconds after 5 failed attempts
-  if (attempts.count >= 5) {
+  // Exponential backoff: 2^(attempts-5) seconds after 5 failed attempts (before lockout)
+  if (attempts.count >= 5 && attempts.count < ACCOUNT_LOCKOUT_THRESHOLD) {
     const backoffTime = Math.pow(2, attempts.count - 5) * 1000; // milliseconds
     
     if (timeSinceLastAttempt < backoffTime) {
@@ -255,6 +283,20 @@ function bruteForceProtection(req, res, next) {
   // Attach function to increment attempts on auth failure
   req.incrementLoginAttempts = () => {
     attempts.count++;
+    
+    // Lock account after threshold reached
+    if (attempts.count >= ACCOUNT_LOCKOUT_THRESHOLD) {
+      attempts.lockedUntil = now + ACCOUNT_LOCKOUT_DURATION;
+      
+      securityLogger.error('Account locked due to excessive failed login attempts', {
+        ip: req.ip,
+        identifier,
+        attempts: attempts.count,
+        lockoutDuration: `${ACCOUNT_LOCKOUT_DURATION / 1000 / 60} minutes`,
+        lockedUntil: new Date(attempts.lockedUntil).toISOString()
+      });
+    }
+    
     loginAttempts.set(identifier, attempts);
   };
 
@@ -265,7 +307,7 @@ function bruteForceProtection(req, res, next) {
 
   // Clean up old entries (older than 1 hour)
   for (const [key, value] of loginAttempts.entries()) {
-    if (now - value.lastAttempt > 3600000) {
+    if (now - value.lastAttempt > 3600000 && (!value.lockedUntil || now > value.lockedUntil)) {
       loginAttempts.delete(key);
     }
   }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import api from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "./LoadingSpinner";
+import { isSuperAdmin } from "../utils/permissions";
 
 const UserManagement = () => {
   const { user } = useAuth();
@@ -231,7 +232,7 @@ const UserManagement = () => {
             Manage staff accounts and permissions
           </p>
         </div>
-        {user?.role === "SHOP_ADMIN" && (
+        {isSuperAdmin(user) && (
           <button
             onClick={() => {
               resetForm();
@@ -338,46 +339,45 @@ const UserManagement = () => {
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center space-x-2">
-                        {user?.role === "SHOP_ADMIN" &&
-                          userItem._id !== user?.id && (
-                            <>
-                              <button
-                                onClick={() => openEditModal(userItem)}
-                                className="text-blue-600 hover:text-blue-900"
-                                title="Edit User"
-                              >
-                                <i className="fas fa-edit"></i>
-                              </button>
-                              <button
-                                onClick={() =>
-                                  toggleUserStatus(
-                                    userItem._id,
-                                    userItem.isActive,
-                                  )
-                                }
-                                className={`${
-                                  userItem.isActive
-                                    ? "text-orange-600 hover:text-orange-900"
-                                    : "text-green-600 hover:text-green-900"
-                                }`}
-                                title={
-                                  userItem.isActive ? "Deactivate" : "Activate"
-                                }
-                              >
-                                <i
-                                  className={`fas ${userItem.isActive ? "fa-pause" : "fa-play"}`}
-                                ></i>
-                              </button>
-                              <button
-                                onClick={() => deleteUser(userItem._id)}
-                                className="text-red-600 hover:text-red-900"
-                                title="Delete User"
-                              >
-                                <i className="fas fa-trash"></i>
-                              </button>
-                            </>
-                          )}
-                        {user?.role !== "SHOP_ADMIN" && (
+                        {isSuperAdmin(user) && userItem._id !== user?.id && (
+                          <>
+                            <button
+                              onClick={() => openEditModal(userItem)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Edit User"
+                            >
+                              <i className="fas fa-edit"></i>
+                            </button>
+                            <button
+                              onClick={() =>
+                                toggleUserStatus(
+                                  userItem._id,
+                                  userItem.isActive,
+                                )
+                              }
+                              className={`${
+                                userItem.isActive
+                                  ? "text-orange-600 hover:text-orange-900"
+                                  : "text-green-600 hover:text-green-900"
+                              }`}
+                              title={
+                                userItem.isActive ? "Deactivate" : "Activate"
+                              }
+                            >
+                              <i
+                                className={`fas ${userItem.isActive ? "fa-pause" : "fa-play"}`}
+                              ></i>
+                            </button>
+                            <button
+                              onClick={() => deleteUser(userItem._id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete User"
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </>
+                        )}
+                        {!isSuperAdmin(user) && (
                           <span className="text-gray-400 text-sm">
                             No actions
                           </span>

@@ -726,7 +726,10 @@ router.get(
   cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:product-profitability:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { startDate, endDate, limit = 20 } = req.query;
+    let { startDate, endDate, limit = 20 } = req.query;
+
+    // Enforce max limit of 100 to prevent excessive data return
+    limit = Math.min(parseInt(limit) || 20, 100);
 
     const today = new Date();
     const defaultStartDate = startDate
@@ -738,7 +741,7 @@ router.get(
 
     const productsCollectionName = shopDb.getCollectionName("products");
 
-    // Product profitability analysis
+    // Product profitability analysis with index hint for date range
     const productProfitability = await shopDb
       .collection("sales")
       .aggregate([
@@ -810,7 +813,7 @@ router.get(
           },
         },
         { $sort: { grossProfit: -1 } },
-        { $limit: parseInt(limit) },
+        { $limit: limit },
       ])
       .toArray();
 

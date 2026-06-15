@@ -8,6 +8,80 @@ const { getShopDatabase, getSystemDatabase } = require("../config/database");
 const { ObjectId } = require("mongodb");
 const { logger } = require("../config/logging");
 
+// Token blacklist for revoked tokens (in-memory, upgrade to Redis for production clustering)
+// Maps token signature to expiry timestamp
+const tokenBlacklist = new Map();
+
+// Clean up expired tokens from blacklist every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [tokenSig, expiry] of tokenBlacklist.entries()) {
+    if (now > expiry) {
+      tokenBlacklist.delete(tokenSig);
+    }
+  }
+}, 3600000); // 1 hour
+
+/**
+ * Add token to blacklist (revoke it)
+ * @param {string} token - JWT token to revoke
+ */
+function revokeToken(token) {
+  try {
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.exp) {
+      return false;
+    }
+    
+    // Extract token signature (last part of JWT)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return false;
+    }
+    const signature = parts[2];
+    
+    // Store signature with expiry timestamp
+    tokenBlacklist.set(signature, decoded.exp * 1000); // exp is in seconds, convert to ms
+    logger.info('Token revoked', { userId: decoded.userId, exp: new Date(decoded.exp * 1000) });
+    return true;
+  } catch (error) {
+    logger.error('Failed to revoke token:', error);
+    return false;
+  }
+}
+
+/**
+ * Check if token is blacklisted (revoked)
+ * @param {string} token - JWT token to check
+ * @returns {boolean} true if blacklisted
+ */
+function isTokenBlacklisted(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return false;
+    }
+    const signature = parts[2];
+    
+    const expiry = tokenBlacklist.get(signature);
+    if (!expiry) {
+      return false;
+    }
+    
+    // Check if token expiry has passed (can remove from blacklist)
+    const now = Date.now();
+    if (now > expiry) {
+      tokenBlacklist.delete(signature);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error('Failed to check token blacklist:', error);
+    return false;
+  }
+}
+
 // Lazy validation of JWT_SECRET (only when middleware is used)
 function getJWTSecret() {
   const JWT_SECRET = process.env.JWT_SECRET;
@@ -44,6 +118,14 @@ async function authenticate(req, res, next) {
       return res.status(401).json({
         success: false,
         message: "No token provided",
+      });
+    }
+
+    // SECURITY FIX: Check if token is blacklisted (revoked)
+    if (isTokenBlacklisted(token)) {
+      return res.status(401).json({
+        success: false,
+        message: "Token has been revoked. Please login again.",
       });
     }
 
@@ -130,8 +212,8 @@ async function authenticate(req, res, next) {
     };
 
     // For SUPER_ADMIN: resolve shopId from request context (query/body/header).
-    // This ensures a Super Admin sees the correct shop's data when switching shops,
-    // instead of always being locked to the first shop.
+    // SUPER_ADMIN MUST explicitly specify which shop they want to access.
+    // This prevents accidentally accessing the wrong shop's data.
     if (req.user.role === "SUPER_ADMIN" && !req.user.shopId) {
       const requestedShopId =
         req.query.shopId ||
@@ -140,22 +222,66 @@ async function authenticate(req, res, next) {
         null;
 
       if (requestedShopId) {
-        req.user.shopId = requestedShopId;
-      } else {
-        // Fallback: assign first active shop only as a last resort
+        // Validate that the requested shop exists and is accessible
         try {
           const systemDb = getSystemDatabase();
-          const firstShop = await systemDb
-            .collection("shops")
-            .findOne({ status: "Active" }, { sort: { createdAt: 1 } });
-          if (firstShop) {
-            req.user.shopId = firstShop.shopId;
+          const shop = await systemDb.collection("shops").findOne({ 
+            shopId: requestedShopId 
+          });
+
+          if (!shop) {
+            logger.warn("SUPER_ADMIN attempted to access non-existent shop", {
+              userId: req.user._id,
+              email: req.user.email,
+              shopId: requestedShopId,
+              path: req.path,
+            });
+            return res.status(400).json({
+              success: false,
+              message: `Shop '${requestedShopId}' not found`,
+            });
           }
+
+          if (shop.status !== "Active") {
+            logger.warn("SUPER_ADMIN attempted to access inactive shop", {
+              userId: req.user._id,
+              email: req.user.email,
+              shopId: requestedShopId,
+              status: shop.status,
+              path: req.path,
+            });
+            return res.status(403).json({
+              success: false,
+              message: `Shop '${requestedShopId}' is ${shop.status}. Cannot access data.`,
+            });
+          }
+
+          req.user.shopId = requestedShopId;
         } catch (shopErr) {
-          logger.warn("Could not resolve shopId for SUPER_ADMIN", {
+          logger.error("Shop validation error:", {
             error: shopErr.message,
+            stack: shopErr.stack,
+            shopId: requestedShopId,
+            userId: req.user._id,
+          });
+          return res.status(500).json({
+            success: false,
+            message: "Failed to validate shop",
           });
         }
+      } else {
+        // CRITICAL: No fallback - SUPER_ADMIN must specify shopId explicitly
+        // This prevents accidentally accessing the wrong shop's data
+        logger.warn("SUPER_ADMIN attempted to access data without shopId", {
+          userId: req.user._id,
+          email: req.user.email,
+          path: req.path,
+          method: req.method,
+        });
+        return res.status(400).json({
+          success: false,
+          message: "SUPER_ADMIN must specify shopId via query parameter (?shopId=xxx), header (X-Shop-Id), or request body. Use GET /api/admin/shops to list available shops.",
+        });
       }
     }
 
@@ -290,4 +416,6 @@ module.exports = {
   generateToken,
   verifyShopAccess,
   checkShopStatus,
+  revokeToken,
+  isTokenBlacklisted,
 };

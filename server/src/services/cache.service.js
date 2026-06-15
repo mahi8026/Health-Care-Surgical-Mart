@@ -161,9 +161,22 @@ class CacheService {
   async set(key, value, ttlSeconds) {
     if (!this.isAvailable()) return false;
     try {
+      const serialized = JSON.stringify(value);
+      const sizeInBytes = Buffer.byteLength(serialized, 'utf8');
+      const maxSize = 1024 * 1024; // 1MB limit
+
+      if (sizeInBytes > maxSize) {
+        logger.warn("Cache value exceeds 1MB limit, skipping cache", {
+          key,
+          sizeInBytes,
+          sizeMB: (sizeInBytes / (1024 * 1024)).toFixed(2)
+        });
+        return false;
+      }
+
       await this._client.set(
         KEY_PREFIX + key,
-        JSON.stringify(value),
+        serialized,
         "EX",
         ttlSeconds
       );

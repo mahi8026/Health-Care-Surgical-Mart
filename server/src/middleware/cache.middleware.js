@@ -17,7 +17,7 @@ const { cacheService } = require("../services/cache.service");
 /**
  * Create a short deterministic hash of an object (for query params).
  * @param {object} obj
- * @returns {string} 8-char hex hash
+ * @returns {string} 16-char hex hash (increased from 8 to reduce collision risk)
  */
 function queryHash(obj) {
   if (!obj || Object.keys(obj).length === 0) return "default";
@@ -28,7 +28,7 @@ function queryHash(obj) {
     .createHash("md5")
     .update(JSON.stringify(sorted))
     .digest("hex")
-    .slice(0, 8);
+    .slice(0, 16);
 }
 
 /**

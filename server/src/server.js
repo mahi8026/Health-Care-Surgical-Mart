@@ -48,6 +48,19 @@ const {
 // Validate environment variables
 validateEnvironment();
 
+// SECURITY FIX: Validate JWT_SECRET at startup (CRITICAL)
+// This must happen BEFORE any middleware that uses JWT
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  logger.error(
+    "FATAL: JWT_SECRET environment variable is missing or too short. " +
+    "JWT_SECRET must be at least 32 characters. " +
+    "Generate a secure secret using: node -e \"require('crypto').randomBytes(32, (err, buf) => { if (err) throw err; process.stdout.write(buf.toString('hex')); })\""
+  );
+  process.exit(1);
+}
+logger.info("✓ JWT_SECRET validated successfully");
+
 // Additional production validation (warnings only in development)
 if (process.env.NODE_ENV === "production") {
   validateProductionEnvironment();

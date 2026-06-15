@@ -17,8 +17,9 @@ const PERMISSIONS = {
   DELETE_SHOP: "delete_shop",
   VIEW_USAGE_STATS: "view_usage_stats",
 
-  // User Management
+  // User Management (SUPER_ADMIN only)
   CREATE_SHOP_ADMIN: "create_shop_admin",
+  CREATE_USER: "create_user",
   CREATE_STAFF: "create_staff",
   EDIT_USER: "edit_user",
   DELETE_USER: "delete_user",
@@ -120,11 +121,7 @@ const ROLE_PERMISSIONS = {
   ],
 
   [ROLES.SHOP_ADMIN]: [
-    // User management within shop
-    PERMISSIONS.CREATE_STAFF,
-    PERMISSIONS.EDIT_USER,
-    PERMISSIONS.DELETE_USER,
-    PERMISSIONS.VIEW_USERS,
+    // NO user management - SUPER_ADMIN only
 
     // Full product management
     PERMISSIONS.CREATE_PRODUCT,

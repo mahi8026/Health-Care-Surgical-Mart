@@ -223,6 +223,8 @@ const returnIndexes = [
   { key: { returnReason: 1 }, name: "return_reason_index" },
   { key: { "customer.phone": 1 }, name: "customer_phone_index" },
   { key: { createdAt: -1 }, name: "created_desc" },
+  // PERF-008: Return analysis optimization
+  { key: { returnDate: 1, status: 1 }, name: "return_date_status_compound" },
 ];
 
 // Stock Movement Schema (for tracking return-related stock changes)

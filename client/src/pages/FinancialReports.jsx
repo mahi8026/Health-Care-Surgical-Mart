@@ -48,8 +48,8 @@ const FinancialReports = () => {
     endDate: new Date().toISOString().split("T")[0],
   });
 
-  // Fetch all financial data
-  const fetchFinancialData = async () => {
+  // Fetch financial data for active tab only (PERF-002: lazy load tabs)
+  const fetchFinancialData = async (tabToFetch = null) => {
     try {
       setLoading(true);
       setError("");
@@ -60,20 +60,25 @@ const FinancialReports = () => {
         endDate: dateRange.endDate,
       });
 
-      // Use real MongoDB endpoints with date range
-      const [plData, dsData, ppData, raData, cfData] = await Promise.all([
-        api.get(`/financial-reports/profit-loss?${params}`),
-        api.get(`/financial-reports/daily-summary?${params}`),
-        api.get(`/financial-reports/product-profitability?${params}`),
-        api.get(`/financial-reports/return-analysis?${params}`),
-        api.get(`/financial-reports/cash-flow?${params}`),
-      ]);
+      // Fetch only the active tab's data, or specific tab if provided
+      const targetTab = tabToFetch || activeTab;
 
-      if (plData?.success) setProfitLossData(plData.data);
-      if (dsData?.success) setDailySummary(dsData.data);
-      if (ppData?.success) setProductProfitability(ppData.data);
-      if (raData?.success) setReturnAnalysis(raData.data);
-      if (cfData?.success) setCashFlow(cfData.data);
+      if (targetTab === "profit-loss" && !profitLossData) {
+        const plData = await api.get(`/financial-reports/profit-loss?${params}`);
+        if (plData?.success) setProfitLossData(plData.data);
+      } else if (targetTab === "daily-summary" && !dailySummary) {
+        const dsData = await api.get(`/financial-reports/daily-summary?${params}`);
+        if (dsData?.success) setDailySummary(dsData.data);
+      } else if (targetTab === "product-analysis" && !productProfitability) {
+        const ppData = await api.get(`/financial-reports/product-profitability?${params}&limit=50`);
+        if (ppData?.success) setProductProfitability(ppData.data);
+      } else if (targetTab === "return-analysis" && !returnAnalysis) {
+        const raData = await api.get(`/financial-reports/return-analysis?${params}`);
+        if (raData?.success) setReturnAnalysis(raData.data);
+      } else if (targetTab === "cash-flow" && !cashFlow) {
+        const cfData = await api.get(`/financial-reports/cash-flow?${params}`);
+        if (cfData?.success) setCashFlow(cfData.data);
+      }
     } catch (error) {
       console.error("Financial data fetch error:", error);
 
@@ -91,14 +96,20 @@ const FinancialReports = () => {
     }
   };
 
-  // Initial data load
+  // Initial data load - fetch only active tab
   useEffect(() => {
     fetchFinancialData();
-  }, []);
+  }, [activeTab]);
 
-  // Refetch when date range changes
+  // Refetch when date range changes (clear data to force refetch)
   useEffect(() => {
     const delayedFetch = setTimeout(() => {
+      // Clear existing data to force refetch
+      setProfitLossData(null);
+      setDailySummary(null);
+      setProductProfitability(null);
+      setReturnAnalysis(null);
+      setCashFlow(null);
       fetchFinancialData();
     }, 500);
 
@@ -335,8 +346,8 @@ const FinancialReports = () => {
   );
 };
 
-// Profit & Loss Tab Component
-const ProfitLossTab = ({ data, formatCurrency, formatPercentage }) => {
+// Profit & Loss Tab Component (wrapped with React.memo for performance - PERF-004)
+const ProfitLossTab = React.memo(({ data, formatCurrency, formatPercentage }) => {
   return (
     <div className="space-y-6">
       {/* P&L Statement */}
@@ -518,10 +529,10 @@ const ProfitLossTab = ({ data, formatCurrency, formatPercentage }) => {
       </div>
     </div>
   );
-};
+});
 
-// Daily Summary Tab Component
-const DailySummaryTab = ({ data, formatCurrency }) => {
+// Daily Summary Tab Component (wrapped with React.memo for performance - PERF-004)
+const DailySummaryTab = React.memo(({ data, formatCurrency }) => {
   const hourlyChartData = {
     labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
     datasets: [
@@ -680,10 +691,10 @@ const DailySummaryTab = ({ data, formatCurrency }) => {
       </div>
     </div>
   );
-};
+});
 
-// Product Analysis Tab Component
-const ProductAnalysisTab = ({ data, formatCurrency, formatPercentage }) => {
+// Product Analysis Tab Component (wrapped with React.memo for performance - PERF-004)
+const ProductAnalysisTab = React.memo(({ data, formatCurrency, formatPercentage }) => {
   return (
     <div className="space-y-6">
       {/* Category Profitability */}
@@ -799,10 +810,10 @@ const ProductAnalysisTab = ({ data, formatCurrency, formatPercentage }) => {
       </div>
     </div>
   );
-};
+});
 
-// Return Analysis Tab Component
-const ReturnAnalysisTab = ({ data, formatCurrency, formatPercentage }) => {
+// Return Analysis Tab Component (wrapped with React.memo for performance - PERF-004)
+const ReturnAnalysisTab = React.memo(({ data, formatCurrency, formatPercentage }) => {
   const returnReasonChart = {
     labels: data.byReason.map((item) => item._id),
     datasets: [
@@ -963,10 +974,10 @@ const ReturnAnalysisTab = ({ data, formatCurrency, formatPercentage }) => {
       </div>
     </div>
   );
-};
+});
 
-// Cash Flow Tab Component
-const CashFlowTab = ({ data, formatCurrency }) => {
+// Cash Flow Tab Component (wrapped with React.memo for performance - PERF-004)
+const CashFlowTab = React.memo(({ data, formatCurrency }) => {
   const dailyCashFlowChart = {
     labels: data.dailyCashFlow.map((day) =>
       new Date(day.date).toLocaleDateString(),
@@ -1111,6 +1122,6 @@ const CashFlowTab = ({ data, formatCurrency }) => {
       )}
     </div>
   );
-};
+});
 
 export default FinancialReports;

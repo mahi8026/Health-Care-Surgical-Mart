@@ -162,6 +162,8 @@ const saleIndexes = [
   { key: { customerId: 1, saleDate: -1 }, name: "customer_date_compound" },
   { key: { paymentStatus: 1, saleDate: -1 }, name: "payment_date_compound" },
   { key: { customerType: 1, saleDate: -1 }, name: "type_date_compound" },
+  // PERF-008: Financial report optimization
+  { key: { saleDate: 1, paymentStatus: 1 }, name: "sale_date_payment_compound" },
 ];
 
 module.exports = { saleSchema, saleIndexes };

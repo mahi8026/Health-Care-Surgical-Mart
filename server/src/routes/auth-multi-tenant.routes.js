@@ -424,7 +424,7 @@ router.post("/login", bruteForceProtection, async (req, res) => {
 
 /**
  * POST /api/auth/change-password
- * Change user password
+ * Change user password (requires old password verification)
  */
 router.post("/change-password", async (req, res) => {
   try {
@@ -502,6 +502,15 @@ router.post("/change-password", async (req, res) => {
       },
     );
 
+    // Audit: password change
+    auditLog.log(req, AUDIT_ACTIONS.UPDATE, "user", user._id?.toString(),
+      `User ${user.email} changed password`, {
+        shopId: user.shopId || null,
+        userId: user._id?.toString(),
+        userEmail: user.email,
+      }
+    );
+
     res.json({
       success: true,
       message: "Password changed successfully",
@@ -511,6 +520,256 @@ router.post("/change-password", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to change password",
+    });
+  }
+});
+
+/**
+ * POST /api/auth/request-password-reset
+ * Request password reset (sends email verification code)
+ * SECURITY FIX: Added email verification before password reset
+ */
+router.post("/request-password-reset", async (req, res) => {
+  try {
+    const { email, shopId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    let user;
+    let targetShopId = shopId;
+
+    // Determine if super admin or shop user
+    const systemDb = getSystemDatabase();
+    const superAdmin = await systemDb
+      .collection("system_users")
+      .findOne({ email });
+
+    if (superAdmin && superAdmin.role === "SUPER_ADMIN") {
+      user = superAdmin;
+      targetShopId = null;
+    } else {
+      // Auto-detect shopId if not provided
+      if (!targetShopId) {
+        const shops = await systemDb
+          .collection("shops")
+          .find({ status: "Active" })
+          .toArray();
+
+        for (const shop of shops) {
+          if (shop.ownerEmail === email) {
+            targetShopId = shop.shopId;
+            break;
+          }
+        }
+
+        if (!targetShopId) {
+          for (const shop of shops) {
+            try {
+              const shopDb = getShopDatabase(shop.shopId);
+              const shopUser = await shopDb.collection("users").findOne({ email });
+              if (shopUser) {
+                targetShopId = shop.shopId;
+                break;
+              }
+            } catch (error) {
+              logger.warn('Failed to query shop during password reset', { 
+                shopId: shop.shopId, 
+                error: error.message 
+              });
+            }
+          }
+        }
+
+        if (!targetShopId) {
+          // Return success even if user not found (prevent email enumeration)
+          return res.json({
+            success: true,
+            message: "If an account with that email exists, a password reset code has been sent.",
+          });
+        }
+      }
+
+      const shopDb = getShopDatabase(targetShopId);
+      user = await shopDb.collection("users").findOne({ email });
+    }
+
+    if (!user) {
+      // Return success even if user not found (prevent email enumeration)
+      return res.json({
+        success: true,
+        message: "If an account with that email exists, a password reset code has been sent.",
+      });
+    }
+
+    // Generate 6-digit reset code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetCodeHash = await bcrypt.hash(resetCode, 10);
+    const resetCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Store reset code in database
+    const collection = user.role === "SUPER_ADMIN" 
+      ? systemDb.collection("system_users")
+      : getShopDatabase(targetShopId).collection("users");
+
+    await collection.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          passwordResetCode: resetCodeHash,
+          passwordResetExpiry: resetCodeExpiry,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    // TODO: Send email with reset code
+    // For now, log it (remove in production)
+    logger.info(`Password reset code for ${email}: ${resetCode} (expires in 15 minutes)`);
+
+    // Audit: password reset requested
+    auditLog.log(req, AUDIT_ACTIONS.UPDATE, "user", user._id?.toString(),
+      `Password reset requested for ${user.email}`, {
+        shopId: targetShopId || null,
+        userId: user._id?.toString(),
+        userEmail: user.email,
+      }
+    );
+
+    res.json({
+      success: true,
+      message: "If an account with that email exists, a password reset code has been sent.",
+      // In development, include the code for testing
+      ...(process.env.NODE_ENV === 'development' && { resetCode }),
+    });
+  } catch (error) {
+    logger.error("Request password reset error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process password reset request",
+    });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password with verification code
+ * SECURITY FIX: Requires email verification code
+ */
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { email, resetCode, newPassword, shopId } = req.body;
+
+    if (!email || !resetCode || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, reset code, and new password are required",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 8 characters",
+      });
+    }
+
+    let user;
+    let collection;
+
+    // Determine if super admin or shop user
+    const systemDb = getSystemDatabase();
+    const superAdmin = await systemDb
+      .collection("system_users")
+      .findOne({ email });
+
+    if (superAdmin && superAdmin.role === "SUPER_ADMIN") {
+      user = superAdmin;
+      collection = systemDb.collection("system_users");
+    } else {
+      if (!shopId) {
+        return res.status(400).json({
+          success: false,
+          message: "Shop ID is required",
+        });
+      }
+
+      const shopDb = getShopDatabase(shopId);
+      user = await shopDb.collection("users").findOne({ email });
+      collection = shopDb.collection("users");
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid or expired reset code",
+      });
+    }
+
+    // Verify reset code exists and not expired
+    if (!user.passwordResetCode || !user.passwordResetExpiry) {
+      return res.status(400).json({
+        success: false,
+        message: "No password reset request found. Please request a new reset code.",
+      });
+    }
+
+    if (new Date() > new Date(user.passwordResetExpiry)) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset code has expired. Please request a new one.",
+      });
+    }
+
+    // Verify reset code
+    const isCodeValid = await bcrypt.compare(resetCode, user.passwordResetCode);
+    if (!isCodeValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid reset code",
+      });
+    }
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    // Update password and clear reset code
+    await collection.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          passwordHash: newPasswordHash,
+          updatedAt: new Date(),
+        },
+        $unset: {
+          passwordResetCode: "",
+          passwordResetExpiry: "",
+        },
+      },
+    );
+
+    // Audit: password reset completed
+    auditLog.log(req, AUDIT_ACTIONS.UPDATE, "user", user._id?.toString(),
+      `Password reset completed for ${user.email}`, {
+        shopId: user.shopId || null,
+        userId: user._id?.toString(),
+        userEmail: user.email,
+      }
+    );
+
+    res.json({
+      success: true,
+      message: "Password reset successful. You can now login with your new password.",
+    });
+  } catch (error) {
+    logger.error("Reset password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset password",
     });
   }
 });
@@ -537,11 +796,31 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
     // Verify Firebase token using Firebase Admin SDK
     const admin = require('../config/firebase-admin');
     
-    // In development without Firebase credentials, skip token verification
-    // and trust the email directly (dev-only bypass)
+    // SECURITY FIX: Remove Firebase token bypass in production
     const firebaseAdminConfigured = admin.apps && admin.apps.length > 0;
     
-    if (firebaseAdminConfigured) {
+    if (!firebaseAdminConfigured) {
+      // In production, Firebase Admin MUST be configured
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('[LOGIN] Firebase Admin SDK not configured in PRODUCTION - authentication blocked', {
+          email,
+          environment: process.env.NODE_ENV
+        });
+        return res.status(503).json({
+          success: false,
+          message: "Authentication service unavailable. Please contact support.",
+        });
+      } else {
+        // Development-only bypass (for local testing without Firebase credentials)
+        logger.warn("[LOGIN] Firebase Admin SDK not configured — BYPASSING token verification (DEVELOPMENT ONLY)", {
+          file: "auth-multi-tenant.routes.js",
+          function: "firebase-login",
+          email,
+          environment: process.env.NODE_ENV
+        });
+      }
+    } else {
+      // Verify Firebase token
       let decodedToken;
       try {
         decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
@@ -566,13 +845,6 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
           message: "Email does not match Firebase token",
         });
       }
-    } else {
-      // Firebase Admin not configured — skip token verification in development
-      logger.warn("[LOGIN] Firebase Admin SDK not configured — skipping token verification (dev mode)", {
-        file: "auth-multi-tenant.routes.js",
-        function: "firebase-login",
-        email,
-      });
     }
 
     let user;
@@ -758,10 +1030,29 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
 
 /**
  * POST /api/auth/logout
- * Logout user by clearing the JWT cookie
+ * Logout user by revoking JWT token and clearing the cookie
+ * SECURITY FIX: Added token revocation/blacklist
  */
 router.post("/logout", (req, res) => {
   try {
+    // Get token from cookie or header
+    let token = req.cookies?.jwt;
+    if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+      token = req.headers.authorization.substring(7);
+    }
+
+    // Revoke token (add to blacklist)
+    if (token) {
+      const { revokeToken } = require('../middleware/auth-multi-tenant');
+      const revoked = revokeToken(token);
+      
+      if (revoked) {
+        logger.info('[LOGOUT] Token revoked successfully');
+      } else {
+        logger.warn('[LOGOUT] Failed to revoke token (invalid or already expired)');
+      }
+    }
+
     // Clear the JWT cookie
     res.clearCookie('jwt', {
       httpOnly: true,

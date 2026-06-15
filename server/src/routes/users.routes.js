@@ -325,12 +325,17 @@ router.get(
 
 /**
  * POST /api/users
- * Create new user
+ * Create new user (SUPER_ADMIN only)
  */
 router.post(
   "/",
-  requirePermission(PERMISSIONS.CREATE_STAFF),
+  requirePermission(PERMISSIONS.CREATE_USER),
   asyncHandler(async (req, res) => {
+    // ── CRITICAL: Only SUPER_ADMIN can create users ──
+    if (req.user.role !== "SUPER_ADMIN") {
+      throw createError.forbidden("Only SUPER_ADMIN can create users");
+    }
+
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, email, password, role = "STAFF", isActive = true } = req.body;
 
@@ -341,24 +346,6 @@ router.post(
 
     if (password.length < 6) {
       throw createError.badRequest("Password must be at least 6 characters");
-    }
-
-    // ── RBAC: Prevent SHOP_ADMIN from creating SHOP_ADMIN or SUPER_ADMIN ──
-    if (req.user.role === "SHOP_ADMIN") {
-      if (role === "SHOP_ADMIN" || role === "SUPER_ADMIN") {
-        throw createError.forbidden(
-          "You do not have permission to create users with SHOP_ADMIN or SUPER_ADMIN role. You can only create STAFF users."
-        );
-      }
-      // Force role to STAFF for SHOP_ADMIN creators
-      if (role !== "STAFF") {
-        throw createError.forbidden("You can only create STAFF users");
-      }
-    }
-
-    // Only SUPER_ADMIN can create SHOP_ADMIN
-    if (role === "SHOP_ADMIN" && req.user.role !== "SUPER_ADMIN") {
-      throw createError.forbidden("Only SUPER_ADMIN can create SHOP_ADMIN users");
     }
 
     // Only SUPER_ADMIN can create SUPER_ADMIN (though this should never happen in shop context)
@@ -444,12 +431,17 @@ router.post(
 
 /**
  * PUT /api/users/:id
- * Update user
+ * Update user (SUPER_ADMIN only)
  */
 router.put(
   "/:id",
   requirePermission(PERMISSIONS.EDIT_USER),
   asyncHandler(async (req, res) => {
+    // ── CRITICAL: Only SUPER_ADMIN can edit users ──
+    if (req.user.role !== "SUPER_ADMIN") {
+      throw createError.forbidden("Only SUPER_ADMIN can edit users");
+    }
+
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, email, password, role, isActive } = req.body;
 
@@ -465,20 +457,6 @@ router.put(
     // Prevent users from editing themselves (except password through dedicated endpoint)
     if (req.params.id === req.user._id?.toString() && (role || isActive !== undefined)) {
       throw createError.forbidden("You cannot change your own role or status");
-    }
-
-    // ── RBAC: Prevent SHOP_ADMIN from assigning SHOP_ADMIN or SUPER_ADMIN role ──
-    if (role && req.user.role === "SHOP_ADMIN") {
-      if (role === "SHOP_ADMIN" || role === "SUPER_ADMIN") {
-        throw createError.forbidden(
-          "You do not have permission to assign SHOP_ADMIN or SUPER_ADMIN role. You can only assign STAFF role."
-        );
-      }
-    }
-
-    // Only SUPER_ADMIN can assign SHOP_ADMIN role
-    if (role === "SHOP_ADMIN" && req.user.role !== "SUPER_ADMIN") {
-      throw createError.forbidden("Only SUPER_ADMIN can assign SHOP_ADMIN role");
     }
 
     // Nobody can assign SUPER_ADMIN through this endpoint
@@ -551,12 +529,17 @@ router.put(
 
 /**
  * DELETE /api/users/:id
- * Delete user
+ * Delete user (SUPER_ADMIN only)
  */
 router.delete(
   "/:id",
   requirePermission(PERMISSIONS.DELETE_USER),
   asyncHandler(async (req, res) => {
+    // ── CRITICAL: Only SUPER_ADMIN can delete users ──
+    if (req.user.role !== "SUPER_ADMIN") {
+      throw createError.forbidden("Only SUPER_ADMIN can delete users");
+    }
+
     const shopDb = getShopDatabase(req.user.shopId);
 
     if (req.params.id === req.user.id) {

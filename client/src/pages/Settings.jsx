@@ -3,6 +3,7 @@ import api from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import UserManagement from "../components/UserManagement";
+import { hasPermission, PERMISSIONS } from "../utils/permissions";
 
 const Settings = () => {
   const { user } = useAuth();
@@ -233,26 +234,29 @@ const Settings = () => {
                 id: "users",
                 name: "User Management",
                 icon: "fas fa-users",
+                requirePermission: PERMISSIONS.VIEW_USERS, // SUPER_ADMIN only
               },
               {
                 id: "backup",
                 name: "Backup & Security",
                 icon: "fas fa-shield-alt",
               },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                  activeTab === tab.id
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                <i className={tab.icon}></i>
-                {tab.name}
-              </button>
-            ))}
+            ]
+              .filter((tab) => !tab.requirePermission || hasPermission(user, tab.requirePermission))
+              .map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    activeTab === tab.id
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  <i className={tab.icon}></i>
+                  {tab.name}
+                </button>
+              ))}
           </nav>
         </div>
 
@@ -293,7 +297,9 @@ const Settings = () => {
             />
           )}
 
-          {activeTab === "users" && <UserManagement />}
+          {activeTab === "users" && hasPermission(user, PERMISSIONS.VIEW_USERS) && (
+            <UserManagement />
+          )}
 
           {activeTab === "backup" && (
             <BackupSettingsTab

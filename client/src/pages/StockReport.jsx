@@ -424,13 +424,16 @@ const StockReport = () => {
     category: "",
     status: "all",
     supplier: "",
-    expiryFrom: "",
-    expiryTo: "",
+    // PERF-009: Default to last 90 days to limit query scope
+    expiryFrom: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    expiryTo: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
   });
 
   // Pagination
   const [page, setPage] = useState(1);
+  // PERF-005: Enforce max limit of 100 to prevent excessive data return
   const [limit, setLimit] = useState(25);
+  const maxLimit = 100; // Hard limit
   const [pagination, setPagination] = useState(null);
 
   // Dropdowns data
@@ -466,8 +469,11 @@ const StockReport = () => {
     setLoading(true);
     setError("");
     try {
+      // PERF-005: Enforce max limit to prevent excessive data queries
+      const effectiveLimit = Math.min(limit, maxLimit);
+      
       // Build query params
-      let url = `/stock?page=${page}&limit=${limit}`;
+      let url = `/stock?page=${page}&limit=${effectiveLimit}`;
       if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
       if (filters.category) url += `&category=${encodeURIComponent(filters.category)}`;
       if (filters.supplier) url += `&supplier=${encodeURIComponent(filters.supplier)}`;
