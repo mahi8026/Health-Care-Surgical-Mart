@@ -99,13 +99,12 @@ const SalesHistory = () => {
   const downloadInvoice = async (saleId) => {
     try {
       setDownloadingInvoice(saleId);
-      // Stream PDF directly from server — no storage dependency
-      const token = localStorage.getItem("token");
+      // Stream PDF directly from server — uses httpOnly cookie for auth
       const apiUrl = import.meta.env.VITE_API_URL || "/api";
       const url = `${apiUrl}/sales/${saleId}/download-invoice`;
 
       const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",  // Send httpOnly cookie automatically
       });
 
       if (!response.ok) {

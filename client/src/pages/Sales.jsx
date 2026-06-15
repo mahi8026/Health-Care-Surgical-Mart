@@ -1381,12 +1381,11 @@ const Sales = () => {
           onClose={() => setShowInvoiceModal(false)}
           onDownload={async (saleId, invoiceNo) => {
             try {
-              // Stream PDF directly from backend — no Cloudinary dependency
-              const token = localStorage.getItem("token");
+              // Stream PDF directly from backend — uses httpOnly cookie for auth
               const apiUrl = import.meta.env.VITE_API_URL || "/api";
               const response = await fetch(
                 `${apiUrl}/sales/${saleId}/download-invoice`,
-                { headers: { Authorization: `Bearer ${token}` } }
+                { credentials: "include" }  // Send httpOnly cookie automatically
               );
               if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
