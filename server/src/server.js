@@ -147,12 +147,13 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
+    // Parse allowed origins and trim whitespace
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS?.split(",") || [
       "http://localhost:3000",
       "http://localhost:3001",
       "http://localhost:5000",
       "http://localhost:5173", // Vite default port
-    ];
+    ]).map(origin => origin.trim());
 
     // In development, allow all localhost origins and null origin (file://)
     if (process.env.NODE_ENV === "development") {
@@ -166,7 +167,10 @@ const corsOptions = {
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      logger.warn(`CORS blocked origin: ${origin}`);
+      logger.warn(`CORS blocked origin: ${origin}`, { 
+        requestedOrigin: origin,
+        allowedOrigins: allowedOrigins 
+      });
       callback(new Error("Not allowed by CORS"));
     }
   },

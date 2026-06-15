@@ -384,7 +384,7 @@ router.post("/login", bruteForceProtection, async (req, res) => {
     res.cookie('jwt', token, {
       httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
       secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: 'strict',       // CSRF protection
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site (different domains)
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: '/',
     });
@@ -706,7 +706,7 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
     res.cookie('jwt', token, {
       httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
       secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: 'strict',       // CSRF protection
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site (different domains)
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: '/',
     });
@@ -766,7 +766,7 @@ router.post("/logout", (req, res) => {
     res.clearCookie('jwt', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: '/',
     });
 
@@ -812,7 +812,7 @@ router.get("/me", async (req, res) => {
       res.clearCookie('jwt', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         path: '/',
       });
       
@@ -848,7 +848,7 @@ router.get("/me", async (req, res) => {
       res.clearCookie('jwt', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         path: '/',
       });
       
