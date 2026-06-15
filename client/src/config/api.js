@@ -21,12 +21,12 @@ const api = axios.create({
   withCredentials: true, // CRITICAL: Send cookies with requests (for httpOnly JWT)
 });
 
-// Request interceptor - NO LONGER NEEDED to add Bearer token
-// The JWT is sent automatically as an httpOnly cookie
+// Request interceptor - The JWT is sent automatically as an httpOnly cookie
 api.interceptors.request.use(
   (config) => {
-    // No need to manually add Authorization header
-    // The browser automatically sends the httpOnly cookie
+    // No need to add shopId for SUPER_ADMIN anymore
+    // SUPER_ADMIN can access ALL shops (aggregated data)
+    // Individual shop access is handled via explicit ?shopId query param when needed
     return config;
   },
   (error) => {

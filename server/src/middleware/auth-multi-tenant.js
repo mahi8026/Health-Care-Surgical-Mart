@@ -211,10 +211,9 @@ async function authenticate(req, res, next) {
       permissions: user.permissions || [],
     };
 
-    // For SUPER_ADMIN: resolve shopId from request context (query/body/header).
-    // SUPER_ADMIN MUST explicitly specify which shop they want to access.
-    // This prevents accidentally accessing the wrong shop's data.
-    if (req.user.role === "SUPER_ADMIN" && !req.user.shopId) {
+    // For SUPER_ADMIN: optionally resolve shopId from request if provided
+    // SUPER_ADMIN can access ALL shops or a specific shop
+    if (req.user.role === "SUPER_ADMIN") {
       const requestedShopId =
         req.query.shopId ||
         req.body?.shopId ||
@@ -222,7 +221,7 @@ async function authenticate(req, res, next) {
         null;
 
       if (requestedShopId) {
-        // Validate that the requested shop exists and is accessible
+        // If SUPER_ADMIN specifies a shopId, validate it
         try {
           const systemDb = getSystemDatabase();
           const shop = await systemDb.collection("shops").findOne({ 
@@ -269,20 +268,9 @@ async function authenticate(req, res, next) {
             message: "Failed to validate shop",
           });
         }
-      } else {
-        // CRITICAL: No fallback - SUPER_ADMIN must specify shopId explicitly
-        // This prevents accidentally accessing the wrong shop's data
-        logger.warn("SUPER_ADMIN attempted to access data without shopId", {
-          userId: req.user._id,
-          email: req.user.email,
-          path: req.path,
-          method: req.method,
-        });
-        return res.status(400).json({
-          success: false,
-          message: "SUPER_ADMIN must specify shopId via query parameter (?shopId=xxx), header (X-Shop-Id), or request body. Use GET /api/admin/shops to list available shops.",
-        });
       }
+      // If no shopId specified, SUPER_ADMIN accesses ALL shops (aggregated data)
+      // req.user.shopId remains null, endpoints should handle this by querying all shops
     }
 
     // Attach shop database to request for convenience
