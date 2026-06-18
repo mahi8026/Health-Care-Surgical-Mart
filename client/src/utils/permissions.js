@@ -96,7 +96,27 @@ export const PERMISSIONS = {
 
 // Role-Permission Mapping
 const ROLE_PERMISSIONS = {
-  [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS), // All permissions
+  // SUPER_ADMIN: Platform management only (no shop operations)
+  [ROLES.SUPER_ADMIN]: [
+    // Shop Management
+    PERMISSIONS.CREATE_SHOP,
+    PERMISSIONS.VIEW_ALL_SHOPS,
+    PERMISSIONS.SUSPEND_SHOP,
+    PERMISSIONS.DELETE_SHOP,
+    PERMISSIONS.VIEW_USAGE_STATS,
+
+    // User Management
+    PERMISSIONS.CREATE_SHOP_ADMIN,
+    PERMISSIONS.CREATE_USER,
+    PERMISSIONS.CREATE_STAFF,
+    PERMISSIONS.EDIT_USER,
+    PERMISSIONS.DELETE_USER,
+    PERMISSIONS.VIEW_USERS,
+
+    // Settings (system-level)
+    PERMISSIONS.VIEW_SETTINGS,
+    PERMISSIONS.EDIT_SETTINGS,
+  ],
 
   [ROLES.SHOP_ADMIN]: [
     // NO user management - SUPER_ADMIN only
