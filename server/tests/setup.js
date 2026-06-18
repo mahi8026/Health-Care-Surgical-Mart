@@ -1,52 +1,44 @@
 /**
  * Test Setup
- * Global test configuration and setup
+ * Common setup for all tests
  */
 
 // Set test environment
-process.env.NODE_ENV = "test";
-process.env.JWT_SECRET = "test_jwt_secret_key_for_testing_only_at_least_32_chars";
-process.env.MONGODB_URI = "mongodb://localhost:27017/medical_store_test";
-process.env.DB_NAME = "medical_store_test";
-process.env.SENDGRID_API_KEY = "SG.test_key_for_testing_purposes_only";
-process.env.SENDGRID_FROM_EMAIL = "test@example.com";
-process.env.SENDGRID_FROM_NAME = "Test Store";
-process.env.ENABLE_QUEUES = "false";
+process.env.NODE_ENV = 'test';
+process.env.LOG_LEVEL = 'error'; // Reduce noise in test output
 
-// Global test timeout
+// Mock environment variables for tests
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_min_32_characters_long_for_testing';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/health_care_test';
+
+// Increase timeout for database operations
 jest.setTimeout(10000);
 
-// Mock console methods in tests
-global.console = {
-  ...console,
-  // Uncomment to suppress console output in tests
-  // log: jest.fn(),
-  // debug: jest.fn(),
-  // info: jest.fn(),
-  // warn: jest.fn(),
-  // error: jest.fn(),
+// Global test utilities
+global.testUtils = {
+  // Generate a test user token
+  generateTestToken: (userData) => {
+    const jwt = require('jsonwebtoken');
+    return jwt.sign(
+      {
+        userId: userData._id || 'test_user_id',
+        email: userData.email || 'test@example.com',
+        role: userData.role || 'SHOP_ADMIN',
+        shopId: userData.shopId || 'test_shop_1',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+  },
+  
+  // Common test data
+  testShopId: 'test_shop_1',
+  testUserId: 'test_user_id',
+  testEmail: 'test@example.com',
 };
 
-// Mock logger globally
-jest.mock("../src/config/logging", () => ({
-  logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-  setupLogging: jest.fn(),
-}));
-
-/**
- * Global error handler middleware for tests.
- * Converts AppError / http-errors / plain Error objects with a statusCode
- * into the standard { success: false, message, status } JSON response that
- * all route tests assert against.
- *
- * Usage in test files — add AFTER routes:
- *   app.use((err, req, res, next) => {
- *     const statusCode = err.statusCode || err.status || 500;
- *     res.status(statusCode).json({ success: false, message: err.message });
- *   });
- */
+// Cleanup after all tests
+afterAll(async () => {
+  // Close database connections
+  // Add cleanup logic here if needed
+});
