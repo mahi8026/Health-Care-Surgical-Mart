@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import api from '../config/api';
 import useStockEvents from '../hooks/useStockEvents';
+import { useAuth } from './AuthContext';
 
 const StockContext = createContext(null);
 
@@ -20,6 +21,8 @@ export const useStock = () => {
 };
 
 export const StockProvider = ({ children }) => {
+  const { user } = useAuth(); // Get user from AuthContext
+  
   // Stock snapshots (current stock levels)
   const [snapshots, setSnapshots] = useState([]);
   const [snapshotsLoading, setSnapshotsLoading] = useState(false);
@@ -209,19 +212,21 @@ export const StockProvider = ({ children }) => {
     }
   }, []);
 
-  // Setup SSE connection
-  const { connected, error: sseError } = useStockEvents(handleStockEvent);
+  // Setup SSE connection - ONLY when user is logged in
+  const { connected, error: sseError } = useStockEvents(user ? handleStockEvent : null);
 
   useEffect(() => {
     setRealtimeConnected(connected);
   }, [connected]);
 
-  // Initial data fetch on mount
+  // Initial data fetch on mount - ONLY when user is logged in
   useEffect(() => {
-    fetchLowStockAlerts();
-    fetchExpiryAlerts();
-    fetchValuation();
-  }, [fetchLowStockAlerts, fetchExpiryAlerts, fetchValuation]);
+    if (user) {
+      fetchLowStockAlerts();
+      fetchExpiryAlerts();
+      fetchValuation();
+    }
+  }, [user, fetchLowStockAlerts, fetchExpiryAlerts, fetchValuation]);
 
   const value = {
     // State

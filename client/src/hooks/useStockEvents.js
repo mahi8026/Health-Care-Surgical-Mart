@@ -25,6 +25,11 @@ const useStockEvents = (onEvent) => {
   const reconnectAttemptsRef = useRef(0);
 
   useEffect(() => {
+    // Don't connect if no callback provided (user not logged in)
+    if (!onEvent) {
+      return;
+    }
+
     // Get auth token from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
