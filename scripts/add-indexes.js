@@ -4,6 +4,9 @@
  * Run: node scripts/add-indexes.js
  */
 
+// Load environment variables from server/.env
+require('dotenv').config({ path: require('path').join(__dirname, '../server/.env') });
+
 const { connectToDatabase, getShopDatabase, getSystemDatabase, closeDatabaseConnection } = require('../server/src/config/database');
 const { logger } = require('../server/src/config/logging');
 
@@ -31,9 +34,13 @@ async function addAllIndexes() {
           { key: { category: 1 }, name: 'category_index' },
           { key: { isActive: 1 }, name: 'active_status_index' },
           { key: { barcode: 1 }, sparse: true, name: 'barcode_index' },
-          { key: { name: 'text', description: 'text', brand: 'text' }, name: 'text_search' },
         ]);
         console.log('  ✓ Products indexes created');
+        
+        // Create text search index separately (Atlas doesn't support it with strict API)
+        // This enables full-text search on product names, descriptions, and brands
+        // Note: Not supported in MongoDB Atlas with serverApi.strict = true
+        // Can be created manually in Atlas UI if needed
       } catch (err) {
         console.log('  ⚠ Products indexes:', err.message);
       }
