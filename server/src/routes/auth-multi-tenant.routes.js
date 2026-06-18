@@ -381,10 +381,11 @@ router.post("/login", bruteForceProtection, async (req, res) => {
     const token = generateToken(user);
 
     // Set JWT as httpOnly cookie (secure, XSS-proof)
+    // For same-domain this is the most secure option
     res.cookie('jwt', token, {
       httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site (different domains)
+      secure: true,             // Always HTTPS (required for sameSite=none)
+      sameSite: 'none',         // Allow cross-site cookies
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: '/',
     });
@@ -399,7 +400,8 @@ router.post("/login", bruteForceProtection, async (req, res) => {
       }
     );
 
-    // Return user data only (NOT the token - it's in the cookie)
+    // Return user data AND token for cross-domain compatibility
+    // Frontend will store token in localStorage and send via Authorization header
     res.json({
       success: true,
       message: "Login successful",
@@ -411,6 +413,7 @@ router.post("/login", bruteForceProtection, async (req, res) => {
           role: user.role,
           shopId: user.shopId || null,
         },
+        token: token, // Include token for cross-domain setups
       },
     });
   } catch (error) {
@@ -975,10 +978,11 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
     const token = generateToken(user);
     
     // Set JWT as httpOnly cookie (secure, XSS-proof)
+    // For same-domain this is the most secure option
     res.cookie('jwt', token, {
       httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site (different domains)
+      secure: true,             // Always HTTPS (required for sameSite=none)
+      sameSite: 'none',         // Allow cross-site cookies
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: '/',
     });
@@ -1000,7 +1004,8 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
       }
     );
 
-    // Return user data only (NOT the token - it's in the cookie)
+    // Return user data AND token for cross-domain compatibility
+    // Frontend will store token in localStorage and send via Authorization header
     res.json({
       success: true,
       message: "Login successful",
@@ -1012,6 +1017,7 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
           role: user.role,
           shopId: user.shopId || null,
         },
+        token: token, // Include token for cross-domain setups
       },
     });
   } catch (error) {

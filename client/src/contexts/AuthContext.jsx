@@ -95,9 +95,20 @@ export const AuthProvider = ({ children }) => {
               setLoading(false);
               return;
             }
-          } catch {
+          } catch (error) {
             // Session expired or invalid - clear stored data
+            console.error('[AUTH] Session verification failed:', error);
             localStorage.removeItem("user");
+            
+            // Don't auto-logout if we just logged in (within last 5 seconds)
+            const loginTime = localStorage.getItem("lastLoginTime");
+            if (loginTime && Date.now() - parseInt(loginTime) < 5000) {
+              console.log('[AUTH] Recent login detected, skipping auto-logout');
+              setMongoUser(parsedUser); // Use stored user data temporarily
+              setUserContext(parsedUser);
+              setLoading(false);
+              return;
+            }
           }
         }
 
@@ -156,8 +167,11 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post("/auth/firebase-login", body);
 
       if (response.success && response.data?.user) {
-        // Store ONLY user data (NOT token - it's in httpOnly cookie)
+        // Store user data AND token
+        // Token is stored in localStorage for cross-domain compatibility
         localStorage.setItem("user", JSON.stringify(response.data.user));
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("lastLoginTime", Date.now().toString());
         setMongoUser(response.data.user);
         
         // Set user context in Sentry
@@ -200,8 +214,10 @@ export const AuthProvider = ({ children }) => {
       // Sign out from Firebase
       await signOutUser();
       
-      // Clear local state
+      // Clear local state and token
       localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("lastLoginTime");
       setMongoUser(null);
       setFirebaseUser(null);
       

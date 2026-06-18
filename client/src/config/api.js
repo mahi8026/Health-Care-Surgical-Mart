@@ -21,12 +21,15 @@ const api = axios.create({
   withCredentials: true, // CRITICAL: Send cookies with requests (for httpOnly JWT)
 });
 
-// Request interceptor - The JWT is sent automatically as an httpOnly cookie
+// Request interceptor - Add Authorization header with token from localStorage
 api.interceptors.request.use(
   (config) => {
-    // No need to add shopId for SUPER_ADMIN anymore
-    // SUPER_ADMIN can access ALL shops (aggregated data)
-    // Individual shop access is handled via explicit ?shopId query param when needed
+    // Get token from localStorage (for cross-domain setups)
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     return config;
   },
   (error) => {
@@ -44,9 +47,10 @@ api.interceptors.response.use(
   (error) => {
     // Handle common errors
     if (error.response?.status === 401) {
-      // Unauthorized - clear user state and redirect to login
-      // The cookie will be cleared by the backend on logout
+      // Unauthorized - clear user state, token, and redirect to login
       localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("lastLoginTime");
       window.location.href = "/login";
     }
 
