@@ -16,7 +16,7 @@ const {
   deleteShop,
   getShopStats,
 } = require("../utils/shop-manager");
-const { listAllShops } = require("../config/database");
+const { listAllShops, getSystemDatabase, getShopDatabase } = require("../config/database");
 const { logger } = require('../config/logging');
 const auditLog = require("../services/audit-log.service");
 const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
@@ -285,7 +285,6 @@ router.get("/dashboard", async (req, res) => {
     
     for (const shop of allShops) {
       try {
-        const { getShopDatabase } = require("../config/database");
         const shopDb = getShopDatabase(shop.shopId);
         const users = await shopDb.collection("users").find({}).toArray();
         totalShopUsers += users.length;
