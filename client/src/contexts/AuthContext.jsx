@@ -112,13 +112,10 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        // No valid session - sign out of Firebase so user goes through login form
-        try {
-          await signOutUser();
-        } catch {
-          // ignore sign-out errors
-        }
-        setFirebaseUser(null);
+        // No valid session - clear state but don't force sign out
+        // (This prevents infinite reload loop on login page)
+        setMongoUser(null);
+        clearUserContext();
       } else {
         // User is signed out
         localStorage.removeItem("user");
