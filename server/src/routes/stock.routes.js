@@ -423,9 +423,140 @@ router.get(
     next();
   },
   authenticate,
+  checkShopStatus,
   asyncHandler(async (req, res) => {
     const sseManager = require('../services/sse-manager.service');
     sseManager.handleConnection(req, res);
+  })
+);
+
+/**
+ * GET /api/stock/expired
+ * Get expired items (for backward compatibility with Dashboard)
+ * Alias for /expiry-alerts with past date
+ */
+router.get(
+  '/expired',
+  requirePermission(PERMISSIONS.VIEW_STOCK),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+
+    const batches = await shopDb
+      .collection('stock_batches')
+      .aggregate([
+        {
+          $match: {
+            shopId: req.user.shopId,
+            status: 'ACTIVE',
+            quantity: { $gt: 0 },
+            expiryDate: { $lt: new Date() }, // Already expired
+          },
+        },
+        {
+          $lookup: {
+            from: shopDb.getCollectionName('products'),
+            localField: 'productId',
+            foreignField: '_id',
+            as: 'product',
+          },
+        },
+        {
+          $unwind: {
+            path: '$product',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $addFields: {
+            productName: '$product.name',
+            currentQty: '$quantity',
+            daysLeft: 0,
+          },
+        },
+        { $sort: { expiryDate: -1 } },
+      ])
+      .toArray();
+
+    res.json({
+      success: true,
+      data: batches,
+      meta: {
+        count: batches.length,
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/stock/expiring-soon
+ * Get items expiring within specified days (for backward compatibility with Dashboard)
+ * Alias for /expiry-alerts
+ */
+router.get(
+  '/expiring-soon',
+  requirePermission(PERMISSIONS.VIEW_STOCK),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+    const daysThreshold = parseInt(req.query.days) || 30;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
+    thresholdDate.setHours(23, 59, 59, 999);
+
+    const batches = await shopDb
+      .collection('stock_batches')
+      .aggregate([
+        {
+          $match: {
+            shopId: req.user.shopId,
+            status: 'ACTIVE',
+            quantity: { $gt: 0 },
+            expiryDate: {
+              $gte: today, // Not yet expired
+              $lte: thresholdDate, // Within threshold
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: shopDb.getCollectionName('products'),
+            localField: 'productId',
+            foreignField: '_id',
+            as: 'product',
+          },
+        },
+        {
+          $unwind: {
+            path: '$product',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $addFields: {
+            productName: '$product.name',
+            currentQty: '$quantity',
+            daysLeft: {
+              $ceil: {
+                $divide: [{ $subtract: ['$expiryDate', new Date()] }, 1000 * 60 * 60 * 24],
+              },
+            },
+          },
+        },
+        { $sort: { expiryDate: 1 } },
+      ])
+      .toArray();
+
+    res.json({
+      success: true,
+      data: batches,
+      meta: {
+        daysThreshold,
+        count: batches.length,
+      },
+    });
   })
 );
 
