@@ -291,7 +291,7 @@ router.use(checkShopStatus);
  */
 router.get(
   "/",
-  requirePermission(PERMISSIONS.READ_SUPPLIERS),
+  requirePermission(PERMISSIONS.VIEW_SUPPLIERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { page = 1, limit = 50, search = "" } = req.query;
@@ -339,7 +339,7 @@ router.get(
  */
 router.get(
   "/:id",
-  requirePermission(PERMISSIONS.READ_SUPPLIERS),
+  requirePermission(PERMISSIONS.VIEW_SUPPLIERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const supplier = await shopDb

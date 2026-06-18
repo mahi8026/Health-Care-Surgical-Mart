@@ -560,11 +560,10 @@ router.get(
   "/filter-options",
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
-    try {
-      const shopDb = getShopDatabase(req.user.shopId);
+    const shopDb = getShopDatabase(req.user.shopId);
 
-      // Get available categories
-      const categories = await shopDb
+    // Get available categories
+    const categories = await shopDb
       .collection("expense_categories")
       .find({ isActive: true })
       .sort({ name: 1 })
@@ -660,25 +659,6 @@ router.get(
         ],
       },
     });
-    } catch (error) {
-      logger.error("Error fetching filter options:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch filter options",
-        data: {
-          categories: [],
-          paymentMethods: [],
-          vendors: [],
-          tags: [],
-          amountRange: { min: 0, max: 0 },
-          dateRange: { min: null, max: null },
-          sortOptions: [
-            { value: "expenseDate", label: "Date" },
-            { value: "amount", label: "Amount" },
-          ],
-        },
-      });
-    }
   }),
 );
 

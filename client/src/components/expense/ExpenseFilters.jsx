@@ -132,15 +132,19 @@ const ExpenseFilters = ({
     { value: "createdAt", label: "Created Date" },
   ];
 
-  const vendorOptions = (filterOptions.vendors || []).map((vendor) => ({
-    value: vendor,
-    label: vendor,
-  }));
+  const vendorOptions = Array.isArray(filterOptions?.vendors) 
+    ? filterOptions.vendors.map((vendor) => ({
+        value: vendor,
+        label: vendor,
+      }))
+    : [];
 
-  const tagOptions = (filterOptions.tags || []).map((tag) => ({
-    value: tag,
-    label: tag,
-  }));
+  const tagOptions = Array.isArray(filterOptions?.tags)
+    ? filterOptions.tags.map((tag) => ({
+        value: tag,
+        label: tag,
+      }))
+    : [];
 
   return (
     <>
