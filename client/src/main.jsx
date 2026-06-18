@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 
 import App from "./App.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
+import { StockProvider } from "./contexts/StockContext.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { initializeSentry } from "./config/sentry.js";
 import "./styles/index.css";
@@ -39,24 +40,26 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           }}
         >
           <AuthProvider>
-            <App />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: "#363636",
-                  color: "#fff",
-                },
-                success: {
-                  duration: 3000,
-                  theme: {
-                    primary: "green",
-                    secondary: "black",
+            <StockProvider>
+              <App />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: "#363636",
+                    color: "#fff",
                   },
-                },
-              }}
-            />
+                  success: {
+                    duration: 3000,
+                    theme: {
+                      primary: "green",
+                      secondary: "black",
+                    },
+                  },
+                }}
+              />
+            </StockProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

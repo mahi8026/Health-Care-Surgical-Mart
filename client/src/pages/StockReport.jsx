@@ -3,6 +3,7 @@ import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import Modal from "../components/ui/Modal";
 import Pagination from "../components/ui/Pagination";
+import { useStock } from "../contexts/StockContext";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n) => new Intl.NumberFormat("en-BD", { style: "currency", currency: "BDT", minimumFractionDigits: 0 }).format(n || 0);
@@ -90,7 +91,8 @@ const StockMovementModal = ({ isOpen, onClose, product }) => {
     setLoading(true);
     try {
       const productId = product._id || product.productId;
-      let url = `/stock/${productId}/movement-history?page=${page}&limit=50`;
+      // Updated to use new event-sourced ledger endpoint
+      let url = `/stock/${productId}/ledger?page=${page}&limit=50`;
       if (dateRange.start) url += `&startDate=${dateRange.start}`;
       if (dateRange.end) url += `&endDate=${dateRange.end}`;
       
@@ -410,6 +412,9 @@ const StockReport = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
+  // Get real-time connection status from StockContext
+  const { realtimeConnected, fetchSnapshots: contextFetchSnapshots } = useStock();
+  
   // Summary stats
   const [summary, setSummary] = useState({
     totalSKUs: 0,
@@ -472,23 +477,20 @@ const StockReport = () => {
       // PERF-005: Enforce max limit to prevent excessive data queries
       const effectiveLimit = Math.min(limit, maxLimit);
       
-      // Build query params
-      let url = `/stock?page=${page}&limit=${effectiveLimit}`;
-      if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
-      if (filters.category) url += `&category=${encodeURIComponent(filters.category)}`;
-      if (filters.supplier) url += `&supplier=${encodeURIComponent(filters.supplier)}`;
-      if (filters.status !== "all") {
-        if (filters.status === "low_stock") url += `&lowStock=true`;
-        if (filters.status === "out_of_stock") url += `&outOfStock=true`;
-        if (filters.status === "in_stock") url += `&inStock=true`;
-        if (filters.status === "expiring_30d") url += `&expiring=30`;
-        if (filters.status === "expiring_60d") url += `&expiring=60`;
-        if (filters.status === "expired") url += `&expired=true`;
-      }
-      if (filters.expiryFrom) url += `&expiryFrom=${filters.expiryFrom}`;
-      if (filters.expiryTo) url += `&expiryTo=${filters.expiryTo}`;
+      // Build query params for new snapshots endpoint
+      const params = {
+        page,
+        limit: effectiveLimit,
+        search: filters.search || undefined,
+        category: filters.category || undefined,
+        status: filters.status !== "all" ? filters.status : undefined,
+        sortBy: 'productName',
+        sortOrder: 'asc',
+      };
 
-      const response = await api.get(url);
+      // Use new event-sourced snapshots endpoint
+      const response = await api.get('/stock/snapshots', { params });
+      
       if (response.success) {
         setStockData(response.data || []);
         setPagination(response.pagination);
@@ -496,22 +498,22 @@ const StockReport = () => {
         // Calculate summary
         const totalSKUs = response.pagination?.total || 0;
         const totalValue = (response.data || []).reduce((sum, item) => {
-          const qty = item.currentQty ?? item.quantity ?? 0;
-          const cost = item.product?.purchasePrice ?? item.purchasePrice ?? 0;
+          const qty = item.onHandQty ?? item.availableQty ?? 0;
+          const cost = item.avgCostPrice ?? 0;
           return sum + (qty * cost);
         }, 0);
         
-        // Fetch counts for summary cards
+        // Fetch counts for summary cards from new endpoints
         const [lowStockRes, expiringRes] = await Promise.all([
-          api.get("/stock/low-stock"),
-          api.get("/stock/expiring-soon?days=30"),
+          api.get("/stock/reorder-alerts"),
+          api.get("/stock/expiry-alerts?days=30"),
         ]);
         
         setSummary({
           totalSKUs,
           totalStockValue: totalValue,
-          lowStockCount: lowStockRes.success ? lowStockRes.count || 0 : 0,
-          expiringSoonCount: expiringRes.success ? expiringRes.count || 0 : 0,
+          lowStockCount: lowStockRes.success ? lowStockRes.meta?.count || 0 : 0,
+          expiringSoonCount: expiringRes.success ? expiringRes.meta?.count || 0 : 0,
         });
       } else {
         setError(response.message || "Failed to fetch stock data");
@@ -589,9 +591,24 @@ const StockReport = () => {
           <h1 className="text-3xl font-bold text-gray-900">Stock Management</h1>
           <p className="text-gray-600 mt-1">Complete inventory overview and operations</p>
         </div>
-        <button onClick={fetchStockData} className="btn-secondary">
-          <i className="fas fa-sync-alt mr-2"></i>Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Real-time connection indicator */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+            realtimeConnected 
+              ? 'bg-green-50 text-green-700 border border-green-200' 
+              : 'bg-gray-100 text-gray-500 border border-gray-200'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              realtimeConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+            }`}></span>
+            <span className="font-medium">
+              {realtimeConnected ? 'Live' : 'Offline'}
+            </span>
+          </div>
+          <button onClick={fetchStockData} className="btn-secondary">
+            <i className="fas fa-sync-alt mr-2"></i>Refresh
+          </button>
+        </div>
       </div>
 
       {/* Error Message */}

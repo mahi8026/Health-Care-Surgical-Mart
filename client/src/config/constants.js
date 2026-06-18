@@ -10,6 +10,9 @@ export const API_CONFIG = {
   RETRY_ATTEMPTS: 3,
 };
 
+// Export base URL separately for SSE connections
+export const API_BASE_URL = API_CONFIG.BASE_URL;
+
 // Application Routes
 export const ROUTES = {
   // Auth

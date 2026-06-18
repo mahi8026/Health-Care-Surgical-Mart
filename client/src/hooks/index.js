@@ -10,3 +10,4 @@ export { usePermissions } from "./usePermissions";
 export { useHeldSales } from "./useHeldSales";
 export { usePOSKeyboard } from "./usePOSKeyboard";
 export { usePolling, useConditionalPolling } from "./usePolling";
+export { default as useStockEvents } from "./useStockEvents";

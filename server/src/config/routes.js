@@ -37,7 +37,7 @@ const setupRoutes = (app) => {
     // Suppliers routes
     app.use("/api/suppliers", require("../routes/suppliers.routes"));
 
-    // Stock routes
+    // Stock routes (new event-sourced system)
     app.use("/api/stock", require("../routes/stock.routes"));
 
     // Reports routes

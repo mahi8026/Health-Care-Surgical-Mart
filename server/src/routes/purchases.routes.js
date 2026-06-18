@@ -519,12 +519,14 @@ router.post(
 /**
  * PUT /api/purchases/:id/receive
  * Mark purchase as received and update stock
+ * Phase 3B: Now creates batches for batch tracking
  */
 router.put(
   "/:id/receive",
   requirePermission(PERMISSIONS.EDIT_PURCHASE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
+    const stockCommand = require('../services/stock-command.service');
     const { receivedItems, notes } = req.body;
 
     // Get purchase order
@@ -547,63 +549,117 @@ router.put(
     // If no receivedItems provided, receive all items as ordered
     const itemsToReceive = receivedItems || purchase.items;
 
-    // Update stock for each received item
+    // Process each received item
     for (let item of itemsToReceive) {
-      const productId = item.productId || item.productId;
+      const productId = toObjectId(item.productId || item.productId);
       const receivedQty = item.receivedQty || item.qty;
+      const unitCost = item.unitCost || item.rate;
 
-      // Get current stock
-      let currentStock = await shopDb
-        .collection("stock")
-        .findOne({ productId: new ObjectId(productId) });
-
-      if (!currentStock) {
-        // Create new stock record
-        const product = await shopDb
-          .collection("products")
-          .findOne({ _id: new ObjectId(productId) });
-
-        currentStock = {
-          productId: new ObjectId(productId),
-          currentQty: 0,
-          availableQty: 0,
-          reservedQty: 0,
-          isLowStock: true,
-          lastUpdated: new Date(),
-        };
-
-        await shopDb.collection("stock").insertOne(currentStock);
-      }
-
-      // Update stock quantity
-      const newQuantity = currentStock.currentQty + parseInt(receivedQty);
+      // Get product details
       const product = await shopDb
         .collection("products")
-        .findOne({ _id: new ObjectId(productId) });
+        .findOne({ _id: productId });
 
-      const isLowStock = newQuantity <= (product?.minStockLevel || 0);
+      if (!product) {
+        logger.warn(`Product not found during purchase receive: ${productId}`);
+        continue;
+      }
 
-      await shopDb.collection("stock").updateOne(
-        { productId: new ObjectId(productId) },
-        {
-          $set: {
-            currentQty: newQuantity,
-            availableQty: newQuantity - (currentStock.reservedQty || 0),
-            isLowStock,
-            lastUpdated: new Date(),
-            lastPurchaseDate: new Date(),
-            updatedBy: new ObjectId(req.user._id),
-          },
-        },
-      );
+      // Phase 3B: Create batch if batch tracking info provided
+      if (item.batchNo || item.expiryDate) {
+        try {
+          // Auto-generate batch number if not provided
+          const batchNo = item.batchNo || `BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+          const batchData = {
+            productId: productId,
+            shopId: req.user.shopId,
+            batchNo: batchNo,
+            lotNo: item.lotNo || null,
+            quantity: parseInt(receivedQty),
+            originalQuantity: parseInt(receivedQty),
+            expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+            manufactureDate: item.manufactureDate ? new Date(item.manufactureDate) : null,
+            receivedDate: new Date(),
+            supplierId: toObjectId(purchase.supplierId),
+            purchaseId: toObjectId(req.params.id),
+            costPrice: parseFloat(unitCost),
+            status: 'ACTIVE',
+            sourceDocument: purchase.purchaseNo || purchase.invoiceNo,
+            notes: item.batchNotes || notes || null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          // Check if batch already exists
+          const existingBatch = await shopDb.collection('stock_batches').findOne({
+            productId: productId,
+            batchNo: batchNo,
+            shopId: req.user.shopId,
+          });
+
+          if (!existingBatch) {
+            await shopDb.collection('stock_batches').insertOne(batchData);
+            logger.info('Batch created from purchase receipt', {
+              shopId: req.user.shopId,
+              purchaseId: req.params.id,
+              batchNo: batchNo,
+              productId: productId.toString(),
+              quantity: receivedQty,
+            });
+          } else {
+            logger.warn('Batch already exists, skipping creation', {
+              batchNo: batchNo,
+              productId: productId.toString(),
+            });
+          }
+        } catch (batchError) {
+          logger.error('Failed to create batch from purchase', {
+            error: batchError.message,
+            productId: productId.toString(),
+            batchNo: item.batchNo,
+          });
+          // Don't fail the entire purchase - continue with stock update
+        }
+      }
+
+      // Record stock movement using event-sourced system
+      try {
+        await stockCommand.recordMovement({
+          shopId: req.user.shopId,
+          productId: productId,
+          movementType: 'PURCHASE',
+          quantity: parseInt(receivedQty),
+          userId: toObjectId(req.user._id),
+          referenceType: 'PURCHASE',
+          referenceId: toObjectId(req.params.id),
+          batchNo: item.batchNo || null,
+          expiryDate: item.expiryDate || null,
+          costPrice: parseFloat(unitCost),
+          note: `Purchase ${purchase.purchaseNo || purchase.invoiceNo} received`,
+        });
+
+        logger.info('Stock movement recorded for purchase', {
+          shopId: req.user.shopId,
+          purchaseId: req.params.id,
+          productId: productId.toString(),
+          quantity: receivedQty,
+        });
+      } catch (stockError) {
+        logger.error('Failed to record stock movement', {
+          error: stockError.message,
+          productId: productId.toString(),
+        });
+        throw createError.serverError(`Failed to update stock for product ${product.name}`);
+      }
 
       // Update product's purchase price if provided
-      if (item.unitCost) {
+      if (unitCost) {
         await shopDb.collection("products").updateOne(
-          { _id: new ObjectId(productId) },
+          { _id: productId },
           {
             $set: {
-              purchasePrice: parseFloat(item.unitCost),
+              purchasePrice: parseFloat(unitCost),
               updatedAt: new Date(),
             },
           },
@@ -613,12 +669,12 @@ router.put(
 
     // Update purchase status
     await shopDb.collection("purchases").updateOne(
-      { _id: new ObjectId(req.params.id) },
+      { _id: toObjectId(req.params.id) },
       {
         $set: {
           status: "received",
           receivedAt: new Date(),
-          receivedBy: new ObjectId(req.user._id),
+          receivedBy: toObjectId(req.user._id),
           receivedItems: itemsToReceive,
           receivingNotes: notes?.trim() || null,
           updatedAt: new Date(),
@@ -626,14 +682,13 @@ router.put(
       },
     );
 
-    // Invalidate financial reports cache (received stock affects cash-flow)
+    // Invalidate caches
     cacheService.invalidateShopCache(req.user.shopId, "reports");
-    // Also invalidate products cache (purchase price may have changed)
     cacheService.invalidateShopCache(req.user.shopId, "products");
 
     res.json({
       success: true,
-      message: "Purchase order received and stock updated successfully",
+      message: "Purchase order received, stock updated, and batches created successfully",
     });
   }),
 );

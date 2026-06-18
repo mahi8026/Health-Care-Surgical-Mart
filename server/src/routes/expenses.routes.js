@@ -425,7 +425,7 @@ router.get(
     }
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName("expense_categories");
     const usersCollectionName = shopDb.getCollectionName("users");
 
     const pipeline = [
@@ -438,7 +438,12 @@ router.get(
           as: "category",
         },
       },
-      { $unwind: "$category" },
+      {
+        $unwind: {
+          path: "$category",
+          preserveNullAndEmptyArrays: true, // Don't exclude expenses without category
+        },
+      },
       {
         $lookup: {
           from: usersCollectionName,
@@ -447,7 +452,12 @@ router.get(
           as: "createdByUser",
         },
       },
-      { $unwind: "$createdByUser" },
+      {
+        $unwind: {
+          path: "$createdByUser",
+          preserveNullAndEmptyArrays: true, // Don't exclude expenses without user
+        },
+      },
     ];
 
     // Enhanced search filter
@@ -669,7 +679,7 @@ router.get(
     const shopDb = getShopDatabase(req.user.shopId);
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName("expense_categories");
     const usersCollectionName = shopDb.getCollectionName("users");
 
     const expense = await shopDb
@@ -684,7 +694,12 @@ router.get(
             as: "category",
           },
         },
-        { $unwind: "$category" },
+        {
+          $unwind: {
+            path: "$category",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
         {
           $lookup: {
             from: usersCollectionName,
@@ -740,7 +755,7 @@ router.post(
 
     // Validate category exists and is active
     const category = await shopDb
-      .collection("expenseCategories")
+      .collection("expense_categories")
       .findOne({ _id: new ObjectId(categoryId), isActive: true });
 
     if (!category) {
@@ -926,7 +941,7 @@ router.put(
     // Validate category if provided
     if (categoryId) {
       const category = await shopDb
-        .collection("expenseCategories")
+        .collection("expense_categories")
         .findOne({ _id: new ObjectId(categoryId), isActive: true });
 
       if (!category) {
@@ -972,7 +987,7 @@ router.put(
 
     if (categoryId) {
       const category = await shopDb
-        .collection("expenseCategories")
+        .collection("expense_categories")
         .findOne({ _id: new ObjectId(categoryId) });
       updateData.categoryId = new ObjectId(categoryId);
       updateData.categoryName = category.name;
