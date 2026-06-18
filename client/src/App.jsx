@@ -6,6 +6,7 @@ import { PERMISSIONS } from "./utils/permissions";
 // Eagerly load critical pages
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 
 // Lazy load other pages
 const Sales = lazy(() => import("./pages/Sales"));
@@ -80,8 +81,17 @@ function App() {
             {/* Redirect root to dashboard */}
             <Route index element={<Navigate to="/dashboard" replace />} />
 
-            {/* Dashboard - Available to all authenticated users */}
-            <Route path="dashboard" element={<Dashboard />} />
+            {/* Dashboard - Route based on user role */}
+            <Route
+              path="dashboard"
+              element={
+                user?.role === "SUPER_ADMIN" ? (
+                  <SuperAdminDashboard />
+                ) : (
+                  <Dashboard />
+                )
+              }
+            />
 
             {/* Sales & POS - Requires CREATE_SALE permission */}
             <Route

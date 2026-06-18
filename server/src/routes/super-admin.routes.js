@@ -264,6 +264,69 @@ router.use(requireRole([ROLES.SUPER_ADMIN]));
  */
 
 /**
+ * GET /api/super-admin/dashboard
+ * Get platform-level dashboard statistics
+ */
+router.get("/dashboard", async (req, res) => {
+  try {
+    const systemDb = getSystemDatabase();
+
+    // Get all shops
+    const allShops = await systemDb.collection("shops").find({}).toArray();
+    const activeShops = allShops.filter((s) => s.status === "Active").length;
+
+    // Get all users from system_users collection
+    const systemUsers = await systemDb.collection("system_users").find({}).toArray();
+    const activeSystemUsers = systemUsers.filter((u) => u.isActive).length;
+
+    // Get shop users count (aggregate from all shop databases)
+    let totalShopUsers = 0;
+    let activeShopUsers = 0;
+    
+    for (const shop of allShops) {
+      try {
+        const { getShopDatabase } = require("../config/database");
+        const shopDb = getShopDatabase(shop.shopId);
+        const users = await shopDb.collection("users").find({}).toArray();
+        totalShopUsers += users.length;
+        activeShopUsers += users.filter((u) => u.isActive).length;
+      } catch (error) {
+        logger.warn(`Failed to get users for shop ${shop.shopId}:`, error.message);
+      }
+    }
+
+    // Get database collections count
+    const collections = await systemDb.listCollections().toArray();
+
+    const stats = {
+      totalShops: allShops.length,
+      activeShops,
+      suspendedShops: allShops.filter((s) => s.status === "Suspended").length,
+      inactiveShops: allShops.filter((s) => s.status === "Inactive").length,
+      totalUsers: systemUsers.length + totalShopUsers,
+      activeUsers: activeSystemUsers + activeShopUsers,
+      systemUsers: systemUsers.length,
+      shopUsers: totalShopUsers,
+      systemHealth: "Good",
+      databaseStatus: "Connected",
+      totalCollections: collections.length,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    logger.error("Get platform dashboard error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get platform statistics",
+    });
+  }
+});
+
+/**
  * POST /api/super-admin/shops
  * Create a new shop
  */

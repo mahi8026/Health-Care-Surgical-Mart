@@ -269,8 +269,8 @@ async function authenticate(req, res, next) {
           });
         }
       }
-      // If no shopId specified, SUPER_ADMIN accesses ALL shops (aggregated data)
-      // req.user.shopId remains null, endpoints should handle this by querying all shops
+      // If no shopId specified, SUPER_ADMIN accesses platform-level data
+      // req.user.shopId remains null
     }
 
     // Attach shop database to request for convenience
