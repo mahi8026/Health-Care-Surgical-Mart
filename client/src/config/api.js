@@ -18,7 +18,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // CRITICAL: Send cookies with requests (for httpOnly JWT)
+  // withCredentials removed - we're using Authorization header now, not cookies
 });
 
 // Request interceptor - Add Authorization header with token from localStorage
