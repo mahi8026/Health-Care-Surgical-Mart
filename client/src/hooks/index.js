@@ -9,3 +9,4 @@ export { useLocalStorage } from "./useLocalStorage";
 export { usePermissions } from "./usePermissions";
 export { useHeldSales } from "./useHeldSales";
 export { usePOSKeyboard } from "./usePOSKeyboard";
+export { usePolling, useConditionalPolling } from "./usePolling";

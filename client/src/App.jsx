@@ -43,16 +43,41 @@ const PageLoader = () => (
 function App() {
   const { user, loading } = useAuth();
 
-  // Keep Render backend alive — ping every 14 minutes to prevent cold starts
+  // Keep Render backend alive — smart ping during business hours only
   useEffect(() => {
-    // VITE_API_URL ends with '/api', but /health is a root-level route (not under /api)
-    // Strip the '/api' suffix to get the base server URL
     const apiUrl = import.meta.env.VITE_API_URL || '/api';
     const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-    const ping = () => fetch(`${baseUrl}/health`, { method: 'GET' }).catch(() => {});
-    ping(); // ping immediately on load
-    const interval = setInterval(ping, 14 * 60 * 1000); // every 14 minutes
-    return () => clearInterval(interval);
+    
+    const ping = async () => {
+      // Only ping during business hours (8am-10pm local time) to save resources
+      const hour = new Date().getHours();
+      if (hour >= 8 && hour <= 22) {
+        try {
+          await fetch(`${baseUrl}/health`, { method: 'GET' });
+          if (import.meta.env.DEV) {
+            console.log('[Keep-Alive] Backend pinged at', new Date().toLocaleTimeString());
+          }
+        } catch (error) {
+          console.warn('[Keep-Alive] Ping failed:', error.message);
+        }
+      }
+    };
+    
+    ping(); // Initial ping on app load
+    const interval = setInterval(ping, 10 * 60 * 1000); // Every 10 minutes
+    
+    // Also ping when tab becomes visible (user returns to app)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        ping();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   if (loading) {

@@ -228,6 +228,43 @@ const logPerformance = (operation, duration, details = {}) => {
   });
 };
 
+// Helper function to log slow database queries
+logger.logSlowQuery = function(queryName, duration, details = {}) {
+  if (duration > 1000) { // >1 second
+    performanceLogger.warn('Slow query detected', { 
+      queryName, 
+      duration: `${duration}ms`,
+      ...details 
+    });
+  } else if (duration > 500) { // >500ms
+    performanceLogger.info('Query performance', { 
+      queryName, 
+      duration: `${duration}ms`,
+      ...details 
+    });
+  }
+};
+
+// Helper function to log API request/response (enhanced version of requestLogger)
+logger.logRequest = function(req, res, duration) {
+  const logData = {
+    method: req.method,
+    path: req.path,
+    statusCode: res.statusCode,
+    duration: `${duration}ms`,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    userId: req.user?._id?.toString(),
+    shopId: req.user?.shopId,
+  };
+  
+  if (duration > 3000) {
+    performanceLogger.warn('Slow API request', logData);
+  } else {
+    apiLogger.info('API request', logData);
+  }
+};
+
 // Setup logging configuration
 const setupLogging = () => {
   // Create logs directory if it doesn't exist

@@ -16,16 +16,16 @@ const config = {
       strict: true,
       deprecationErrors: true,
     },
-    // Connection pool settings
-    maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 50,
-    minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 5,
-    maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 30000,
+    // Connection pool settings (optimized for multi-tenant workload)
+    maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 50, // Increased for concurrent shops
+    minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 10, // Keep warm connections
+    maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 30000, // Close idle after 30s
 
     // Connection timeout settings
     connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
     socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 60000,
     serverSelectionTimeoutMS:
-      parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 30000,
+      parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 5000, // Reduced for faster failover
 
     // Retry settings
     retryWrites: true,
@@ -38,6 +38,9 @@ const config = {
 
     // Monitoring
     monitorCommands: process.env.NODE_ENV === "development",
+    
+    // Compression (reduces network bandwidth)
+    compressors: ['zlib'],
   },
 };
 
