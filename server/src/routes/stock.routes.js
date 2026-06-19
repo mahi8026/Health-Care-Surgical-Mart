@@ -831,3 +831,87 @@ router.post(
     });
   })
 );
+
+/**
+ * POST /api/stock/init-missing-snapshots
+ * Initialize stock snapshots for products that don't have them
+ * This fixes products created before the event-sourced stock system was implemented
+ */
+router.post(
+  '/init-missing-snapshots',
+  requirePermission(PERMISSIONS.MANAGE_STOCK),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+    
+    // Get all products
+    const products = await shopDb.collection('products').find({}).toArray();
+    
+    let created = 0;
+    let skipped = 0;
+    const results = [];
+    
+    for (const product of products) {
+      // Check if snapshot exists
+      const existingSnapshot = await shopDb.collection('stock_snapshots').findOne({
+        productId: product._id
+      });
+      
+      if (existingSnapshot) {
+        skipped++;
+        continue;
+      }
+      
+      // Create snapshot with current stock quantity from product record
+      const snapshot = {
+        productId: product._id,
+        productName: product.name,
+        sku: product.sku || null,
+        onHandQty: product.stockQuantity || 0,
+        reservedQty: 0,
+        availableQty: product.stockQuantity || 0,
+        avgCostPrice: product.purchasePrice || 0,
+        totalCostValue: (product.stockQuantity || 0) * (product.purchasePrice || 0),
+        reorderPoint: product.minStockLevel || product.reorderPoint || 10,
+        lastMovementType: product.stockQuantity > 0 ? 'OPENING_STOCK' : null,
+        lastMovementDate: product.stockQuantity > 0 ? new Date() : null,
+        batchCount: 0,
+        oldestExpiryDate: null,
+        nearestExpiryDate: null,
+        lastLedgerVersion: 0,
+        lastLedgerEntryId: null,
+        version: 0,
+        updatedAt: new Date(),
+        createdAt: new Date(),
+      };
+      
+      await shopDb.collection('stock_snapshots').insertOne(snapshot);
+      created++;
+      
+      results.push({
+        productId: product._id,
+        productName: product.name,
+        sku: product.sku,
+        initialQty: product.stockQuantity || 0
+      });
+    }
+    
+    logger.info('Missing snapshots initialized', {
+      shopId: req.user.shopId,
+      totalProducts: products.length,
+      snapshotsCreated: created,
+      snapshotsSkipped: skipped,
+      user: req.user.name
+    });
+    
+    res.json({
+      success: true,
+      message: `Initialized ${created} missing stock snapshots (${skipped} already existed)`,
+      data: {
+        totalProducts: products.length,
+        snapshotsCreated: created,
+        snapshotsSkipped: skipped,
+        products: results
+      }
+    });
+  })
+);
