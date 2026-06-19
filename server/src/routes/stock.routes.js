@@ -410,19 +410,12 @@ router.get(
  * SSE endpoint for real-time stock updates
  * 
  * Note: EventSource API doesn't support custom headers,
- * so we accept token via query parameter for this endpoint only
+ * so we accept token via query parameter for this endpoint only.
+ * The authenticate middleware will check req.query.token automatically.
  */
 router.get(
   '/events',
-  (req, res, next) => {
-    // Special handling for SSE: extract token from query param and set as Authorization header
-    // This allows EventSource to connect (it can't send custom headers)
-    if (req.query.token) {
-      req.headers.authorization = `Bearer ${req.query.token}`;
-    }
-    next();
-  },
-  authenticate,
+  authenticate, // Reads token from query param (see auth-multi-tenant.js)
   checkShopStatus,
   asyncHandler(async (req, res) => {
     const sseManager = require('../services/sse-manager.service');

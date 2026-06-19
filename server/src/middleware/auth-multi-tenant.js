@@ -113,6 +113,10 @@ async function authenticate(req, res, next) {
     else if (req.headers.authorization?.startsWith("Bearer ")) {
       token = req.headers.authorization.substring(7);
     }
+    // Fallback: Query parameter (for SSE EventSource which can't send custom headers)
+    else if (req.query.token) {
+      token = req.query.token;
+    }
 
     if (!token) {
       return res.status(401).json({
