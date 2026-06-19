@@ -17,6 +17,13 @@ const SalesHistory = () => {
   const [editDueLoading, setEditDueLoading] = useState(false);
   const [editDueError, setEditDueError] = useState("");
 
+  // Pay Due state
+  const [payDueSale, setPayDueSale] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [payDueLoading, setPayDueLoading] = useState(false);
+  const [payDueError, setPayDueError] = useState("");
+
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
@@ -173,6 +180,58 @@ const SalesHistory = () => {
       setEditDueError(err?.message || "Failed to update previous due");
     } finally {
       setEditDueLoading(false);
+    }
+  };
+
+  const openPayDue = (sale) => {
+    setPayDueSale(sale);
+    // Default to full due amount
+    const totalDue = (sale.dueAmount || 0) + (sale.previousDue || 0);
+    setPaymentAmount(totalDue > 0 ? totalDue.toFixed(2) : "");
+    setPaymentMethod("cash");
+    setPayDueError("");
+  };
+
+  const closePayDue = () => {
+    setPayDueSale(null);
+    setPaymentAmount("");
+    setPaymentMethod("cash");
+    setPayDueError("");
+  };
+
+  const submitPayDue = async () => {
+    const amount = parseFloat(paymentAmount);
+    const totalDue = (payDueSale.dueAmount || 0) + (payDueSale.previousDue || 0);
+    
+    if (isNaN(amount) || amount <= 0) {
+      setPayDueError("Please enter a valid payment amount");
+      return;
+    }
+    
+    if (amount > totalDue) {
+      setPayDueError(`Payment cannot exceed total due amount (Tk ${totalDue.toFixed(2)})`);
+      return;
+    }
+
+    setPayDueLoading(true);
+    setPayDueError("");
+    try {
+      const response = await api.post(`/sales/${payDueSale._id}/pay-due`, {
+        amount,
+        paymentMethod,
+      });
+      
+      if (response.success) {
+        // Refresh the sales list to show updated due amounts
+        fetchSalesHistory();
+        closePayDue();
+      } else {
+        setPayDueError(response.message || "Failed to record payment");
+      }
+    } catch (err) {
+      setPayDueError(err.response?.data?.message || err.message || "Failed to record payment");
+    } finally {
+      setPayDueLoading(false);
     }
   };
 
@@ -514,6 +573,15 @@ const SalesHistory = () => {
                               : <i className="fas fa-download text-xs"></i>
                             }
                           </button>
+                          {((sale.dueAmount || 0) > 0 || (sale.previousDue || 0) > 0) && (
+                            <button
+                              onClick={() => openPayDue(sale)}
+                              className="bg-emerald-500 hover:bg-emerald-600 text-white w-8 h-8 rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center"
+                              title="Pay Due Amount"
+                            >
+                              <i className="fas fa-money-bill-wave text-xs"></i>
+                            </button>
+                          )}
                           <button
                             onClick={() => openEditDue(sale)}
                             className="bg-orange-500 hover:bg-orange-600 text-white w-8 h-8 rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center"
@@ -589,6 +657,175 @@ const SalesHistory = () => {
           onClose={() => { setShowInvoiceModal(false); setSelectedSale(null); }}
           onDownload={downloadInvoice}
         />
+      )}
+
+      {/* Pay Due Modal */}
+      {payDueSale && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                  <i className="fas fa-money-bill-wave"></i>
+                  Pay Due Amount
+                </h3>
+                <p className="text-emerald-100 text-xs mt-0.5">Invoice: {payDueSale.invoiceNo}</p>
+              </div>
+              <button
+                onClick={closePayDue}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <i className="fas fa-times text-lg"></i>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Customer Info */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shadow-md">
+                    {(payDueSale.customerName || "C")[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium">Customer</p>
+                    <p className="text-base font-bold text-gray-800">{payDueSale.customerName || "Cash Customer"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Due Amount Breakdown */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+                  <p className="text-xs text-orange-600 font-medium mb-1 flex items-center gap-1">
+                    <i className="fas fa-history"></i>
+                    Previous Due
+                  </p>
+                  <p className="text-xl font-bold text-orange-700">Tk {Number(payDueSale.previousDue || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                  <p className="text-xs text-red-600 font-medium mb-1 flex items-center gap-1">
+                    <i className="fas fa-receipt"></i>
+                    This Sale Due
+                  </p>
+                  <p className="text-xl font-bold text-red-700">Tk {Number(payDueSale.dueAmount || 0).toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Total Due */}
+              <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-lg p-4 text-center">
+                <p className="text-white/90 text-sm font-medium mb-1">Total Outstanding</p>
+                <p className="text-3xl font-bold text-white">
+                  Tk {Number((payDueSale.dueAmount || 0) + (payDueSale.previousDue || 0)).toFixed(2)}
+                </p>
+              </div>
+
+              {/* Error Message */}
+              {payDueError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
+                  <i className="fas fa-exclamation-circle mt-0.5"></i>
+                  <span>{payDueError}</span>
+                </div>
+              )}
+
+              {/* Payment Amount Input */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <i className="fas fa-coins text-emerald-500"></i>
+                  Payment Amount (Tk)
+                </label>
+                <input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full px-4 py-3 text-lg font-semibold border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                />
+                <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                  <i className="fas fa-info-circle"></i>
+                  Enter the amount customer is paying now
+                </p>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <i className="fas fa-credit-card text-blue-500"></i>
+                  Payment Method
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("cash")}
+                    className={`px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                      paymentMethod === "cash"
+                        ? "bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    <i className="fas fa-money-bill-wave mr-1"></i>
+                    Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("bank")}
+                    className={`px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                      paymentMethod === "bank"
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    <i className="fas fa-university mr-1"></i>
+                    Bank
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("card")}
+                    className={`px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                      paymentMethod === "card"
+                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    <i className="fas fa-credit-card mr-1"></i>
+                    Card
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={closePayDue}
+                  disabled={payDueLoading}
+                  className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitPayDue}
+                  disabled={payDueLoading}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white rounded-lg font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {payDueLoading ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin"></i>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-check-circle"></i>
+                      Record Payment
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Previous Due Modal */}

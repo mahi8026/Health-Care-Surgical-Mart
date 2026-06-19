@@ -401,6 +401,202 @@ router.patch(
 );
 
 /**
+ * POST /api/sales/:id/pay-due
+ * Record a payment towards the due amount (reduces dueAmount and/or previousDue)
+ */
+router.post(
+  "/:id/pay-due",
+  requirePermission(PERMISSIONS.MANAGE_SALES),
+  async (req, res) => {
+    try {
+      const { ObjectId } = require("mongodb");
+      const { logger } = require("../config/logging");
+
+      const { amount, paymentMethod = "cash" } = req.body;
+
+      // Validate payment amount
+      if (amount === undefined || amount === null || amount === "") {
+        return res.status(400).json({ success: false, message: "Payment amount is required" });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ success: false, message: "Payment amount must be a positive number" });
+      }
+
+      // Validate payment method
+      const validPaymentMethods = ["cash", "bank", "card"];
+      if (!validPaymentMethods.includes(paymentMethod)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Invalid payment method. Must be one of: ${validPaymentMethods.join(", ")}` 
+        });
+      }
+
+      // Validate sale ID
+      let saleId;
+      try {
+        saleId = new ObjectId(req.params.id);
+      } catch {
+        return res.status(400).json({ success: false, message: "Invalid sale ID" });
+      }
+
+      // Get the sale
+      const sale = await req.shopDb.collection("sales").findOne({ _id: saleId });
+      if (!sale) {
+        return res.status(404).json({ success: false, message: "Sale not found" });
+      }
+
+      // Calculate current due
+      const currentDueAmount = sale.dueAmount || 0;
+      const currentPreviousDue = sale.previousDue || 0;
+      const totalDue = currentDueAmount + currentPreviousDue;
+
+      // Validate payment doesn't exceed total due
+      if (parsedAmount > totalDue) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Payment amount (Tk ${parsedAmount.toFixed(2)}) exceeds total due (Tk ${totalDue.toFixed(2)})` 
+        });
+      }
+
+      // Calculate new amounts
+      // Priority: First pay off current sale's due, then previous due
+      let newDueAmount = currentDueAmount;
+      let newPreviousDue = currentPreviousDue;
+      let remainingPayment = parsedAmount;
+
+      // First, reduce current sale's due amount
+      if (remainingPayment > 0 && newDueAmount > 0) {
+        const duePayment = Math.min(remainingPayment, newDueAmount);
+        newDueAmount -= duePayment;
+        remainingPayment -= duePayment;
+      }
+
+      // Then, reduce previous due if any payment remains
+      if (remainingPayment > 0 && newPreviousDue > 0) {
+        const previousDuePayment = Math.min(remainingPayment, newPreviousDue);
+        newPreviousDue -= previousDuePayment;
+        remainingPayment -= previousDuePayment;
+      }
+
+      // Update paid amounts based on payment method
+      const updatedFields = {
+        dueAmount: newDueAmount,
+        previousDue: newPreviousDue,
+        totalOutstanding: newDueAmount + newPreviousDue,
+        updatedAt: new Date(),
+      };
+
+      // Add payment to the appropriate paid field
+      if (paymentMethod === "cash") {
+        updatedFields.cashPaid = (sale.cashPaid || 0) + parsedAmount;
+      } else if (paymentMethod === "bank") {
+        updatedFields.bankPaid = (sale.bankPaid || 0) + parsedAmount;
+      } else if (paymentMethod === "card") {
+        // For card, add to bank paid (can be separated if needed)
+        updatedFields.bankPaid = (sale.bankPaid || 0) + parsedAmount;
+      }
+
+      // Recalculate payment status
+      const totalPaid = (updatedFields.cashPaid || sale.cashPaid || 0) + (updatedFields.bankPaid || sale.bankPaid || 0);
+      const grandTotal = sale.grandTotal || 0;
+
+      if (totalPaid >= grandTotal && newDueAmount === 0 && newPreviousDue === 0) {
+        updatedFields.paymentStatus = "Paid";
+      } else if (totalPaid > 0) {
+        updatedFields.paymentStatus = "Partial";
+      } else {
+        updatedFields.paymentStatus = "Credit";
+      }
+
+      // Update the sale
+      await req.shopDb.collection("sales").updateOne(
+        { _id: saleId },
+        { $set: updatedFields }
+      );
+
+      // Record payment in payment history (optional - create payments collection if needed)
+      try {
+        await req.shopDb.collection("payments").insertOne({
+          saleId,
+          invoiceNo: sale.invoiceNo,
+          customerId: sale.customerId,
+          customerName: sale.customerName,
+          amount: parsedAmount,
+          paymentMethod,
+          paymentDate: new Date(),
+          recordedBy: new ObjectId(req.user.id),
+          recordedByName: req.user.name || "Unknown",
+          notes: `Payment towards ${sale.invoiceNo}`,
+          createdAt: new Date(),
+        });
+      } catch (paymentErr) {
+        logger.warn("Failed to record payment history:", { error: paymentErr.message });
+        // Non-blocking - continue even if payment history fails
+      }
+
+      // Audit log
+      try {
+        auditLog.log(
+          req,
+          AUDIT_ACTIONS.SALE_UPDATED || "SALE_UPDATED",
+          "sale",
+          req.params.id,
+          `Payment received for sale ${sale.invoiceNo}: Tk ${parsedAmount.toFixed(2)} via ${paymentMethod}`,
+          {
+            before: { 
+              dueAmount: currentDueAmount, 
+              previousDue: currentPreviousDue,
+              totalOutstanding: totalDue,
+              paymentStatus: sale.paymentStatus,
+            },
+            after: { 
+              dueAmount: newDueAmount, 
+              previousDue: newPreviousDue,
+              totalOutstanding: newDueAmount + newPreviousDue,
+              paymentStatus: updatedFields.paymentStatus,
+            },
+            payment: {
+              amount: parsedAmount,
+              method: paymentMethod,
+            },
+          }
+        );
+      } catch (_) { /* non-blocking */ }
+
+      logger.info(`Payment received for sale ${sale.invoiceNo}`, {
+        saleId: req.params.id,
+        amount: parsedAmount,
+        paymentMethod,
+        before: { dueAmount: currentDueAmount, previousDue: currentPreviousDue },
+        after: { dueAmount: newDueAmount, previousDue: newPreviousDue },
+        recordedBy: req.user.name,
+      });
+
+      return res.json({
+        success: true,
+        message: "Payment recorded successfully",
+        data: {
+          _id: sale._id,
+          invoiceNo: sale.invoiceNo,
+          paymentReceived: parsedAmount,
+          paymentMethod,
+          dueAmount: newDueAmount,
+          previousDue: newPreviousDue,
+          totalOutstanding: newDueAmount + newPreviousDue,
+          paymentStatus: updatedFields.paymentStatus,
+        },
+      });
+    } catch (error) {
+      const { logger } = require("../config/logging");
+      logger.error("Pay due error:", { error: error.message, saleId: req.params.id });
+      return res.status(500).json({ success: false, message: "Failed to record payment" });
+    }
+  }
+);
+
+/**
  * GET /api/sales/:id/download-invoice
  * Generate PDF invoice and stream directly to browser (no storage needed)
  */
