@@ -206,13 +206,26 @@ class BulkProductImportService {
                     { _id: existingProduct._id },
                     { $set: { ...productData, updatedAt: new Date() } },
                   );
+                  
+                  // Phase 6: Use event-sourced system for initial stock
                   if (row.initialStock) {
-                    await shopDb.collection("stock").updateOne(
-                      { productId: existingProduct._id },
-                      { $set: { currentQty: parseInt(row.initialStock), updatedAt: new Date() } },
-                      { upsert: true },
-                    );
+                    const stockCommand = require('./stock-command.service');
+                    await stockCommand.recordMovement({
+                      shopId: bulkImport.shopId,
+                      productId: existingProduct._id,
+                      movementType: 'OPENING_STOCK',
+                      quantity: parseInt(row.initialStock),
+                      userId: bulkImport.uploadedBy,
+                      referenceType: 'BULK_IMPORT',
+                      referenceId: bulkImport._id,
+                      note: `Bulk import update - initial stock`,
+                      metadata: {
+                        importFile: bulkImport.fileName,
+                        rowIndex
+                      }
+                    });
                   }
+                  
                   results.success.push({ row: rowIndex, productId: existingProduct._id, action: "updated" });
                   successCount++;
                 } else {
@@ -223,19 +236,25 @@ class BulkProductImportService {
                 const insertResult = await shopDb.collection("products").insertOne(productData);
                 const newProductId = insertResult.insertedId;
 
+                // Phase 6: Use event-sourced system for initial stock
                 if (row.initialStock) {
-                  await shopDb.collection("stock").insertOne({
+                  const stockCommand = require('./stock-command.service');
+                  await stockCommand.recordMovement({
+                    shopId: bulkImport.shopId,
                     productId: newProductId,
-                    productName: productData.name,
-                    currentQty: parseInt(row.initialStock),
-                    reservedQty: 0,
-                    availableQty: parseInt(row.initialStock),
-                    minStockLevel: productData.minStockLevel || 0,
-                    isLowStock: parseInt(row.initialStock) <= (productData.minStockLevel || 0),
-                    batchNo: row.batchNumber || undefined,
-                    expiryDate: row.expiryDate ? new Date(row.expiryDate) : undefined,
-                    lastUpdated: new Date(),
-                    createdAt: new Date(),
+                    movementType: 'OPENING_STOCK',
+                    quantity: parseInt(row.initialStock),
+                    userId: bulkImport.uploadedBy,
+                    referenceType: 'BULK_IMPORT',
+                    referenceId: bulkImport._id,
+                    batchNo: row.batchNumber || null,
+                    expiryDate: row.expiryDate ? new Date(row.expiryDate) : null,
+                    note: `Bulk import - initial stock for ${productData.name}`,
+                    metadata: {
+                      importFile: bulkImport.fileName,
+                      rowIndex,
+                      sku: productData.sku
+                    }
                   });
                 }
 

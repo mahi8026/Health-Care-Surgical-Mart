@@ -466,7 +466,7 @@ class SalesController {
 
   /**
    * Update stock quantities after sale
-   * Phase 4: Integrated with event-sourced stock system + FEFO batch tracking
+   * Phase 6: Event-sourced system with FEFO batch tracking (legacy system retired)
    */
   async _updateStockForSale(shopDb, enrichedItems, session = null, saleId = null, userId = null, shopId = null) {
     const stockCommand = require('../services/stock-command.service');
@@ -518,76 +518,9 @@ class SalesController {
       }
     }
 
-    // Legacy stock collection update (for backward compatibility during migration)
-    // TODO: Remove this after Phase 5 when legacy system is fully retired
-    const options = session ? { session } : {};
-
-    for (const item of enrichedItems) {
-      if (!item.productId || item.productId === null) continue;
-
-      const existingStock = await shopDb.collection("stock").findOne(
-        { productId: item.productId },
-        options,
-      );
-
-      if (existingStock) {
-        // Update legacy stock collection
-        await shopDb.collection("stock").updateOne(
-          { productId: item.productId },
-          {
-            $inc: {
-              currentQty: -item.qty,
-              availableQty: -item.qty,
-            },
-            $set: {
-              lastUpdated: new Date(),
-              lastSaleDate: new Date(),
-            },
-          },
-          options,
-        );
-      } else {
-        // Create stock record with negative quantity
-        const product = await shopDb.collection("products").findOne(
-          { _id: item.productId },
-          options,
-        );
-
-        await shopDb.collection("stock").insertOne(
-          {
-            productId: item.productId,
-            productName: product?.name || item.name,
-            currentQty: -item.qty,
-            reservedQty: 0,
-            availableQty: -item.qty,
-            minStockLevel: product?.minStockLevel || 0,
-            isLowStock: true,
-            lastUpdated: new Date(),
-            lastSaleDate: new Date(),
-            createdAt: new Date(),
-          },
-          options,
-        );
-
-        logger.warn(
-          `Created stock record for ${item.name} with negative quantity: -${item.qty}`,
-        );
-      }
-
-      // Update low stock flag
-      const updatedStock = await shopDb.collection("stock").findOne(
-        { productId: item.productId },
-        options,
-      );
-
-      if (updatedStock) {
-        const isLowStock =
-          updatedStock.currentQty <= (updatedStock.minStockLevel || 0);
-        await shopDb
-          .collection("stock")
-          .updateOne({ productId: item.productId }, { $set: { isLowStock } }, options);
-      }
-    }
+    // Phase 6: Legacy stock collection updates REMOVED
+    // Snapshot system is now the single source of truth
+    logger.info('Stock updates completed via event-sourced system');
   }
 
   /**

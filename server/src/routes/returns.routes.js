@@ -639,23 +639,28 @@ router.post(
       // Insert return record
       const result = await shopDb.collection("returns").insertOne(returnData);
 
-      // Update stock quantities for returned items
+      // Phase 6: Update stock using event-sourced system
+      const stockCommand = require('../services/stock-command.service');
+      
       for (const item of returnItems) {
-        await shopDb.collection("stock").updateOne(
-          { productId: item.productId },
-          {
-            $inc: {
-              currentQty: item.returnQuantity,
-              availableQty: item.returnQuantity,
-            },
-            $set: {
-              lastUpdated: new Date(),
-              updatedBy: req.user.id,
-            },
-          },
-        );
+        // Record stock movement via event-sourced system
+        await stockCommand.recordMovement({
+          shopId: req.user.shopId,
+          productId: item.productId,
+          movementType: 'RETURN_IN',
+          quantity: item.returnQuantity,
+          userId: req.user._id || req.user.id,
+          referenceType: 'RETURN',
+          referenceId: result.insertedId,
+          note: `Return from sale ${originalInvoiceNumber}`,
+          metadata: {
+            returnNumber,
+            originalSaleId,
+            reason: returnReason
+          }
+        });
 
-        // Log stock movement
+        // Log stock movement (legacy - for backward compatibility)
         await shopDb.collection("stock_movements").insertOne({
           productId: item.productId,
           productName: item.name,
@@ -728,41 +733,48 @@ router.put(
       throw createError.notFound("Return record not found");
     }
 
-    // If cancelling a completed return, restore stock
+    // If cancelling a completed return, restore stock (remove returned items)
+    // Phase 6: Use event-sourced system
     if (status === "cancelled" && returnRecord.status === "completed") {
+      const stockCommand = require('../services/stock-command.service');
+      
       for (const item of returnRecord.items) {
-        await shopDb.collection("stock").updateOne(
-          { productId: item.productId },
-          {
-            $inc: {
-              currentQty: -item.returnQuantity,
-              availableQty: -item.returnQuantity,
-            },
-            $set: {
-              lastUpdated: new Date(),
-              updatedBy: req.user.id,
-            },
-          },
-        );
+        await stockCommand.recordMovement({
+          shopId: req.user.shopId,
+          productId: item.productId,
+          movementType: 'RETURN_OUT',
+          quantity: item.returnQuantity,
+          userId: req.user._id || req.user.id,
+          referenceType: 'RETURN_CANCEL',
+          referenceId: returnRecord._id,
+          note: `Cancelled return ${returnRecord.returnNumber}`,
+          metadata: {
+            returnNumber: returnRecord.returnNumber,
+            reason: notes || 'Return cancelled'
+          }
+        });
       }
     }
 
-    // If completing a pending return, update stock
+    // If completing a pending return, update stock (add returned items)
     if (status === "completed" && returnRecord.status === "pending") {
+      const stockCommand = require('../services/stock-command.service');
+      
       for (const item of returnRecord.items) {
-        await shopDb.collection("stock").updateOne(
-          { productId: item.productId },
-          {
-            $inc: {
-              currentQty: item.returnQuantity,
-              availableQty: item.returnQuantity,
-            },
-            $set: {
-              lastUpdated: new Date(),
-              updatedBy: req.user.id,
-            },
-          },
-        );
+        await stockCommand.recordMovement({
+          shopId: req.user.shopId,
+          productId: item.productId,
+          movementType: 'RETURN_IN',
+          quantity: item.returnQuantity,
+          userId: req.user._id || req.user.id,
+          referenceType: 'RETURN',
+          referenceId: returnRecord._id,
+          note: `Approved return ${returnRecord.returnNumber}`,
+          metadata: {
+            returnNumber: returnRecord.returnNumber,
+            originalStatus: returnRecord.status
+          }
+        });
       }
     }
 
