@@ -294,6 +294,26 @@ BUG_FIXES*.md
 FINAL_*.md
 QUICK_*.md
 
+# Phase and deployment documentation
+PHASE_*.md
+*_PHASE.md
+*_DEPLOYED.md
+*_IMPLEMENTATION.md
+DEPLOYMENT_*.md
+*_DEPLOYMENT.md
+ACTION_*.md
+*_ACTION.md
+DIAGNOSE_*.md
+*_DIAGNOSE.md
+FIX_*.md
+VERIFY_*.md
+*_VERIFY.md
+*_CHECKLIST.md
+*_PLAN.md
+*_AUDIT*.md
+*_REPORT.md
+*_DIAGRAM.md
+
 # ============================================
 # Miscellaneous
 # ============================================

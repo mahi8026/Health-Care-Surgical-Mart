@@ -27,13 +27,17 @@ const useStockEvents = (onEvent) => {
   useEffect(() => {
     // Don't connect if no callback provided (user not logged in)
     if (!onEvent) {
+      setConnected(false);
+      setError(null);
       return;
     }
 
     // Get auth token from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
+      console.warn('[SSE] No token found, skipping connection');
       setError('Authentication required');
+      setConnected(false);
       return;
     }
 
