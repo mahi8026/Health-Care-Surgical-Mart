@@ -767,7 +767,7 @@ const StockReport = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Search */}
           <div className="lg:col-span-2">
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-search text-teal-500 text-xs"></i>
               Search
             </label>
@@ -785,7 +785,7 @@ const StockReport = () => {
 
           {/* Category */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-tags text-blue-500 text-xs"></i>
               Category
             </label>
@@ -806,7 +806,7 @@ const StockReport = () => {
 
           {/* Status */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-info-circle text-purple-500 text-xs"></i>
               Status
             </label>
@@ -830,7 +830,7 @@ const StockReport = () => {
 
           {/* Supplier */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-truck text-orange-500 text-xs"></i>
               Supplier
             </label>
@@ -875,7 +875,7 @@ const StockReport = () => {
         {/* Expiry Date Range */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 pt-5 border-t border-gray-200">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-calendar-alt text-green-500 text-xs"></i>
               Expiry From
             </label>
@@ -887,7 +887,7 @@ const StockReport = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-calendar-check text-blue-500 text-xs"></i>
               Expiry To
             </label>

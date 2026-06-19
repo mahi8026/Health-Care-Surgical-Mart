@@ -292,7 +292,7 @@ const SalesHistory = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {/* Search Input */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-search text-indigo-500 text-xs"></i>
               Search Invoice
             </label>
@@ -329,7 +329,7 @@ const SalesHistory = () => {
 
           {/* Start Date */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-calendar-alt text-green-500 text-xs"></i>
               Start Date
             </label>
@@ -345,7 +345,7 @@ const SalesHistory = () => {
 
           {/* End Date */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-calendar-check text-blue-500 text-xs"></i>
               End Date
             </label>
@@ -361,7 +361,7 @@ const SalesHistory = () => {
 
           {/* Payment Status */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <label className="flex text-xs font-semibold text-gray-700 mb-2 items-center gap-1.5">
               <i className="fas fa-money-check-alt text-purple-500 text-xs"></i>
               Payment Status
             </label>
@@ -731,7 +731,7 @@ const SalesHistory = () => {
 
               {/* Payment Amount Input */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <label className="flex text-sm font-semibold text-gray-700 mb-2 items-center gap-2">
                   <i className="fas fa-coins text-emerald-500"></i>
                   Payment Amount (Tk)
                 </label>
@@ -752,7 +752,7 @@ const SalesHistory = () => {
 
               {/* Payment Method */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <label className="flex text-sm font-semibold text-gray-700 mb-2 items-center gap-2">
                   <i className="fas fa-credit-card text-blue-500"></i>
                   Payment Method
                 </label>
