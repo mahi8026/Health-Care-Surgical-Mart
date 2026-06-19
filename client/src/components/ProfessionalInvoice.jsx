@@ -166,10 +166,10 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                   Qty
                 </th>
                 <th className="px-2 py-2 text-right font-medium uppercase w-24">
-                  Rate (৳)
+                  Rate (Tk)
                 </th>
                 <th className="px-2 py-2 text-right font-medium uppercase w-24">
-                  Total (৳)
+                  Total (Tk)
                 </th>
               </tr>
             </thead>
@@ -227,14 +227,14 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
               }
             </span>
             <span className="text-gray-700">
-              <strong>Cash Paid:</strong> ৳{formatCurrency(sale?.cashPaid || 0)}
+              <strong>Cash Paid:</strong> Tk {formatCurrency(sale?.cashPaid || 0)}
             </span>
             <span className="text-gray-700">
-              <strong>Bank Paid:</strong> ৳{formatCurrency(sale?.bankPaid || 0)}
+              <strong>Bank Paid:</strong> Tk {formatCurrency(sale?.bankPaid || 0)}
             </span>
             {(sale?.changeAmount > 0 || sale?.returnAmount > 0 || returnAmount > 0) && (
               <span className="text-gray-700">
-                <strong>Change:</strong> ৳{formatCurrency(sale?.changeAmount || sale?.returnAmount || returnAmount)}
+                <strong>Change:</strong> Tk {formatCurrency(sale?.changeAmount || sale?.returnAmount || returnAmount)}
               </span>
             )}
           </div>
@@ -264,14 +264,14 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium">
-                  {formatCurrency(sale?.subtotal || subtotal)} ৳
+                  Tk {formatCurrency(sale?.subtotal || subtotal)}
                 </span>
               </div>
               {(sale?.discountAmount > 0 || sale?.discount > 0) && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Discount</span>
                   <span className="font-medium text-red-600">
-                    -{formatCurrency(sale?.discountAmount || sale?.discount)} ৳
+                    -Tk {formatCurrency(sale?.discountAmount || sale?.discount)}
                   </span>
                 </div>
               )}
@@ -281,26 +281,26 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                     VAT ({sale?.vatPercent || 0}%)
                   </span>
                   <span className="font-medium">
-                    {formatCurrency(sale?.vatAmount)} ৳
+                    Tk {formatCurrency(sale?.vatAmount)}
                   </span>
                 </div>
               )}
               <div className="border-t border-dashed border-gray-300 pt-2"></div>
               <div className="flex justify-between text-base font-bold text-green-600">
                 <span>Grand Total</span>
-                <span>{formatCurrency(sale?.grandTotal || grandTotal)} ৳</span>
+                <span>Tk {formatCurrency(sale?.grandTotal || grandTotal)}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Paid</span>
                 <span className="font-medium text-green-700">
-                  {formatCurrency((sale?.cashPaid || 0) + (sale?.bankPaid || 0))} ৳
+                  Tk {formatCurrency((sale?.cashPaid || 0) + (sale?.bankPaid || 0))}
                 </span>
               </div>
               {(sale?.changeAmount > 0 || sale?.returnAmount > 0 || returnAmount > 0) && (
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-600">Return</span>
                   <span className="font-medium">
-                    {formatCurrency(sale?.changeAmount || sale?.returnAmount || returnAmount)} ৳
+                    Tk {formatCurrency(sale?.changeAmount || sale?.returnAmount || returnAmount)}
                   </span>
                 </div>
               )}
@@ -315,7 +315,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">This Sale Due</span>
                       <span className="font-semibold text-orange-600">
-                        {formatCurrency(sale.dueAmount)} ৳
+                        Tk {formatCurrency(sale.dueAmount)}
                       </span>
                     </div>
                   )}
@@ -325,7 +325,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">Previous Due</span>
                       <span className="font-semibold text-orange-600">
-                        {formatCurrency(sale.previousDue)} ৳
+                        Tk {formatCurrency(sale.previousDue)}
                       </span>
                     </div>
                   )}
@@ -335,7 +335,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                     <div className="flex justify-between text-sm font-bold border-t border-red-200 pt-2 mt-1">
                       <span className="text-red-700">Total Outstanding</span>
                       <span className="text-red-700">
-                        {formatCurrency(sale?.totalOutstanding || (sale.previousDue + sale.dueAmount))} ৳
+                        Tk {formatCurrency(sale?.totalOutstanding || (sale.previousDue + sale.dueAmount))}
                       </span>
                     </div>
                   )}
@@ -345,7 +345,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                     <div className="flex justify-between text-sm font-bold border-t border-red-200 pt-2 mt-1">
                       <span className="text-red-700">Total Outstanding</span>
                       <span className="text-red-700">
-                        {formatCurrency(sale.previousDue)} ৳
+                        Tk {formatCurrency(sale.previousDue)}
                       </span>
                     </div>
                   )}
@@ -355,7 +355,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600 font-semibold">Due</span>
                       <span className="font-bold text-red-600">
-                        {formatCurrency(sale.dueAmount)} ৳
+                        Tk {formatCurrency(sale.dueAmount)}
                       </span>
                     </div>
                   )}
