@@ -176,7 +176,7 @@ const SalesHistory = () => {
     }
   };
 
-  const formatCurrency = (amount) => `৳${Number(amount || 0).toFixed(2)}`;
+  const formatCurrency = (amount) => `Tk ${Number(amount || 0).toFixed(2)}`;
 
   const formatDate = (date) => {
     if (!date) return "N/A";
@@ -188,90 +188,149 @@ const SalesHistory = () => {
 
   const statusBadge = (status) => {
     const colors = {
-      Paid: "bg-green-100 text-green-800",
-      Partial: "bg-yellow-100 text-yellow-800",
-      Credit: "bg-orange-100 text-orange-800",
-      Pending: "bg-gray-100 text-gray-800",
+      Paid: "bg-gradient-to-r from-green-500 to-emerald-500 text-white",
+      Partial: "bg-gradient-to-r from-yellow-400 to-amber-400 text-white",
+      Credit: "bg-gradient-to-r from-orange-500 to-red-500 text-white",
+      Pending: "bg-gradient-to-r from-gray-400 to-gray-500 text-white",
+    };
+    const icons = {
+      Paid: "fa-check-circle",
+      Partial: "fa-exclamation-circle",
+      Credit: "fa-clock",
+      Pending: "fa-hourglass-half",
     };
     return (
-      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || colors.Pending}`}>
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${colors[status] || colors.Pending}`}>
+        <i className={`fas ${icons[status] || icons.Pending}`}></i>
         {status}
       </span>
     );
   };
 
   return (
-    <div>
-      {/* Page Header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <i className="fas fa-history text-blue-600"></i>
-          Sales History
-        </h1>
-        <p className="text-sm text-gray-500 mt-0.5">View and manage all previous sales transactions</p>
+    <div className="max-w-[1600px]">
+      {/* Page Header with Gradient Background */}
+      <div className="mb-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
+                <i className="fas fa-history"></i>
+              </div>
+              Sales History
+            </h1>
+            <p className="text-blue-100 mt-2 text-sm">Track and manage all sales transactions with advanced filtering</p>
+          </div>
+          <div className="text-right">
+            <div className="text-white/90 text-sm mb-1">Total Records</div>
+            <div className="text-3xl font-bold text-white">{pagination.total}</div>
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-            <i className="fas fa-filter text-gray-400"></i> Filters
-          </span>
-          <button onClick={resetFilters} className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-            <i className="fas fa-redo"></i> Reset
+      {/* Enhanced Filters Section */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-lg shadow-md">
+              <i className="fas fa-filter text-white text-sm"></i>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Filter Sales</h3>
+              <p className="text-xs text-gray-500">Narrow down your search results</p>
+            </div>
+          </div>
+          <button 
+            onClick={resetFilters} 
+            className="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-lg font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+          >
+            <i className="fas fa-redo-alt"></i> Reset All
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          {/* Search Input */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Search Invoice</label>
-            <input
-              type="text"
-              value={filters.searchTerm}
-              onChange={(e) => handleFilterChange("searchTerm", e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && applyFilters()}
-              placeholder="Invoice no, customer..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-search text-indigo-500 text-xs"></i>
+              Search Invoice
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={filters.searchTerm}
+                onChange={(e) => handleFilterChange("searchTerm", e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+                placeholder="Invoice no, customer..."
+                className="w-full pl-10 pr-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              />
+              <i className="fas fa-search absolute left-3 top-3.5 text-gray-400 text-xs"></i>
+            </div>
           </div>
+
+          {/* Start Date */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => handleFilterChange("startDate", e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-calendar-alt text-green-500 text-xs"></i>
+              Start Date
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => handleFilterChange("startDate", e.target.value)}
+                className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              />
+            </div>
           </div>
+
+          {/* End Date */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => handleFilterChange("endDate", e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-calendar-check text-blue-500 text-xs"></i>
+              End Date
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => handleFilterChange("endDate", e.target.value)}
+                className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+            </div>
           </div>
+
+          {/* Payment Status */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Payment Status</label>
-            <select
-              value={filters.paymentStatus}
-              onChange={(e) => handleFilterChange("paymentStatus", e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Status</option>
-              <option value="Paid">Paid</option>
-              <option value="Partial">Partial</option>
-              <option value="Credit">Credit</option>
-              <option value="Pending">Pending</option>
-            </select>
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-money-check-alt text-purple-500 text-xs"></i>
+              Payment Status
+            </label>
+            <div className="relative">
+              <select
+                value={filters.paymentStatus}
+                onChange={(e) => handleFilterChange("paymentStatus", e.target.value)}
+                className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all appearance-none bg-white"
+              >
+                <option value="">All Status</option>
+                <option value="Paid">✓ Paid</option>
+                <option value="Partial">⚠ Partial</option>
+                <option value="Credit">⏱ Credit</option>
+                <option value="Pending">⏳ Pending</option>
+              </select>
+              <i className="fas fa-chevron-down absolute right-3 top-3.5 text-gray-400 text-xs pointer-events-none"></i>
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between pt-2">
+          <div className="text-xs text-gray-500 flex items-center gap-1.5">
+            <i className="fas fa-info-circle text-blue-500"></i>
+            Press <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Enter</kbd> in search to apply
+          </div>
           <button
             onClick={applyFilters}
-            className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+            className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2"
           >
             <i className="fas fa-search"></i> Apply Filters
           </button>
@@ -291,96 +350,176 @@ const SalesHistory = () => {
         </div>
       )}
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* Enhanced Table */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
         {loading ? (
-          <div className="flex justify-center items-center py-16">
+          <div className="flex flex-col justify-center items-center py-20">
             <LoadingSpinner />
+            <p className="text-gray-500 mt-4 text-sm">Loading sales history...</p>
           </div>
         ) : sales.length === 0 ? (
-          <div className="text-center py-16">
-            <i className="fas fa-receipt text-5xl text-gray-200 mb-3"></i>
-            <p className="text-gray-500 font-medium">No sales found</p>
-            <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
+          <div className="text-center py-20">
+            <div className="bg-gray-100 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-4">
+              <i className="fas fa-receipt text-5xl text-gray-300"></i>
+            </div>
+            <p className="text-gray-600 font-semibold text-lg">No sales found</p>
+            <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or create a new sale</p>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice No</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Items</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Paid</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Due</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
+                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <i className="fas fa-hashtag"></i>
+                        Invoice No
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <i className="fas fa-calendar"></i>
+                        Date
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <i className="fas fa-user"></i>
+                        Customer
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center justify-center gap-2">
+                        <i className="fas fa-boxes"></i>
+                        Items
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
+                        <i className="fas fa-money-bill-wave"></i>
+                        Total
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
+                        <i className="fas fa-check-circle"></i>
+                        Paid
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center justify-end gap-2">
+                        <i className="fas fa-exclamation-triangle"></i>
+                        Due
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center justify-center gap-2">
+                        <i className="fas fa-info-circle"></i>
+                        Status
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                      <div className="flex items-center justify-center gap-2">
+                        <i className="fas fa-cog"></i>
+                        Actions
+                      </div>
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {sales.map((sale) => (
-                    <tr key={sale._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-mono font-medium text-gray-900 whitespace-nowrap">
-                        {sale.invoiceNo}
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {sales.map((sale, index) => (
+                    <tr 
+                      key={sale._id} 
+                      className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200 ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                      }`}
+                    >
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shadow-sm">
+                            {index + 1}
+                          </div>
+                          <span className="font-mono font-semibold text-gray-900">
+                            {sale.invoiceNo}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        {formatDate(sale.saleDate)}
+                      <td className="px-4 py-4">
+                        <div className="text-gray-700 font-medium text-xs">
+                          {formatDate(sale.saleDate)}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{sale.customerName || "Cash Customer"}</div>
-                        <div className="text-xs text-gray-400">{sale.customerType || "Walk-in"}</div>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-gradient-to-br from-purple-500 to-pink-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow-sm">
+                            {(sale.customerName || "C")[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">{sale.customerName || "Cash Customer"}</div>
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <i className="fas fa-tag text-xs"></i>
+                              {sale.customerType || "Walk-in"}
+                            </div>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-center text-gray-600">
-                        {sale.items?.length || 0}
+                      <td className="px-4 py-4 text-center">
+                        <span className="inline-flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 font-bold px-3 py-1 rounded-full text-xs shadow-sm">
+                          {sale.items?.length || 0}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
-                        {formatCurrency(sale.grandTotal)}
+                      <td className="px-4 py-4 text-right">
+                        <span className="font-bold text-gray-900 text-base">
+                          {formatCurrency(sale.grandTotal)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-green-600 whitespace-nowrap">
-                        {formatCurrency((sale.cashPaid || 0) + (sale.bankPaid || 0))}
+                      <td className="px-4 py-4 text-right">
+                        <span className="font-semibold text-green-600">
+                          {formatCurrency((sale.cashPaid || 0) + (sale.bankPaid || 0))}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-red-600 font-medium whitespace-nowrap">
-                        {formatCurrency(sale.dueAmount || 0)}
+                      <td className="px-4 py-4 text-right">
+                        <span className={`font-bold ${(sale.dueAmount || 0) > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                          {formatCurrency(sale.dueAmount || 0)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-4 text-center">
                         {statusBadge(sale.paymentStatus)}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-3">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => viewInvoice(sale._id)}
-                            className="text-blue-500 hover:text-blue-700 transition-colors"
+                            className="bg-blue-500 hover:bg-blue-600 text-white w-8 h-8 rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center"
                             title="View Invoice"
                           >
-                            <i className="fas fa-eye"></i>
+                            <i className="fas fa-eye text-xs"></i>
                           </button>
                           <button
                             onClick={() => printInvoice(sale)}
-                            className="text-green-500 hover:text-green-700 transition-colors"
+                            className="bg-green-500 hover:bg-green-600 text-white w-8 h-8 rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center"
                             title="Print Invoice"
                           >
-                            <i className="fas fa-print"></i>
+                            <i className="fas fa-print text-xs"></i>
                           </button>
                           <button
                             onClick={() => downloadInvoice(sale._id)}
                             disabled={downloadingInvoice === sale._id}
-                            className="text-purple-500 hover:text-purple-700 transition-colors disabled:opacity-40"
+                            className="bg-purple-500 hover:bg-purple-600 text-white w-8 h-8 rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                             title="Download PDF"
                           >
                             {downloadingInvoice === sale._id
-                              ? <i className="fas fa-spinner fa-spin"></i>
-                              : <i className="fas fa-download"></i>
+                              ? <i className="fas fa-spinner fa-spin text-xs"></i>
+                              : <i className="fas fa-download text-xs"></i>
                             }
                           </button>
                           <button
                             onClick={() => openEditDue(sale)}
-                            className="text-orange-500 hover:text-orange-700 transition-colors"
+                            className="bg-orange-500 hover:bg-orange-600 text-white w-8 h-8 rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center"
                             title="Edit Previous Due"
                           >
-                            <i className="fas fa-edit"></i>
+                            <i className="fas fa-edit text-xs"></i>
                           </button>
                         </div>
                       </td>
@@ -390,27 +529,52 @@ const SalesHistory = () => {
               </table>
             </div>
 
-            {/* Pagination */}
+            {/* Enhanced Pagination */}
             {pagination.pages > 1 && (
-              <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
-                <span className="text-xs text-gray-500">
-                  Page {pagination.page} of {pagination.pages} &nbsp;·&nbsp; {pagination.total} total
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleFilterChange("page", filters.page - 1)}
-                    disabled={filters.page === 1}
-                    className="px-3 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <i className="fas fa-chevron-left mr-1"></i> Prev
-                  </button>
-                  <button
-                    onClick={() => handleFilterChange("page", filters.page + 1)}
-                    disabled={filters.page >= pagination.pages}
-                    className="px-3 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Next <i className="fas fa-chevron-right ml-1"></i>
-                  </button>
+              <div className="px-6 py-4 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">
+                      Page <span className="font-bold text-indigo-600">{pagination.page}</span> of <span className="font-bold">{pagination.pages}</span>
+                    </span>
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    <span className="text-sm text-gray-600 flex items-center gap-1.5">
+                      <i className="fas fa-list-ul text-indigo-500"></i>
+                      <span className="font-semibold text-indigo-600">{pagination.total}</span> total records
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleFilterChange("page", 1)}
+                      disabled={filters.page === 1}
+                      className="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gradient-to-r hover:from-indigo-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-700"
+                      title="First Page"
+                    >
+                      <i className="fas fa-angle-double-left"></i>
+                    </button>
+                    <button
+                      onClick={() => handleFilterChange("page", filters.page - 1)}
+                      disabled={filters.page === 1}
+                      className="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gradient-to-r hover:from-indigo-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-700 flex items-center gap-2"
+                    >
+                      <i className="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <button
+                      onClick={() => handleFilterChange("page", filters.page + 1)}
+                      disabled={filters.page >= pagination.pages}
+                      className="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gradient-to-r hover:from-indigo-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-700 flex items-center gap-2"
+                    >
+                      Next <i className="fas fa-chevron-right"></i>
+                    </button>
+                    <button
+                      onClick={() => handleFilterChange("page", pagination.pages)}
+                      disabled={filters.page >= pagination.pages}
+                      className="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gradient-to-r hover:from-indigo-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-700"
+                      title="Last Page"
+                    >
+                      <i className="fas fa-angle-double-right"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -455,18 +619,18 @@ const SalesHistory = () => {
                 </div>
                 <div className="bg-orange-50 rounded-lg p-3 text-center">
                   <p className="text-xs text-orange-600 mb-1">Current Previous Due</p>
-                  <p className="text-sm font-bold text-orange-700">৳{Number(editDueSale.previousDue || 0).toFixed(2)}</p>
+                  <p className="text-sm font-bold text-orange-700">Tk {Number(editDueSale.previousDue || 0).toFixed(2)}</p>
                 </div>
                 <div className="bg-red-50 rounded-lg p-3 text-center">
                   <p className="text-xs text-red-500 mb-1">Sale Due</p>
-                  <p className="text-sm font-bold text-red-700">৳{Number(editDueSale.dueAmount || 0).toFixed(2)}</p>
+                  <p className="text-sm font-bold text-red-700">Tk {Number(editDueSale.dueAmount || 0).toFixed(2)}</p>
                 </div>
               </div>
 
               {/* Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New Previous Due Amount (৳)
+                  New Previous Due Amount (Tk)
                 </label>
                 <input
                   id="edit-previous-due-input"
@@ -492,7 +656,7 @@ const SalesHistory = () => {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex justify-between items-center">
                   <span className="text-sm text-blue-700">New Total Outstanding</span>
                   <span className="font-bold text-blue-800 text-base">
-                    ৳{(parseFloat(editDueValue || 0) + (editDueSale.dueAmount || 0)).toFixed(2)}
+                    Tk {(parseFloat(editDueValue || 0) + (editDueSale.dueAmount || 0)).toFixed(2)}
                   </span>
                 </div>
               )}
