@@ -129,7 +129,7 @@ class SalesController {
             insertedId = result.insertedId;
 
             // 2. Update stock quantities
-            await this._updateStockForSale(req.shopDb, enrichedItems, session);
+            await this._updateStockForSale(req.shopDb, enrichedItems, session, insertedId, req.user._id, req.user.shopId);
 
             // 3. Update customer totals (credit due, totalPurchased, lastPurchaseDate)
             if (customer?.id) {
@@ -155,7 +155,7 @@ class SalesController {
             );
             const result = await req.shopDb.collection("sales").insertOne(sale);
             insertedId = result.insertedId;
-            await this._updateStockForSale(req.shopDb, enrichedItems);
+            await this._updateStockForSale(req.shopDb, enrichedItems, null, insertedId, req.user._id, req.user.shopId);
             if (customer?.id) {
               await this._updateCustomerAfterSale(
                 req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
@@ -172,7 +172,7 @@ class SalesController {
         logger.warn("MongoDB client unavailable — using non-transactional sale insert");
         const result = await req.shopDb.collection("sales").insertOne(sale);
         insertedId = result.insertedId;
-        await this._updateStockForSale(req.shopDb, enrichedItems);
+        await this._updateStockForSale(req.shopDb, enrichedItems, null, insertedId, req.user._id, req.user.shopId);
         if (customer?.id) {
           await this._updateCustomerAfterSale(
             req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
@@ -466,9 +466,11 @@ class SalesController {
 
   /**
    * Update stock quantities after sale
+   * Phase 4: Integrated with event-sourced stock system + FEFO batch tracking
    */
-  async _updateStockForSale(shopDb, enrichedItems, session = null) {
-    const options = session ? { session } : {};
+  async _updateStockForSale(shopDb, enrichedItems, session = null, saleId = null, userId = null, shopId = null) {
+    const stockCommand = require('../services/stock-command.service');
+    const { InsufficientStockError } = require('../services/stock-command.service');
 
     for (const item of enrichedItems) {
       // Skip stock updates for custom items (no productId)
@@ -477,13 +479,59 @@ class SalesController {
         continue;
       }
 
+      try {
+        // 1. Allocate batches using FEFO (First Expiry First Out)
+        const batchAllocations = await stockCommand.allocateBatchesFEFO(
+          item.productId,
+          item.qty,
+          shopId
+        );
+
+        // 2. Record stock movement with batch tracking
+        await stockCommand.recordMovement({
+          shopId,
+          productId: item.productId,
+          movementType: 'SALE',
+          quantity: item.qty,
+          userId,
+          referenceType: 'SALE',
+          referenceId: saleId,
+          batchAllocations,
+          costPrice: item.rate, // Use selling price as reference
+          note: `Sale ${saleId}`
+        });
+
+        logger.info(`Stock consumed via FEFO for ${item.name}:`, {
+          productId: item.productId.toString(),
+          quantity: item.qty,
+          batches: batchAllocations.length
+        });
+
+      } catch (error) {
+        if (error instanceof InsufficientStockError) {
+          // Re-throw with more context
+          throw new Error(
+            `Insufficient stock for ${item.name}. Available: ${error.available}, Requested: ${error.requested}`
+          );
+        }
+        throw error;
+      }
+    }
+
+    // Legacy stock collection update (for backward compatibility during migration)
+    // TODO: Remove this after Phase 5 when legacy system is fully retired
+    const options = session ? { session } : {};
+
+    for (const item of enrichedItems) {
+      if (!item.productId || item.productId === null) continue;
+
       const existingStock = await shopDb.collection("stock").findOne(
         { productId: item.productId },
         options,
       );
 
       if (existingStock) {
-        // Update existing stock
+        // Update legacy stock collection
         await shopDb.collection("stock").updateOne(
           { productId: item.productId },
           {
