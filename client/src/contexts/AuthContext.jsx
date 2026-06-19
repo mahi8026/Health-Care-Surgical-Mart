@@ -77,48 +77,48 @@ export const AuthProvider = ({ children }) => {
       setFirebaseUser(currentUser);
 
       if (currentUser) {
-        // Check if we already have a valid session (from httpOnly cookie)
-        // Try to restore user from /api/auth/me endpoint
+        // Check if we have stored user and token in localStorage
         const storedUser = localStorage.getItem("user");
+        const storedToken = localStorage.getItem("token");
 
-        if (storedUser) {
+        if (storedUser && storedToken) {
           try {
             const parsedUser = JSON.parse(storedUser);
             
-            // Verify session is still valid by calling /me endpoint
-            const response = await api.get("/auth/me");
-            
-            if (response.success && response.data?.user) {
-              setMongoUser(response.data.user);
-              localStorage.setItem("user", JSON.stringify(response.data.user));
-              setUserContext(response.data.user);
-              setLoading(false);
-              return;
+            // Verify token is not expired (JWT format: header.payload.signature)
+            const tokenParts = storedToken.split('.');
+            if (tokenParts.length === 3) {
+              const payload = JSON.parse(atob(tokenParts[1]));
+              const expiryTime = payload.exp * 1000; // Convert to milliseconds
+              
+              if (Date.now() < expiryTime) {
+                // Token is still valid - restore session without API call
+                setMongoUser(parsedUser);
+                setUserContext(parsedUser);
+                setLoading(false);
+                return;
+              } else {
+                // Token expired - clear it
+                console.log('[AUTH] Token expired, clearing session');
+                localStorage.removeItem("user");
+                localStorage.removeItem("token");
+              }
             }
           } catch (error) {
-            // Session expired or invalid - clear stored data
-            console.error('[AUTH] Session verification failed:', error);
+            // Invalid token or user data - clear it
+            console.error('[AUTH] Failed to parse stored session:', error);
             localStorage.removeItem("user");
-            
-            // Don't auto-logout if we just logged in (within last 5 seconds)
-            const loginTime = localStorage.getItem("lastLoginTime");
-            if (loginTime && Date.now() - parseInt(loginTime) < 5000) {
-              console.log('[AUTH] Recent login detected, skipping auto-logout');
-              setMongoUser(parsedUser); // Use stored user data temporarily
-              setUserContext(parsedUser);
-              setLoading(false);
-              return;
-            }
+            localStorage.removeItem("token");
           }
         }
 
-        // No valid session - clear state but don't force sign out
-        // (This prevents infinite reload loop on login page)
+        // No valid stored session - user needs to log in
         setMongoUser(null);
         clearUserContext();
       } else {
-        // User is signed out
+        // User is signed out from Firebase
         localStorage.removeItem("user");
+        localStorage.removeItem("token");
         setMongoUser(null);
         
         // Clear user context in Sentry
