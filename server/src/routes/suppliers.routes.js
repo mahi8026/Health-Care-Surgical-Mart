@@ -363,7 +363,7 @@ router.get(
  */
 router.post(
   "/",
-  requirePermission(PERMISSIONS.CREATE_SUPPLIERS),
+  requirePermission(PERMISSIONS.CREATE_SUPPLIER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, company, phone, email, address, contactPerson } = req.body;
@@ -413,7 +413,7 @@ router.post(
  */
 router.put(
   "/:id",
-  requirePermission(PERMISSIONS.UPDATE_SUPPLIERS),
+  requirePermission(PERMISSIONS.EDIT_SUPPLIER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, company, phone, email, address, contactPerson, isActive } =
@@ -472,7 +472,7 @@ router.put(
  */
 router.delete(
   "/:id",
-  requirePermission(PERMISSIONS.DELETE_SUPPLIERS),
+  requirePermission(PERMISSIONS.DELETE_SUPPLIER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
