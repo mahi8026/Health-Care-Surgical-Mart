@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import Modal from "../components/ui/Modal";
@@ -438,14 +438,12 @@ const StockReport = () => {
     category: "",
     status: "all",
     supplier: "",
-    // PERF-009: Default to last 90 days to limit query scope
-    expiryFrom: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    expiryTo: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    expiryFrom: "",
+    expiryTo: "",
   });
 
   // Pagination
   const [page, setPage] = useState(1);
-  // PERF-005: Enforce max limit of 100 to prevent excessive data return
   const [limit, setLimit] = useState(25);
   const maxLimit = 100; // Hard limit
   const [pagination, setPagination] = useState(null);
@@ -461,15 +459,18 @@ const StockReport = () => {
   const [movementModal, setMovementModal] = useState({ isOpen: false, product: null });
   const [adjustmentModal, setAdjustmentModal] = useState({ isOpen: false, product: null });
 
-  // Fetch categories and suppliers
+  // Fetch categories and suppliers with delay to avoid rate limiting
   useEffect(() => {
     const fetchDropdowns = async () => {
       try {
-        const [catRes, supRes] = await Promise.all([
-          api.get("/categories"),
-          api.get("/suppliers"),
-        ]);
+        // Fetch categories first
+        const catRes = await api.get("/categories");
         if (catRes.success) setCategories(catRes.data || []);
+        
+        // Wait 500ms before fetching suppliers to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const supRes = await api.get("/suppliers");
         if (supRes.success) setSuppliers(supRes.data || []);
       } catch (err) {
         console.error("Failed to fetch dropdowns:", err);
@@ -479,11 +480,21 @@ const StockReport = () => {
   }, []);
 
   // Fetch stock data
+  const fetchStockDataRef = useRef(false); // Prevent duplicate requests with ref
+  
   const fetchStockData = useCallback(async () => {
+    // Prevent duplicate requests using ref
+    if (fetchStockDataRef.current) {
+      console.log('Already loading, skipping duplicate request');
+      return;
+    }
+    
+    fetchStockDataRef.current = true;
     setLoading(true);
     setError("");
+    
     try {
-      // PERF-005: Enforce max limit to prevent excessive data queries
+      // Enforce max limit to prevent excessive data queries
       const effectiveLimit = Math.min(limit, maxLimit);
       
       // Build query params for new snapshots endpoint
@@ -493,6 +504,9 @@ const StockReport = () => {
         search: filters.search || undefined,
         category: filters.category || undefined,
         status: filters.status !== "all" ? filters.status : undefined,
+        supplier: filters.supplier || undefined,
+        expiryFrom: filters.expiryFrom || undefined,
+        expiryTo: filters.expiryTo || undefined,
         sortBy: 'productName',
         sortOrder: 'asc',
       };
@@ -512,36 +526,67 @@ const StockReport = () => {
           return sum + (qty * cost);
         }, 0);
         
-        // Fetch counts for summary cards from new endpoints
-        const [lowStockRes, expiringRes] = await Promise.all([
-          api.get("/stock/reorder-alerts"),
-          api.get("/stock/expiry-alerts?days=30"),
-        ]);
-        
-        setSummary({
-          totalSKUs,
-          totalStockValue: totalValue,
-          lowStockCount: lowStockRes.success ? lowStockRes.meta?.count || 0 : 0,
-          expiringSoonCount: expiringRes.success ? expiringRes.meta?.count || 0 : 0,
-        });
+        // Fetch counts for summary cards from new endpoints (with error handling)
+        try {
+          const [lowStockRes, expiringRes] = await Promise.all([
+            api.get("/stock/reorder-alerts").catch(() => ({ success: false, meta: { count: 0 } })),
+            api.get("/stock/expiry-alerts?days=30").catch(() => ({ success: false, meta: { count: 0 } })),
+          ]);
+          
+          setSummary({
+            totalSKUs,
+            totalStockValue: totalValue,
+            lowStockCount: lowStockRes.success ? lowStockRes.meta?.count || 0 : 0,
+            expiringSoonCount: expiringRes.success ? expiringRes.meta?.count || 0 : 0,
+          });
+        } catch (alertErr) {
+          // If alerts fail, still show main data
+          console.warn('Failed to fetch alert counts:', alertErr);
+          setSummary({
+            totalSKUs,
+            totalStockValue: totalValue,
+            lowStockCount: 0,
+            expiringSoonCount: 0,
+          });
+        }
       } else {
         setError(response.message || "Failed to fetch stock data");
       }
     } catch (err) {
-      setError(err.message || "Failed to fetch stock data");
+      // Handle specific error codes
+      if (err.response?.status === 429) {
+        setError("Too many requests. The server is rate limiting. Please wait 1-2 minutes and refresh.");
+      } else if (err.response?.status === 503) {
+        setError("Server is starting up. Please wait 30-60 seconds and try again.");
+      } else {
+        setError(err.response?.data?.message || err.message || "Failed to fetch stock data");
+      }
     } finally {
       setLoading(false);
+      fetchStockDataRef.current = false; // Reset the ref
     }
   }, [page, limit, filters]);
 
   useEffect(() => {
-    fetchStockData();
-  }, [fetchStockData]);
+    // Delay initial fetch to avoid rate limiting on page load
+    const timeoutId = setTimeout(() => {
+      fetchStockData();
+    }, 1000); // Wait 1 second after component mounts
+    
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit]); // Only refetch when page or limit changes, not on every filter change
 
-  // Handle filter changes
+  // Handle filter changes (don't auto-fetch)
   const handleFilterChange = (key, value) => {
     setFilters({ ...filters, [key]: value });
+    // Don't automatically fetch - user must click Apply or press Enter
+  };
+
+  // Apply filters manually
+  const applyFilters = () => {
     setPage(1); // Reset to first page
+    fetchStockData();
   };
 
   // Handle summary card click
@@ -593,30 +638,38 @@ const StockReport = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Stock Management</h1>
-          <p className="text-gray-600 mt-1">Complete inventory overview and operations</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Real-time connection indicator */}
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-            realtimeConnected 
-              ? 'bg-green-50 text-green-700 border border-green-200' 
-              : 'bg-gray-100 text-gray-500 border border-gray-200'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${
-              realtimeConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-            }`}></span>
-            <span className="font-medium">
-              {realtimeConnected ? 'Live' : 'Offline'}
-            </span>
+    <div className="space-y-6 max-w-[1600px]">
+      {/* Enhanced Header with Gradient Background */}
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
+                <i className="fas fa-boxes"></i>
+              </div>
+              Stock Management
+            </h1>
+            <p className="text-teal-100 mt-2 text-sm">Complete inventory overview and real-time operations</p>
           </div>
-          <button onClick={fetchStockData} className="btn-secondary">
-            <i className="fas fa-sync-alt mr-2"></i>Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Real-time connection indicator */}
+            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-md ${
+              realtimeConnected 
+                ? 'bg-white text-emerald-600' 
+                : 'bg-white/20 text-white border-2 border-white/30'
+            }`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                realtimeConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
+              }`}></span>
+              <span>{realtimeConnected ? 'Live' : 'Offline'}</span>
+            </div>
+            <button 
+              onClick={fetchStockData} 
+              className="px-4 py-2.5 bg-white hover:bg-gray-50 text-teal-700 rounded-lg font-semibold shadow-md transition-all flex items-center gap-2"
+            >
+              <i className="fas fa-sync-alt"></i> Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -628,161 +681,225 @@ const StockReport = () => {
         </div>
       )}
 
-      {/* Section 1: Summary Cards */}
+      {/* Enhanced Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card hover:shadow-lg transition-shadow cursor-pointer">
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 hover:shadow-lg transition-shadow cursor-pointer">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total SKUs</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{summary.totalSKUs}</p>
-              <p className="text-xs text-gray-500 mt-1">Unique products</p>
+              <p className="text-sm font-semibold text-gray-600 mb-1">Total SKUs</p>
+              <p className="text-3xl font-bold text-gray-900">{summary.totalSKUs}</p>
+              <p className="text-xs text-gray-500 mt-2">Unique products</p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <i className="fas fa-boxes text-blue-600 text-2xl"></i>
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-4 rounded-xl shadow-md">
+              <i className="fas fa-boxes text-white text-2xl"></i>
             </div>
           </div>
         </div>
 
-        <div className="card hover:shadow-lg transition-shadow cursor-pointer">
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 hover:shadow-lg transition-shadow cursor-pointer">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Stock Value</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{fmt(summary.totalStockValue)}</p>
-              <p className="text-xs text-gray-500 mt-1">Cost price basis</p>
+              <p className="text-sm font-semibold text-gray-600 mb-1">Total Stock Value</p>
+              <p className="text-3xl font-bold text-emerald-600">{fmt(summary.totalStockValue)}</p>
+              <p className="text-xs text-gray-500 mt-2">Cost price basis</p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <i className="fas fa-dollar-sign text-green-600 text-2xl"></i>
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-xl shadow-md">
+              <i className="fas fa-dollar-sign text-white text-2xl"></i>
             </div>
           </div>
         </div>
 
         <div
-          className="card hover:shadow-lg transition-shadow cursor-pointer bg-orange-50 border-orange-200"
+          className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl shadow-md border-2 border-orange-200 p-5 hover:shadow-lg transition-all cursor-pointer"
           onClick={() => handleCardClick("low_stock")}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-orange-700">Low Stock</p>
-              <p className="text-3xl font-bold text-orange-600 mt-1">{summary.lowStockCount}</p>
-              <p className="text-xs text-orange-600 mt-1">Click to filter</p>
+              <p className="text-sm font-semibold text-orange-700 mb-1">Low Stock</p>
+              <p className="text-3xl font-bold text-orange-600">{summary.lowStockCount}</p>
+              <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                <i className="fas fa-mouse-pointer"></i> Click to filter
+              </p>
             </div>
-            <div className="p-3 bg-orange-200 rounded-lg">
-              <i className="fas fa-exclamation-triangle text-orange-700 text-2xl"></i>
+            <div className="bg-gradient-to-br from-orange-500 to-red-500 p-4 rounded-xl shadow-md">
+              <i className="fas fa-exclamation-triangle text-white text-2xl"></i>
             </div>
           </div>
         </div>
 
         <div
-          className="card hover:shadow-lg transition-shadow cursor-pointer bg-red-50 border-red-200"
+          className="bg-gradient-to-br from-red-50 to-pink-50 rounded-xl shadow-md border-2 border-red-200 p-5 hover:shadow-lg transition-all cursor-pointer"
           onClick={() => handleCardClick("expiring_soon")}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-red-700">Expiring Soon</p>
-              <p className="text-3xl font-bold text-red-600 mt-1">{summary.expiringSoonCount}</p>
-              <p className="text-xs text-red-600 mt-1">≤30 days • Click to filter</p>
+              <p className="text-sm font-semibold text-red-700 mb-1">Expiring Soon</p>
+              <p className="text-3xl font-bold text-red-600">{summary.expiringSoonCount}</p>
+              <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                <i className="fas fa-mouse-pointer"></i> ≤30 days • Click
+              </p>
             </div>
-            <div className="p-3 bg-red-200 rounded-lg">
-              <i className="fas fa-calendar-times text-red-700 text-2xl"></i>
+            <div className="bg-gradient-to-br from-red-500 to-pink-600 p-4 rounded-xl shadow-md">
+              <i className="fas fa-calendar-times text-white text-2xl"></i>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Section 2: Filter Bar */}
-      <div className="card">
+      {/* Enhanced Filter Bar */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-teal-500 to-cyan-600 p-2.5 rounded-lg shadow-md">
+              <i className="fas fa-filter text-white text-sm"></i>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Filter Stock</h3>
+              <p className="text-xs text-gray-500">Refine your inventory search</p>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Search */}
           <div className="lg:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
-            <input
-              type="text"
-              placeholder="Product, SKU, or batch..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange("search", e.target.value)}
-              className="input-field"
-            />
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-search text-teal-500 text-xs"></i>
+              Search
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Product, SKU, or batch..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange("search", e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              />
+              <i className="fas fa-search absolute left-3 top-3.5 text-gray-400 text-xs"></i>
+            </div>
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
-            <select
-              value={filters.category}
-              onChange={(e) => handleFilterChange("category", e.target.value)}
-              className="input-field"
-            >
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat._id} value={cat.name}>{cat.name}</option>
-              ))}
-            </select>
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-tags text-blue-500 text-xs"></i>
+              Category
+            </label>
+            <div className="relative">
+              <select
+                value={filters.category}
+                onChange={(e) => handleFilterChange("category", e.target.value)}
+                className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
+              >
+                <option value="">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat._id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
+              <i className="fas fa-chevron-down absolute right-3 top-3.5 text-gray-400 text-xs pointer-events-none"></i>
+            </div>
           </div>
 
           {/* Status */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => handleFilterChange("status", e.target.value)}
-              className="input-field"
-            >
-              <option value="all">All</option>
-              <option value="in_stock">In Stock</option>
-              <option value="low_stock">Low Stock</option>
-              <option value="out_of_stock">Out of Stock</option>
-              <option value="expiring_30d">Expiring 30d</option>
-              <option value="expiring_60d">Expiring 60d</option>
-              <option value="expired">Expired</option>
-            </select>
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-info-circle text-purple-500 text-xs"></i>
+              Status
+            </label>
+            <div className="relative">
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange("status", e.target.value)}
+                className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all appearance-none bg-white"
+              >
+                <option value="all">All</option>
+                <option value="in_stock">✓ In Stock</option>
+                <option value="low_stock">⚠ Low Stock</option>
+                <option value="out_of_stock">✗ Out of Stock</option>
+                <option value="expiring_30d">⏰ Expiring 30d</option>
+                <option value="expiring_60d">⏳ Expiring 60d</option>
+                <option value="expired">❌ Expired</option>
+              </select>
+              <i className="fas fa-chevron-down absolute right-3 top-3.5 text-gray-400 text-xs pointer-events-none"></i>
+            </div>
           </div>
 
           {/* Supplier */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Supplier</label>
-            <select
-              value={filters.supplier}
-              onChange={(e) => handleFilterChange("supplier", e.target.value)}
-              className="input-field"
-            >
-              <option value="">All Suppliers</option>
-              {suppliers.map((sup) => (
-                <option key={sup._id} value={sup.name}>{sup.name}</option>
-              ))}
-            </select>
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-truck text-orange-500 text-xs"></i>
+              Supplier
+            </label>
+            <div className="relative">
+              <select
+                value={filters.supplier}
+                onChange={(e) => handleFilterChange("supplier", e.target.value)}
+                className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all appearance-none bg-white"
+              >
+                <option value="">All Suppliers</option>
+                {suppliers.map((sup) => (
+                  <option key={sup._id} value={sup.name}>{sup.name}</option>
+                ))}
+              </select>
+              <i className="fas fa-chevron-down absolute right-3 top-3.5 text-gray-400 text-xs pointer-events-none"></i>
+            </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-end gap-2">
-            <button onClick={resetFilters} className="btn-secondary flex-1">
-              <i className="fas fa-redo mr-1"></i>Reset
+            <button 
+              onClick={resetFilters} 
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 rounded-lg font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+            >
+              <i className="fas fa-redo-alt"></i> Reset
             </button>
-            <button onClick={handleExport} className="btn-primary flex-1">
-              <i className="fas fa-file-excel mr-1"></i>Export
+            <button 
+              onClick={applyFilters} 
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <i className="fas fa-search"></i> Apply
+            </button>
+            <button 
+              onClick={handleExport} 
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <i className="fas fa-file-excel"></i> Export
             </button>
           </div>
         </div>
 
         {/* Expiry Date Range */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 pt-5 border-t border-gray-200">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Expiry From</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-calendar-alt text-green-500 text-xs"></i>
+              Expiry From
+            </label>
             <input
               type="date"
               value={filters.expiryFrom}
               onChange={(e) => handleFilterChange("expiryFrom", e.target.value)}
-              className="input-field"
+              className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Expiry To</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <i className="fas fa-calendar-check text-blue-500 text-xs"></i>
+              Expiry To
+            </label>
             <input
               type="date"
               value={filters.expiryTo}
               onChange={(e) => handleFilterChange("expiryTo", e.target.value)}
-              className="input-field"
+              className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
           </div>
+        </div>
+
+        {/* Helper text */}
+        <div className="mt-3 text-xs text-gray-500 flex items-center gap-1.5">
+          <i className="fas fa-info-circle text-blue-500"></i>
+          Change filters and click <strong>Apply</strong> to update results
         </div>
       </div>
 
