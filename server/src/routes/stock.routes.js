@@ -691,3 +691,143 @@ router.put(
 );
 
 module.exports = router;
+
+
+/**
+ * POST /api/stock/adjust
+ * Manual stock adjustment (add, subtract, or set exact quantity)
+ * Phase 5: Stock management features
+ */
+router.post(
+  '/adjust',
+  requirePermission(PERMISSIONS.MANAGE_STOCK),
+  asyncHandler(async (req, res) => {
+    const { productId, adjustmentType, quantity, reason, notes } = req.body;
+    
+    // Validation
+    if (!productId || !adjustmentType || quantity === undefined) {
+      throw createError.badRequest('Missing required fields: productId, adjustmentType, quantity');
+    }
+    
+    if (!['ADD', 'SUBTRACT', 'SET'].includes(adjustmentType)) {
+      throw createError.badRequest('Invalid adjustmentType. Must be: ADD, SUBTRACT, or SET');
+    }
+    
+    if (adjustmentType !== 'SET' && quantity <= 0) {
+      throw createError.badRequest('Quantity must be positive for ADD/SUBTRACT');
+    }
+    
+    if (adjustmentType === 'SET' && quantity < 0) {
+      throw createError.badRequest('Quantity cannot be negative for SET');
+    }
+    
+    // Map adjustment type to movement type
+    const movementType = {
+      'ADD': 'ADJUSTMENT_ADD',
+      'SUBTRACT': 'ADJUSTMENT_SUB',
+      'SET': 'ADJUSTMENT_SET'
+    }[adjustmentType];
+    
+    // Record adjustment
+    const result = await stockCommand.recordMovement({
+      shopId: req.user.shopId,
+      productId: new ObjectId(productId),
+      movementType,
+      quantity: parseFloat(quantity),
+      userId: req.user._id,
+      referenceType: 'ADJUSTMENT',
+      note: `${reason || 'Manual adjustment'}: ${notes || ''}`,
+      metadata: {
+        reason: reason || 'Manual adjustment',
+        adjustmentType,
+        adjustedBy: req.user.name
+      }
+    });
+    
+    logger.info('Stock adjustment recorded', {
+      shopId: req.user.shopId,
+      productId,
+      adjustmentType,
+      quantity,
+      user: req.user.name
+    });
+    
+    res.json({
+      success: true,
+      message: 'Stock adjusted successfully',
+      data: {
+        ledgerEntry: result.ledgerEntry,
+        newQuantity: result.snapshot.onHandQty
+      }
+    });
+  })
+);
+
+/**
+ * POST /api/stock/opening-stock
+ * Create opening stock for products (bulk initialization)
+ * Phase 5: For initial inventory setup
+ */
+router.post(
+  '/opening-stock',
+  requirePermission(PERMISSIONS.MANAGE_STOCK),
+  asyncHandler(async (req, res) => {
+    const { items } = req.body; // Array of { productId, quantity, costPrice, notes }
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw createError.badRequest('Items array is required');
+    }
+    
+    const results = [];
+    const errors = [];
+    
+    for (const item of items) {
+      try {
+        if (!item.productId || item.quantity === undefined) {
+          throw new Error('Missing productId or quantity');
+        }
+        
+        const result = await stockCommand.recordMovement({
+          shopId: req.user.shopId,
+          productId: new ObjectId(item.productId),
+          movementType: 'OPENING_STOCK',
+          quantity: parseFloat(item.quantity),
+          userId: req.user._id,
+          referenceType: 'OPENING_STOCK',
+          costPrice: item.costPrice ? parseFloat(item.costPrice) : null,
+          note: item.notes || 'Opening stock entry',
+          metadata: {
+            source: 'bulk_opening_stock',
+            importedBy: req.user.name
+          }
+        });
+        
+        results.push({
+          productId: item.productId,
+          success: true,
+          newQuantity: result.snapshot.onHandQty
+        });
+      } catch (error) {
+        errors.push({
+          productId: item.productId,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    logger.info('Opening stock created', {
+      shopId: req.user.shopId,
+      totalItems: items.length,
+      successful: results.length,
+      failed: errors.length,
+      user: req.user.name
+    });
+    
+    res.json({
+      success: true,
+      message: `Opening stock created for ${results.length} of ${items.length} products`,
+      data: { results, errors }
+    });
+  })
+);
