@@ -244,8 +244,10 @@ const StockAdjustmentModal = ({ isOpen, onClose, product, onSuccess }) => {
     setError("");
 
     if (!formData.quantity || parseFloat(formData.quantity) <= 0) {
-      setError("Please enter a valid quantity");
-      return;
+      if (formData.adjustmentType !== 'set_exact') {
+        setError("Please enter a valid quantity");
+        return;
+      }
     }
 
     if (formData.reason === "Other" && !formData.note.trim()) {
@@ -256,17 +258,24 @@ const StockAdjustmentModal = ({ isOpen, onClose, product, onSuccess }) => {
     setLoading(true);
     try {
       const productId = product._id || product.productId;
+      
+      // Map adjustment type to backend format (ADD, SUBTRACT, SET)
+      const adjustmentTypeMap = {
+        'add': 'ADD',
+        'subtract': 'SUBTRACT',
+        'set_exact': 'SET'
+      };
+      
       const payload = {
-        type: formData.adjustmentType,  // server's PUT endpoint reads "type" not "adjustmentType"
-        adjustmentType: formData.adjustmentType, // keep for compatibility
+        productId: productId,
+        adjustmentType: adjustmentTypeMap[formData.adjustmentType] || 'ADD',
         quantity: parseFloat(formData.quantity),
         reason: formData.reason,
-        note: formData.note,
+        notes: formData.note,
       };
-      if (formData.batchNo) payload.batchNo = formData.batchNo;
-      if (formData.expiryDate) payload.expiryDate = formData.expiryDate;
 
-      const response = await api.put(`/stock/${productId}/adjust`, payload);
+      // Use new Phase 5A endpoint
+      const response = await api.post(`/stock/adjust`, payload);
       if (response.success) {
         onSuccess?.();
         onClose();
@@ -274,7 +283,7 @@ const StockAdjustmentModal = ({ isOpen, onClose, product, onSuccess }) => {
         setError(response.message || "Failed to adjust stock");
       }
     } catch (err) {
-      setError(err.message || "Failed to adjust stock");
+      setError(err.response?.data?.message || err.message || "Failed to adjust stock");
     } finally {
       setLoading(false);
     }
