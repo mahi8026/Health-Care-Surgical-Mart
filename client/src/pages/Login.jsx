@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { COMPANY } from "../config/constants";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 const Login = () => {
@@ -47,11 +48,19 @@ const Login = () => {
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i className="fas fa-heartbeat text-white text-2xl"></i>
+          <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+            <img 
+              src={COMPANY.LOGO_URL} 
+              alt={COMPANY.NAME}
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = COMPANY.LOGO_FALLBACK;
+              }}
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Health Care Surgical Mart
+            {COMPANY.NAME}
           </h1>
           <p className="text-gray-600">Management System</p>
         </div>

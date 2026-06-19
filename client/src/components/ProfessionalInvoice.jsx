@@ -1,4 +1,5 @@
 import React from "react";
+import { COMPANY } from "../config/constants";
 
 const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
   const handlePrint = () => {
@@ -52,19 +53,23 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <img
-              className="w-28 h-20"
-              src="https://i.ibb.co.com/GvmSMXXM/Untitled-design-1.png"
-              alt="logo"
+              className="w-28 h-20 object-contain"
+              src={COMPANY.LOGO_URL}
+              alt={COMPANY.NAME}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = COMPANY.LOGO_FALLBACK;
+              }}
             />
           </div>
 
           {/* Company Name */}
           <div className="flex-grow mt-5 text-center">
             <h1 className="text-4xl font-bold text-green-800">
-              Health Care Surgical Mart
+              {COMPANY.NAME}
             </h1>
             <div className="bg-orange-500 text-white px-4 py-1 inline-block mt-3 text-sm font-medium">
-              A Trust Medical Equipment Company
+              {COMPANY.TAGLINE}
             </div>
             <p className="text-sm text-green-800 mt-3 leading-tight">
               All Kinds of Medical Equipment, Hospital Furniture, Pathological
@@ -380,7 +385,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
       <footer className="mt-4 pt-3 border-t border-gray-300 text-center">
         <div className="text-xs text-gray-600">
           <p className="mb-1">
-            <strong>Contact:</strong> Phone: +880-1792880999 | Email:healthcaresurgicalmart@gmail.com
+            <strong>Contact:</strong> Phone: {COMPANY.PHONE} | Email: {COMPANY.EMAIL}
           </p>
           <p className="text-[10px] text-gray-500 italic">
             Thank you for your business! This is a computer generated invoice — no signature required.

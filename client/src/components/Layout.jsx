@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { COMPANY } from "../config/constants";
 import {
   hasPermission as checkPermission,
   isAdmin,
@@ -61,10 +62,18 @@ const Layout = () => {
               >
                 <i className="fas fa-bars text-xl"></i>
               </button>
-              <i className="fas fa-heartbeat text-2xl text-blue-600 mr-3"></i>
+              <img 
+                src={COMPANY.LOGO_URL} 
+                alt={COMPANY.NAME}
+                className="h-10 w-10 mr-3 object-contain"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = COMPANY.LOGO_FALLBACK;
+                }}
+              />
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
-                  Health Care Surgical Mart
+                  {COMPANY.NAME}
                 </h1>
                 <p className="text-xs text-gray-500 hidden sm:block">
                   Point of Sale System

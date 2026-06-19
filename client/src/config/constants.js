@@ -3,6 +3,17 @@
  * Centralized configuration for the application
  */
 
+// Company Branding
+export const COMPANY = {
+  NAME: "Health Care Surgical Mart",
+  TAGLINE: "A Trust Medical Equipment Company",
+  LOGO_URL: "https://i.ibb.co/GvmSMXM/Untitled-design-1.png",
+  LOGO_FALLBACK: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ctext x='50' y='50' font-family='Arial' font-size='40' fill='%23059669' text-anchor='middle' dominant-baseline='middle'%3EH%3C/text%3E%3C/svg%3E",
+  EMAIL: "healthcaresurgicalmart@gmail.com",
+  PHONE: "+880-1792880999",
+  ADDRESS: "", // Add if needed
+};
+
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || '/api',
