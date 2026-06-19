@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Expiry Alert</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: #ffffff;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e74c3c;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      color: #e74c3c;
+      margin: 0;
+      font-size: 28px;
+    }
+    .shop-name {
+      color: #666;
+      font-size: 18px;
+      margin-top: 10px;
+    }
+    .summary {
+      background-color: #fff5f5;
+      border-left: 4px solid #e74c3c;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .summary h2 {
+      margin: 0 0 10px 0;
+      color: #e74c3c;
+      font-size: 20px;
+    }
+    .summary-stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 15px;
+    }
+    .stat-box {
+      text-align: center;
+      padding: 10px;
+    }
+    .stat-number {
+      font-size: 32px;
+      font-weight: bold;
+      display: block;
+    }
+    .stat-label {
+      color: #666;
+      font-size: 14px;
+      display: block;
+      margin-top: 5px;
+    }
+    .expired .stat-number { color: #c0392b; }
+    .critical .stat-number { color: #e74c3c; }
+    .warning .stat-number { color: #f39c12; }
+    
+    .section {
+      margin: 30px 0;
+    }
+    .section-title {
+      font-size: 20px;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #eee;
+    }
+    .section-title.expired { color: #c0392b; border-color: #c0392b; }
+    .section-title.critical { color: #e74c3c; border-color: #e74c3c; }
+    .section-title.warning { color: #f39c12; border-color: #f39c12; }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th {
+      background-color: #f8f9fa;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid #dee2e6;
+    }
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #dee2e6;
+    }
+    tr:hover {
+      background-color: #f8f9fa;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+    }
+    .badge-expired { background-color: #c0392b; }
+    .badge-critical { background-color: #e74c3c; }
+    .badge-warning { background-color: #f39c12; }
+    
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #eee;
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+    }
+    .cta-button {
+      display: inline-block;
+      background-color: #3498db;
+      color: white !important;
+      padding: 12px 30px;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+      font-weight: 600;
+    }
+    .cta-button:hover {
+      background-color: #2980b9;
+    }
+    .no-items {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>⚠️ Stock Expiry Alert</h1>
+      <div class="shop-name">{{shopName}}</div>
+      <div style="color: #999; font-size: 14px; margin-top: 5px;">{{reportDate}}</div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary">
+      <h2>Summary</h2>
+      <p>You have <strong>{{totalItems}}</strong> batch(es) that require your attention.</p>
+      <div class="summary-stats">
+        <div class="stat-box expired">
+          <span class="stat-number">{{expired.length}}</span>
+          <span class="stat-label">Expired</span>
+        </div>
+        <div class="stat-box critical">
+          <span class="stat-number">{{critical.length}}</span>
+          <span class="stat-label">Critical (≤7 days)</span>
+        </div>
+        <div class="stat-box warning">
+          <span class="stat-number">{{warning.length}}</span>
+          <span class="stat-label">Warning (8-30 days)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expired Items -->
+    {{#if expired.length}}
+    <div class="section">
+      <h3 class="section-title expired">🔴 Expired Items (Action Required)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Batch No</th>
+            <th>Quantity</th>
+            <th>Expiry Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each expired}}
+          <tr>
+            <td><strong>{{this.product}}</strong></td>
+            <td>{{this.sku}}</td>
+            <td>{{this.batchNo}}</td>
+            <td>{{this.qty}} {{this.unit}}</td>
+            <td>{{this.expiryDate}}</td>
+            <td><span class="badge badge-expired">EXPIRED</span></td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{/if}}
+
+    <!-- Critical Items -->
+    {{#if critical.length}}
+    <div class="section">
+      <h3 class="section-title critical">🔸 Critical - Expiring Within 7 Days</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Batch No</th>
+            <th>Quantity</th>
+            <th>Expiry Date</th>
+            <th>Days Left</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each critical}}
+          <tr>
+            <td><strong>{{this.product}}</strong></td>
+            <td>{{this.sku}}</td>
+            <td>{{this.batchNo}}</td>
+            <td>{{this.qty}} {{this.unit}}</td>
+            <td>{{this.expiryDate}}</td>
+            <td><span class="badge badge-critical">{{this.daysLeft}} days</span></td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{/if}}
+
+    <!-- Warning Items -->
+    {{#if warning.length}}
+    <div class="section">
+      <h3 class="section-title warning">🔶 Warning - Expiring Within 30 Days</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Batch No</th>
+            <th>Quantity</th>
+            <th>Expiry Date</th>
+            <th>Days Left</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each warning}}
+          <tr>
+            <td><strong>{{this.product}}</strong></td>
+            <td>{{this.sku}}</td>
+            <td>{{this.batchNo}}</td>
+            <td>{{this.qty}} {{this.unit}}</td>
+            <td>{{this.expiryDate}}</td>
+            <td><span class="badge badge-warning">{{this.daysLeft}} days</span></td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{/if}}
+
+    <!-- Call to Action -->
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="{{dashboardUrl}}" class="cta-button">View Inventory Dashboard</a>
+    </div>
+
+    <!-- Recommendations -->
+    <div style="background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <h3 style="margin-top: 0; color: #2e7d32;">💡 Recommended Actions</h3>
+      <ul style="margin: 0; padding-left: 20px;">
+        <li><strong>Expired items:</strong> Remove from inventory and mark as expired in the system</li>
+        <li><strong>Critical items:</strong> Prioritize selling these products first (FEFO)</li>
+        <li><strong>Warning items:</strong> Plan promotions or discount campaigns to move inventory</li>
+        <li>Contact suppliers for return policies on near-expiry items</li>
+        <li>Adjust ordering quantities to reduce future waste</li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>Health Care Surgical Mart</strong></p>
+      <p>Inventory Management System</p>
+      <p style="font-size: 12px; margin-top: 15px;">
+        This is an automated alert. For questions, contact your system administrator.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

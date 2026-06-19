@@ -408,6 +408,10 @@ const startServer = async () => {
     startRecurringExpenseScheduler();
     logger.info("Recurring expense scheduler initialized");
 
+    // Start expiry alert cron job (Phase 3: FEFO Batch Tracking)
+    require('./jobs/expiry-alert.job');
+    logger.info("Expiry alert cron job initialized");
+
     // Start keep-alive cron to prevent Render free-tier cold starts
     startKeepAlive();
   } catch (error) {
