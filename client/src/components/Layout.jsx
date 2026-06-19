@@ -65,7 +65,7 @@ const Layout = () => {
               <img 
                 src={COMPANY.LOGO_URL} 
                 alt={COMPANY.NAME}
-                className="h-10 w-10 mr-3 object-contain"
+                className="h-12 w-12 mr-3 object-contain"
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = COMPANY.LOGO_FALLBACK;

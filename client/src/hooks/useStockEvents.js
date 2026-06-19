@@ -54,7 +54,7 @@ const useStockEvents = (onEvent) => {
         const eventSource = new EventSource(url);
 
         eventSource.onopen = () => {
-          console.log('SSE connected to stock updates');
+          console.log('[SSE] Connected to stock updates');
           setConnected(true);
           setError(null);
           reconnectAttemptsRef.current = 0; // Reset reconnect counter
@@ -63,6 +63,7 @@ const useStockEvents = (onEvent) => {
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('[SSE] Event received:', data.type);
             setLastUpdate(data);
 
             // Call the provided callback
@@ -70,12 +71,12 @@ const useStockEvents = (onEvent) => {
               onEvent(data);
             }
           } catch (err) {
-            console.error('Failed to parse SSE event:', err);
+            console.error('[SSE] Failed to parse event:', err);
           }
         };
 
         eventSource.onerror = (err) => {
-          console.error('SSE connection error:', err);
+          console.error('[SSE] Connection error:', err);
           setConnected(false);
           setError('Connection lost');
           eventSource.close();
@@ -84,7 +85,7 @@ const useStockEvents = (onEvent) => {
           reconnectAttemptsRef.current += 1;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
           
-          console.log(`Reconnecting in ${delay}ms... (attempt ${reconnectAttemptsRef.current})`);
+          console.log(`[SSE] Reconnecting in ${delay}ms... (attempt ${reconnectAttemptsRef.current})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
@@ -93,13 +94,15 @@ const useStockEvents = (onEvent) => {
 
         eventSourceRef.current = eventSource;
       } catch (err) {
-        console.error('Failed to create SSE connection:', err);
+        console.error('[SSE] Failed to create connection:', err);
         setError(err.message);
       }
     };
 
-    // Initial connection
-    connect();
+    // Delay initial connection to avoid rate limiting on page load (wait 3 seconds)
+    const connectTimeoutId = setTimeout(() => {
+      connect();
+    }, 3000);
 
     // Cleanup on unmount
     return () => {
@@ -110,6 +113,9 @@ const useStockEvents = (onEvent) => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
+      }
+      if (connectTimeoutId) {
+        clearTimeout(connectTimeoutId);
       }
     };
   }, [onEvent]);

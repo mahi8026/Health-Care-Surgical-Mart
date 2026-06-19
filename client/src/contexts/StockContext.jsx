@@ -219,14 +219,15 @@ export const StockProvider = ({ children }) => {
     setRealtimeConnected(connected);
   }, [connected]);
 
-  // Initial data fetch on mount - ONLY when user is logged in
-  useEffect(() => {
-    if (user) {
-      fetchLowStockAlerts();
-      fetchExpiryAlerts();
-      fetchValuation();
-    }
-  }, [user, fetchLowStockAlerts, fetchExpiryAlerts, fetchValuation]);
+  // Don't auto-fetch on mount to prevent rate limiting
+  // Components should explicitly call fetch methods when needed
+  // useEffect(() => {
+  //   if (user) {
+  //     fetchLowStockAlerts();
+  //     fetchExpiryAlerts();
+  //     fetchValuation();
+  //   }
+  // }, [user, fetchLowStockAlerts, fetchExpiryAlerts, fetchValuation]);
 
   const value = {
     // State

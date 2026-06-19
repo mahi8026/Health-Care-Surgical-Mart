@@ -463,12 +463,15 @@ const StockReport = () => {
   useEffect(() => {
     const fetchDropdowns = async () => {
       try {
+        // Wait before starting any requests to avoid rate limiting on page load
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
         // Fetch categories first
         const catRes = await api.get("/categories");
         if (catRes.success) setCategories(catRes.data || []);
         
-        // Wait 500ms before fetching suppliers to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait 1 second before fetching suppliers
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         const supRes = await api.get("/suppliers");
         if (supRes.success) setSuppliers(supRes.data || []);
@@ -569,9 +572,10 @@ const StockReport = () => {
 
   useEffect(() => {
     // Delay initial fetch to avoid rate limiting on page load
+    // Wait for dropdown fetches to complete first (800ms + 1000ms + 500ms buffer = 2300ms)
     const timeoutId = setTimeout(() => {
       fetchStockData();
-    }, 1000); // Wait 1 second after component mounts
+    }, 2500); // Wait 2.5 seconds after component mounts
     
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps

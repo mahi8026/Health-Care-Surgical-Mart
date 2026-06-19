@@ -53,7 +53,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <img
-              className="w-28 h-20 object-contain"
+              className="w-40 h-32 object-contain"
               src={COMPANY.LOGO_URL}
               alt={COMPANY.NAME}
               onError={(e) => {
@@ -63,15 +63,15 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
             />
           </div>
 
-          {/* Company Name */}
-          <div className="flex-grow mt-5 text-center">
-            <h1 className="text-4xl font-bold text-green-800">
+          {/* Company Name - Larger and more prominent */}
+          <div className="flex-grow text-center">
+            <h1 className="text-5xl font-bold text-green-800 mb-2">
               {COMPANY.NAME}
             </h1>
-            <div className="bg-orange-500 text-white px-4 py-1 inline-block mt-3 text-sm font-medium">
+            <div className="bg-orange-500 text-white px-6 py-2 inline-block text-base font-bold shadow-md">
               {COMPANY.TAGLINE}
             </div>
-            <p className="text-sm text-green-800 mt-3 leading-tight">
+            <p className="text-sm text-green-800 mt-4 leading-relaxed font-medium px-4">
               All Kinds of Medical Equipment, Hospital Furniture, Pathological
               Reagent, Surgical Instrument, Import & Whole Sales, Service Order
               Supply
@@ -79,7 +79,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           </div>
         </div>
 
-        <div className="border-b border-gray-300"></div>
+        <div className="border-b-2 border-gray-300"></div>
       </header>
 
       {/* Bill To and Invoice Details */}
@@ -451,10 +451,10 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           .invoice-content .space-y-0\\.5 > * + * { margin-top: 0.05cm !important; }
           
           /* Header - Compact */
-          .invoice-content header img { width: 70px !important; height: 50px !important; }
-          .invoice-content header h1 { font-size: 20pt !important; line-height: 1.1 !important; font-weight: bold !important; }
-          .invoice-content header .text-sm { font-size: 8pt !important; line-height: 1.2 !important; }
-          .invoice-content .inline-block { padding: 2px 10px !important; font-size: 8pt !important; }
+          .invoice-content header img { width: 100px !important; height: 80px !important; }
+          .invoice-content header h1 { font-size: 28pt !important; line-height: 1.2 !important; font-weight: bold !important; }
+          .invoice-content header .text-sm { font-size: 9pt !important; line-height: 1.3 !important; }
+          .invoice-content .inline-block { padding: 4px 12px !important; font-size: 10pt !important; font-weight: bold !important; }
           
           /* All font sizes - Compact but readable */
           .invoice-content .text-4xl { font-size: 20pt !important; line-height: 1.1 !important; }

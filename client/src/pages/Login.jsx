@@ -48,7 +48,7 @@ const Login = () => {
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+          <div className="w-24 h-24 mx-auto mb-4 flex items-center justify-center">
             <img 
               src={COMPANY.LOGO_URL} 
               alt={COMPANY.NAME}
