@@ -111,8 +111,8 @@ class ProductsController extends BaseController {
       // Insert product
       const result = await req.shopDb.collection("products").insertOne(product);
 
-      // Create initial stock record
-      await this._createInitialStock(req.shopDb, result.insertedId, name, minStockLevel);
+      // Create initial stock record (both old and new systems)
+      await this._createInitialStock(req.shopDb, result.insertedId, name, sku, minStockLevel);
 
       // Audit: product created
       auditLog.log(req, AUDIT_ACTIONS.PRODUCT_CREATED, "product", result.insertedId.toString(),
@@ -385,7 +385,8 @@ class ProductsController extends BaseController {
   /**
    * Create initial stock record for new product
    */
-  async _createInitialStock(shopDb, productId, name, minStockLevel) {
+  async _createInitialStock(shopDb, productId, name, sku, minStockLevel) {
+    // Create record in old stock collection (for backward compatibility)
     await shopDb.collection("stock").insertOne({
       productId: productId,
       productName: name,
@@ -395,6 +396,27 @@ class ProductsController extends BaseController {
       minStockLevel: parseInt(minStockLevel),
       isLowStock: true,
       lastUpdated: new Date(),
+      createdAt: new Date(),
+    });
+
+    // Create initial snapshot in new event-sourced stock system
+    await shopDb.collection("stock_snapshots").insertOne({
+      productId: productId,
+      productName: name,
+      sku: sku || null,
+      onHandQty: 0,
+      reservedQty: 0,
+      availableQty: 0,
+      avgCostPrice: 0,
+      totalCostValue: 0,
+      reorderPoint: parseInt(minStockLevel),
+      lastMovementType: null,
+      lastMovementDate: null,
+      batchCount: 0,
+      oldestExpiryDate: null,
+      nearestExpiryDate: null,
+      version: 0,
+      updatedAt: new Date(),
       createdAt: new Date(),
     });
   }

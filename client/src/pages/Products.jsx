@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import BulkProductImport from "../components/BulkProductImport";
+import StockAdjustmentModal from "../components/StockAdjustmentModal";
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -16,6 +17,7 @@ const Products = () => {
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [adjustingStock, setAdjustingStock] = useState(null);
 
   const categories = ["Medical", "Lab", "Surgical"];
   const units = ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr"];
@@ -518,6 +520,13 @@ const Products = () => {
                     <td className="table-cell">
                       <div className="flex space-x-2">
                         <button
+                          onClick={() => setAdjustingStock(product)}
+                          className="text-purple-600 hover:text-purple-800"
+                          title="Adjust Stock"
+                        >
+                          <i className="fas fa-boxes"></i>
+                        </button>
+                        <button
                           onClick={() => setEditingProduct(product)}
                           className="text-blue-600 hover:text-blue-800"
                           title="Edit Product"
@@ -639,6 +648,24 @@ const Products = () => {
           onClose={() => setShowBulkImport(false)}
           onSuccess={() => {
             setShowBulkImport(false);
+            fetchProducts();
+          }}
+        />
+      )}
+
+      {/* Stock Adjustment Modal */}
+      {adjustingStock && (
+        <StockAdjustmentModal
+          isOpen={!!adjustingStock}
+          onClose={() => setAdjustingStock(null)}
+          product={{
+            ...adjustingStock,
+            productName: adjustingStock.name,
+            currentQty: adjustingStock.stockQuantity,
+            onHandQty: adjustingStock.stockQuantity,
+          }}
+          onSuccess={() => {
+            setAdjustingStock(null);
             fetchProducts();
           }}
         />
