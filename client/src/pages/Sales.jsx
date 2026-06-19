@@ -1000,15 +1000,223 @@ const Sales = () => {
           </div>
           <div className="p-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 SubTotal
               </label>
               <input
                 type="text"
-                value={subtotal.toFixed(2)}
+                value={`৳${subtotal.toFixed(2)}`}
                 readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-50 font-bold text-lg text-gray-900"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Discount
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">৳</span>
+                  <input
+                    type="number"
+                    value={posData.discount}
+                    onChange={(e) =>
+                      handlePosDataChange(
+                        "discount",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
+                    className="w-full pl-8 pr-3 py-2.5 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={posData.discountPercent}
+                    onChange={(e) =>
+                      handlePosDataChange(
+                        "discountPercent",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
+                    className="w-full pl-3 pr-10 py-2.5 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    placeholder="0"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">%</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                VAT/Tax
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">৳</span>
+                  <input
+                    type="number"
+                    value={posData.vat}
+                    onChange={(e) =>
+                      handlePosDataChange("vat", parseFloat(e.target.value) || 0)
+                    }
+                    className="w-full pl-8 pr-3 py-2.5 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={posData.vatPercent}
+                    onChange={(e) =>
+                      handlePosDataChange(
+                        "vatPercent",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
+                    className="w-full pl-3 pr-10 py-2.5 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    placeholder="0"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">%</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-lg p-4">
+              <label className="block text-sm font-semibold text-indigo-900 mb-2">
+                Grand Total
+              </label>
+              <div className="text-3xl font-bold text-indigo-700">
+                ৳{grandTotal.toFixed(2)}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Payment Method
+              </label>
+              
+              {/* Quick Payment Buttons */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handlePosDataChange("cashPaid", grandTotal);
+                    handlePosDataChange("bankPaid", 0);
+                  }}
+                  className="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg transition-colors text-sm"
+                >
+                  <i className="fas fa-money-bill-wave mr-1"></i>
+                  Cash
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handlePosDataChange("cashPaid", 0);
+                    handlePosDataChange("bankPaid", grandTotal);
+                  }}
+                  className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg transition-colors text-sm"
+                >
+                  <i className="fas fa-credit-card mr-1"></i>
+                  Card
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const half = grandTotal / 2;
+                    handlePosDataChange("cashPaid", half);
+                    handlePosDataChange("bankPaid", half);
+                  }}
+                  className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold rounded-lg transition-colors text-sm"
+                >
+                  <i className="fas fa-exchange-alt mr-1"></i>
+                  Split
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Cash Paid
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">৳</span>
+                    <input
+                      type="number"
+                      value={posData.cashPaid}
+                      onChange={(e) =>
+                        handlePosDataChange(
+                          "cashPaid",
+                          parseFloat(e.target.value) || 0,
+                        )
+                      }
+                      className="w-full pl-8 pr-3 py-2.5 border-2 border-green-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all font-semibold"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Bank/Card Paid
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">৳</span>
+                    <input
+                      type="number"
+                      value={posData.bankPaid}
+                      onChange={(e) =>
+                        handlePosDataChange(
+                          "bankPaid",
+                          parseFloat(e.target.value) || 0,
+                        )
+                      }
+                      className="w-full pl-8 pr-3 py-2.5 border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all font-semibold"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {returnAmount > 0 && (
+              <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                <label className="block text-sm font-semibold text-green-800 mb-1">
+                  <i className="fas fa-hand-holding-usd mr-2"></i>
+                  Change to Return
+                </label>
+                <div className="text-2xl font-bold text-green-700">
+                  ৳{returnAmount.toFixed(2)}
+                </div>
+              </div>
+            )}
+
+            {dueAmount > 0 && (
+              <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
+                <label className="block text-sm font-semibold text-orange-800 mb-1">
+                  <i className="fas fa-exclamation-triangle mr-2"></i>
+                  Due Amount
+                </label>
+                <div className="text-2xl font-bold text-orange-700">
+                  ৳{dueAmount.toFixed(2)}
+                </div>
+              </div>
+            )}
             </div>
 
             <div>
@@ -1235,119 +1443,167 @@ const Sales = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-4">
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-4 pt-6">
               <button
                 onClick={processSale}
                 disabled={loading || cart.length === 0}
-                className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-3 px-4 rounded font-semibold transition-colors"
+                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-400 text-white py-4 px-6 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
-                    <LoadingSpinner size="sm" className="mr-2" />
+                    <LoadingSpinner size="sm" />
                     Processing...
                   </>
                 ) : (
-                  "Sale"
+                  <>
+                    <i className="fas fa-check-circle text-xl"></i>
+                    Complete Sale
+                  </>
                 )}
               </button>
               <button
                 onClick={clearSale}
-                className="bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded font-semibold transition-colors"
+                disabled={loading}
+                className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white py-4 px-6 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 flex items-center justify-center gap-2"
               >
+                <i className="fas fa-plus-circle text-xl"></i>
                 New Sale
               </button>
+            </div>
+
+            {/* Quick Tips */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-700 flex items-start gap-2">
+                <i className="fas fa-lightbulb mt-0.5"></i>
+                <span>
+                  <strong>Tip:</strong> Use quick payment buttons for faster checkout. Press Tab to navigate between fields quickly.
+                </span>
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Cart Table */}
+      {/* Cart Table - Enhanced Design */}
       <div className="mt-4 bg-white rounded-lg shadow-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-blue-600 text-white">
-            <tr>
-              <th className="px-4 py-3 text-left">SL</th>
-              <th className="px-4 py-3 text-left">Product Name</th>
-              <th className="px-4 py-3 text-left">Category</th>
-              <th className="px-4 py-3 text-right">Rate</th>
-              <th className="px-4 py-3 text-right">Quantity</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {cart.length === 0 ? (
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white flex items-center">
+              <i className="fas fa-shopping-cart mr-3"></i>
+              Shopping Cart
+            </h3>
+            <p className="text-indigo-100 text-sm mt-1">
+              {cart.length} {cart.length === 1 ? 'item' : 'items'} • Subtotal: ৳{subtotal.toFixed(2)}
+            </p>
+          </div>
+          {cart.length > 0 && (
+            <button
+              onClick={() => setCart([])}
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <i className="fas fa-trash-alt"></i>
+              Clear All
+            </button>
+          )}
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b-2 border-gray-200">
               <tr>
-                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                  <i className="fas fa-shopping-cart text-4xl mb-4"></i>
-                  <p className="text-lg">No items in cart</p>
-                  <p className="text-sm">Add products to start selling</p>
-                </td>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SL</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Rate</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
               </tr>
-            ) : (
-              cart.map((item, index) => (
-                <tr key={item.productId} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">{index + 1}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{item.name}</span>
-                      {item.isCustom && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700 border border-gray-300">
-                          <i className="fas fa-tag mr-1 text-xs"></i>
-                          Custom
-                        </span>
-                      )}
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {cart.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="bg-gray-100 rounded-full p-6 mb-4">
+                        <i className="fas fa-shopping-cart text-5xl text-gray-400"></i>
+                      </div>
+                      <p className="text-xl font-semibold text-gray-700 mb-2">Your cart is empty</p>
+                      <p className="text-sm text-gray-500">Add products from the product section to get started</p>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    {item.isCustom ? (
-                      <span className="text-gray-500 italic">{item.category}</span>
-                    ) : (
-                      item.category
+                </tr>
+              ) : (
+                cart.map((item, index) => (
+                  <tr key={item.productId} className="hover:bg-blue-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-semibold text-sm">
+                        {index + 1}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">{item.name}</span>
+                        {item.isCustom && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                            <i className="fas fa-tag mr-1 text-xs"></i>
+                            Custom
+                          </span>
+                        )}
+                      </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                      {item.category}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="font-semibold text-gray-900">৳{item.rate.toFixed(2)}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center space-x-2">
+                      <button
+                        onClick={() =>
+                          updateCartQuantity(item.productId, item.quantity - 1)
+                        }
+                        className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm flex items-center justify-center transition-colors shadow-sm hover:shadow-md"
+                        title="Decrease quantity"
+                      >
+                        <i className="fas fa-minus"></i>
+                      </button>
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-lg text-gray-900">{item.quantity}</span>
+                        <span className="text-xs text-gray-500">{item.unit}</span>
+                      </div>
+                      <button
+                        onClick={() =>
+                          updateCartQuantity(item.productId, item.quantity + 1)
+                        }
+                        className="w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center justify-center transition-colors shadow-sm hover:shadow-md"
+                        title="Increase quantity"
+                        disabled={!item.isCustom && item.quantity >= item.maxStock}
+                      >
+                        <i className="fas fa-plus"></i>
+                      </button>
+                    </div>
+                    {!item.isCustom && item.maxStock && (
+                      <div className="text-xs text-gray-500 text-center mt-1">
+                        Max: {item.maxStock}
+                      </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    ৳{item.rate.toFixed(2)}
+                  <td className="px-6 py-4 text-right">
+                    <span className="font-bold text-lg text-indigo-700">৳{item.total.toFixed(2)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {item.isCustom ? (
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() =>
-                            updateCartQuantity(item.productId, item.quantity - 1)
-                          }
-                          className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded text-xs flex items-center justify-center"
-                        >
-                          <i className="fas fa-minus"></i>
-                        </button>
-                        <span className="w-16 text-center font-medium">
-                          {item.quantity} {item.unit}
-                        </span>
-                        <button
-                          onClick={() =>
-                            updateCartQuantity(item.productId, item.quantity + 1)
-                          }
-                          className="w-6 h-6 bg-green-500 hover:bg-green-600 text-white rounded text-xs flex items-center justify-center"
-                        >
-                          <i className="fas fa-plus"></i>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() =>
-                            updateCartQuantity(item.productId, item.quantity - 1)
-                          }
-                          className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded text-xs flex items-center justify-center"
-                        >
-                          <i className="fas fa-minus"></i>
-                        </button>
-                        <span className="w-16 text-center font-medium">
-                          {item.quantity} {item.unit}
-                        </span>
-                        <button
-                          onClick={() =>
-                            updateCartQuantity(item.productId, item.quantity + 1)
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => removeFromCart(item.productId)}
+                      className="inline-flex items-center justify-center w-10 h-10 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors"
+                      title="Remove item"
+                    >
+                      <i className="fas fa-trash-alt"></i>
+                    </button>
                           }
                           className="w-6 h-6 bg-green-500 hover:bg-green-600 text-white rounded text-xs flex items-center justify-center"
                           disabled={item.quantity >= item.maxStock}
