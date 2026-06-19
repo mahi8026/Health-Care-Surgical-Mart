@@ -244,6 +244,8 @@ class SalesController {
         startDate,
         endDate,
         customerId,
+        search,
+        paymentStatus,
         limit = 20,
         page = 1,
       } = req.query;
@@ -253,7 +255,7 @@ class SalesController {
       const skip = (parsedPage - 1) * parsedLimit;
 
       // Build filter
-      const filter = this._buildSalesFilter({ startDate, endDate, customerId });
+      const filter = this._buildSalesFilter({ startDate, endDate, customerId, search, paymentStatus });
 
       // Run count and data fetch in parallel
       const [total, sales] = await Promise.all([
@@ -560,7 +562,7 @@ class SalesController {
   /**
    * Build filter for sales query
    */
-  _buildSalesFilter({ startDate, endDate, customerId }) {
+  _buildSalesFilter({ startDate, endDate, customerId, search, paymentStatus }) {
     const filter = {};
 
     if (startDate || endDate) {
@@ -571,6 +573,19 @@ class SalesController {
 
     if (customerId) {
       filter.customerId = new ObjectId(customerId);
+    }
+
+    // Search by invoice number or customer name
+    if (search && search.trim()) {
+      filter.$or = [
+        { invoiceNo: { $regex: search.trim(), $options: 'i' } },
+        { customerName: { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+
+    // Filter by payment status
+    if (paymentStatus && paymentStatus.trim()) {
+      filter.paymentStatus = paymentStatus.trim();
     }
 
     return filter;

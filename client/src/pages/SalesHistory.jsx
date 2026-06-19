@@ -209,24 +209,6 @@ const SalesHistory = () => {
 
   return (
     <div className="max-w-[1600px]">
-      {/* Page Header with Gradient Background */}
-      <div className="mb-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
-                <i className="fas fa-history"></i>
-              </div>
-              Sales History
-            </h1>
-            <p className="text-blue-100 mt-2 text-sm">Track and manage all sales transactions with advanced filtering</p>
-          </div>
-          <div className="text-right">
-            <div className="text-white/90 text-sm mb-1">Total Records</div>
-            <div className="text-3xl font-bold text-white">{pagination.total}</div>
-          </div>
-        </div>
-      </div>
 
       {/* Enhanced Filters Section */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-6">
@@ -260,11 +242,29 @@ const SalesHistory = () => {
                 type="text"
                 value={filters.searchTerm}
                 onChange={(e) => handleFilterChange("searchTerm", e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyFilters();
+                  }
+                }}
                 placeholder="Invoice no, customer..."
-                className="w-full pl-10 pr-4 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                className="w-full pl-10 pr-10 py-2.5 text-sm border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               />
               <i className="fas fa-search absolute left-3 top-3.5 text-gray-400 text-xs"></i>
+              {filters.searchTerm && (
+                <button
+                  onClick={() => {
+                    handleFilterChange("searchTerm", "");
+                    // Auto-apply when clearing to show all results immediately
+                    setTimeout(() => applyFilters(), 0);
+                  }}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  title="Clear search"
+                >
+                  <i className="fas fa-times text-xs"></i>
+                </button>
+              )}
             </div>
           </div>
 
