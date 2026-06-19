@@ -23,7 +23,7 @@ const Sales = () => {
 
   // POS Form State
   const [posData, setPosData] = useState({
-    invoiceNo: `INV-${Date.now()}`,
+    invoiceNo: "Loading...",
     employee: "Current User",
     reference: "",
     saleDate: new Date().toISOString().split("T")[0],
@@ -86,6 +86,26 @@ const Sales = () => {
     }
   };
 
+  // Fetch next invoice number
+  const fetchNextInvoiceNumber = async () => {
+    try {
+      const response = await api.get("/sales/next-invoice-number");
+      if (response.success && response.data.invoiceNumber) {
+        setPosData((prev) => ({
+          ...prev,
+          invoiceNo: response.data.invoiceNumber,
+        }));
+      }
+    } catch (error) {
+      console.error("Fetch invoice number error:", error);
+      // Fallback to timestamp-based if API fails
+      setPosData((prev) => ({
+        ...prev,
+        invoiceNo: `INV-${Date.now()}`,
+      }));
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
   }, [searchTerm]);
@@ -93,6 +113,10 @@ const Sales = () => {
   useEffect(() => {
     fetchCustomers();
   }, [customerSearchTerm]);
+
+  useEffect(() => {
+    fetchNextInvoiceNumber();
+  }, []);
 
   // Handle form changes
   const handlePosDataChange = (field, value) => {
@@ -329,8 +353,12 @@ const Sales = () => {
   const clearSale = () => {
     setCart([]);
     setSelectedCustomer(null);
-    setPosData({
-      invoiceNo: `INV-${Date.now()}`,
+    
+    // Fetch new invoice number for next sale
+    fetchNextInvoiceNumber();
+    
+    setPosData((prev) => ({
+      ...prev,
       employee: "Current User",
       reference: "",
       saleDate: new Date().toISOString().split("T")[0],
@@ -348,7 +376,7 @@ const Sales = () => {
       cashPaid: 0,
       bankPaid: 0,
       previousDue: 0,
-    });
+    }));
     setCustomItem({
       name: "",
       rate: "",
@@ -450,54 +478,68 @@ const Sales = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-red-400 to-pink-400 p-4 rounded-t-lg">
-        <div className="grid grid-cols-5 gap-4 text-black">
+      {/* Header - Improved UI */}
+      <div className="bg-white shadow-md rounded-lg overflow-hidden mb-4">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-3">
+          <h2 className="text-xl font-bold text-white flex items-center">
+            <i className="fas fa-cash-register mr-3"></i>
+            Point of Sale
+          </h2>
+        </div>
+        <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50">
           <div>
-            <label className="block text-sm font-medium mb-1">Invoice no</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Invoice Number
+            </label>
             <input
               type="text"
               value={posData.invoiceNo}
-              onChange={(e) => handlePosDataChange("invoiceNo", e.target.value)}
-              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white placeholder-white/70"
-              placeholder="Invoice number"
+              readOnly
+              className="w-full px-3 py-2.5 bg-white border-2 border-blue-200 rounded-lg font-mono font-semibold text-blue-700 text-center shadow-sm"
+              placeholder="Loading..."
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Employee</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Employee
+            </label>
             <select
               value={posData.employee}
               onChange={(e) => handlePosDataChange("employee", e.target.value)}
-              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white"
+              className="w-full px-3 py-2.5 bg-white border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
             >
               <option value="Current User">Current User</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Reference</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Reference
+            </label>
             <input
               type="text"
               value={posData.reference}
               onChange={(e) => handlePosDataChange("reference", e.target.value)}
-              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white placeholder-white/70"
-              placeholder="Reference"
+              className="w-full px-3 py-2.5 bg-white border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              placeholder="Optional reference"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Sale Date</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Sale Date
+            </label>
             <input
               type="date"
               value={posData.saleDate}
               onChange={(e) => handlePosDataChange("saleDate", e.target.value)}
-              className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white"
+              className="w-full px-3 py-2.5 bg-white border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
             />
           </div>
           <div className="flex items-end">
             <button
               onClick={clearSale}
-              className="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded border border-white/30 transition-colors"
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center"
             >
-              <i className="fas fa-refresh mr-2"></i>
+              <i className="fas fa-plus-circle mr-2"></i>
               New Sale
             </button>
           </div>
@@ -521,16 +563,16 @@ const Sales = () => {
       )}
 
       {/* Main Content */}
-      <div className="grid grid-cols-3 gap-4 bg-white rounded-b-lg shadow-lg">
+      <div className="grid grid-cols-3 gap-4">
         {/* Customer Information */}
-        <div className="p-4">
-          <div className="bg-blue-600 text-white p-3 rounded-t-lg">
-            <h3 className="font-semibold flex items-center">
-              <i className="fas fa-user mr-2"></i>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4">
+            <h3 className="font-semibold flex items-center text-lg">
+              <i className="fas fa-user-circle mr-2"></i>
               Customer Information
             </h3>
           </div>
-          <div className="bg-blue-50 p-4 rounded-b-lg space-y-4">
+          <div className="p-4 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Customer Type
@@ -686,14 +728,14 @@ const Sales = () => {
         </div>
 
         {/* Product Information */}
-        <div className="p-4">
-          <div className="bg-blue-600 text-white p-3 rounded-t-lg">
-            <h3 className="font-semibold flex items-center">
-              <i className="fas fa-box mr-2"></i>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-gradient-to-r from-green-600 to-green-500 text-white p-4">
+            <h3 className="font-semibold flex items-center text-lg">
+              <i className="fas fa-box-open mr-2"></i>
               Product Information
             </h3>
           </div>
-          <div className="bg-blue-50 p-4 rounded-b-lg space-y-4">
+          <div className="p-4 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product
@@ -949,14 +991,14 @@ const Sales = () => {
         </div>
 
         {/* Amount Details */}
-        <div className="p-4">
-          <div className="bg-blue-600 text-white p-3 rounded-t-lg">
-            <h3 className="font-semibold flex items-center">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-600 to-purple-500 text-white p-4">
+            <h3 className="font-semibold flex items-center text-lg">
               <i className="fas fa-calculator mr-2"></i>
               Amount Details
             </h3>
           </div>
-          <div className="bg-blue-50 p-4 rounded-b-lg space-y-4">
+          <div className="p-4 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 SubTotal

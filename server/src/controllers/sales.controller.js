@@ -79,8 +79,9 @@ class SalesController {
         }
       }
 
-      // Use provided invoice number or generate one
-      const invoiceNo = invoiceNumber || `INV-${Date.now()}`;
+      // Generate sequential invoice number
+      const invoiceNumberService = require('../services/invoice-number.service');
+      const invoiceNo = await invoiceNumberService.generateInvoiceNumber(req.user.shopId);
 
       // Enrich items with product details (outside transaction — read-only)
       const enrichedItems = await this._enrichSaleItems(req.shopDb, items);

@@ -20,6 +20,33 @@ router.use(authenticate);
 router.use(checkShopStatus);
 
 /**
+ * GET /api/sales/next-invoice-number
+ * Get next sequential invoice number
+ */
+router.get(
+  "/next-invoice-number",
+  requirePermission(PERMISSIONS.CREATE_SALE),
+  async (req, res) => {
+    try {
+      const invoiceNumberService = require('../services/invoice-number.service');
+      const nextInvoiceNumber = await invoiceNumberService.getNextInvoiceNumber(req.user.shopId);
+      
+      res.json({
+        success: true,
+        data: {
+          invoiceNumber: nextInvoiceNumber
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate invoice number'
+      });
+    }
+  }
+);
+
+/**
  * @swagger
  * /api/sales:
  *   post:
