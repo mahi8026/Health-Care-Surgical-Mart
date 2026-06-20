@@ -198,7 +198,7 @@ async function authenticate(req, res, next) {
       name: user.name,
       email: user.email,
       role: user.role,
-      shopId: user.shopId || decoded.shopId,
+      shopId: (user.shopId || decoded.shopId)?.toString(), // Convert ObjectId to string
       permissions: user.permissions || [],
     };
 
