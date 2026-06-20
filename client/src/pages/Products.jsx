@@ -745,6 +745,7 @@ const ProductModal = ({
     purchasePrice: "",
     sellingPrice: "",
     unit: "",
+    initialQuantity: "",
     minStockLevel: "",
     description: "",
     batchNo: "",
@@ -765,6 +766,7 @@ const ProductModal = ({
         : "",
       reorderPoint: product.reorderPoint ?? 10,
       maxStock: product.maxStock ?? "",
+      initialQuantity: "", // Not editable for existing products
     }),
   });
   const [loading, setLoading] = useState(false);
@@ -960,6 +962,27 @@ const ProductModal = ({
                 ))}
               </select>
             </div>
+
+            {!product && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Initial Stock Quantity *
+                </label>
+                <input
+                  type="number"
+                  name="initialQuantity"
+                  value={formData.initialQuantity}
+                  onChange={handleChange}
+                  required
+                  min="0"
+                  className="input-field"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Set the starting stock quantity for this product
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

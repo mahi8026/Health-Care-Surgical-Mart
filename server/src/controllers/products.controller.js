@@ -61,6 +61,7 @@ class ProductsController extends BaseController {
         purchasePrice,
         sellingPrice,
         unit,
+        initialQuantity,
         minStockLevel,
         description,
         batchNo,
@@ -111,8 +112,17 @@ class ProductsController extends BaseController {
       // Insert product
       const result = await req.shopDb.collection('products').insertOne(product);
 
-      // Create initial stock record (both old and new systems)
-      await this._createInitialStock(req.shopDb, result.insertedId, name, sku, minStockLevel);
+      // Create initial stock record with initial quantity
+      const initialQty = initialQuantity !== undefined ? parseInt(initialQuantity) : 0;
+      await this._createInitialStock(
+        req.shopDb,
+        result.insertedId,
+        name,
+        sku,
+        minStockLevel,
+        initialQty,
+        parseFloat(purchasePrice)
+      );
 
       // Audit: product created
       auditLog.log(req, AUDIT_ACTIONS.PRODUCT_CREATED, 'product', result.insertedId.toString(),
@@ -385,40 +395,65 @@ class ProductsController extends BaseController {
   /**
    * Create initial stock record for new product
    */
-  async _createInitialStock(shopDb, productId, name, sku, minStockLevel) {
+  async _createInitialStock(shopDb, productId, name, sku, minStockLevel, initialQty = 0, costPrice = 0) {
+    const quantity = parseInt(initialQty) || 0;
+    const isLowStock = quantity <= parseInt(minStockLevel);
+
     // Create record in old stock collection (for backward compatibility)
     await shopDb.collection('stock').insertOne({
       productId: productId,
       productName: name,
-      currentQty: 0,
+      currentQty: quantity,
       reservedQty: 0,
-      availableQty: 0,
+      availableQty: quantity,
       minStockLevel: parseInt(minStockLevel),
-      isLowStock: true,
+      isLowStock: isLowStock,
       lastUpdated: new Date(),
       createdAt: new Date(),
     });
 
     // Create initial snapshot in new event-sourced stock system
-    await shopDb.collection('stock_snapshots').insertOne({
+    const snapshot = {
       productId: productId,
       productName: name,
       sku: sku || null,
-      onHandQty: 0,
+      onHandQty: quantity,
       reservedQty: 0,
-      availableQty: 0,
-      avgCostPrice: 0,
-      totalCostValue: 0,
+      availableQty: quantity,
+      avgCostPrice: parseFloat(costPrice) || 0,
+      totalCostValue: quantity * (parseFloat(costPrice) || 0),
       reorderPoint: parseInt(minStockLevel),
-      lastMovementType: null,
-      lastMovementDate: null,
-      batchCount: 0,
+      lastMovementType: quantity > 0 ? 'INITIAL_STOCK' : null,
+      lastMovementDate: quantity > 0 ? new Date() : null,
+      batchCount: quantity > 0 ? 1 : 0,
       oldestExpiryDate: null,
       nearestExpiryDate: null,
       version: 0,
       updatedAt: new Date(),
       createdAt: new Date(),
-    });
+    };
+
+    await shopDb.collection('stock_snapshots').insertOne(snapshot);
+
+    // If initial quantity > 0, create a stock event for audit trail
+    if (quantity > 0) {
+      await shopDb.collection('stock_events').insertOne({
+        productId: productId,
+        productName: name,
+        sku: sku || null,
+        eventType: 'INITIAL_STOCK',
+        eventSubtype: 'PRODUCT_CREATION',
+        quantityChange: quantity,
+        quantityBefore: 0,
+        quantityAfter: quantity,
+        costPrice: parseFloat(costPrice) || 0,
+        totalValue: quantity * (parseFloat(costPrice) || 0),
+        reason: 'Initial stock when product was created',
+        performedBy: null, // Will be set by middleware if available
+        createdAt: new Date(),
+        version: 0,
+      });
+    }
   }
 
   /**
