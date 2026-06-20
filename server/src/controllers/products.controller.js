@@ -278,8 +278,14 @@ class ProductsController extends BaseController {
   _buildProductFilter({ category, search, isActive }) {
     const matchStage = {};
 
+    // Default to showing only active products unless explicitly specified
+    if (isActive !== undefined) {
+      matchStage.isActive = isActive === 'true';
+    } else {
+      matchStage.isActive = true; // Default: only show active products
+    }
+
     if (category) {matchStage.category = category;}
-    if (isActive !== undefined) {matchStage.isActive = isActive === 'true';}
     if (search) {
       matchStage.$or = [
         { name: { $regex: search, $options: 'i' } },
