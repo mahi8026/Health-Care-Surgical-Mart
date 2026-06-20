@@ -29,25 +29,25 @@ const exportToExcel = (stockData) => {
     "Expiry Date", "Status", "Category", "Supplier",
   ];
   const rows = stockData.map((item) => {
-    const qty = item.currentQty ?? item.quantity ?? 0;
-    const cost = item.product?.purchasePrice ?? item.purchasePrice ?? 0;
-    const reorder = item.reorderPoint ?? item.product?.reorderPoint ?? item.minStockLevel ?? 0;
+    const qty = item.onHandQty ?? item.availableQty ?? 0;
+    const cost = item.purchasePrice ?? item.avgCostPrice ?? 0;
+    const reorder = item.reorderPoint ?? 0;
     const status = qty === 0 ? "Out of Stock" : qty <= reorder ? "Low Stock" : "In Stock";
     return [
-      item.productName ?? item.product?.name ?? "",
-      item.sku ?? item.product?.sku ?? "",
+      item.productName ?? "",
+      item.sku ?? "",
       item.batchNo ?? "",
       item.lotNo ?? "",
       qty,
-      item.unit ?? item.product?.unit ?? "",
+      item.unit ?? "",
       cost,
-      item.product?.sellingPrice ?? item.sellingPrice ?? 0,
+      item.sellingPrice ?? 0,
       (qty * cost).toFixed(2),
       reorder,
       item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : "",
       status,
-      item.category ?? item.product?.category ?? "",
-      item.supplier ?? item.product?.supplier ?? "",
+      item.category ?? "",
+      item.supplier ?? "",
     ];
   });
   const csv = [headers, ...rows].map((r) => r.map((f) => `"${f}"`).join(",")).join("\n");
@@ -304,7 +304,7 @@ const StockAdjustmentModal = ({ isOpen, onClose, product, onSuccess }) => {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700">Current Stock:</span>
-            <span className="text-lg font-bold text-blue-600">{product?.currentQty ?? product?.quantity ?? 0}</span>
+            <span className="text-lg font-bold text-blue-600">{product?.onHandQty ?? product?.availableQty ?? 0}</span>
           </div>
         </div>
 
@@ -968,12 +968,12 @@ const StockReport = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {stockData.map((item) => {
-                    const qty = item.currentQty ?? item.quantity ?? 0;
-                    const cost = item.product?.purchasePrice ?? item.purchasePrice ?? 0;
-                    const selling = item.product?.sellingPrice ?? item.sellingPrice ?? 0;
-                    const reorder = item.reorderPoint ?? item.product?.reorderPoint ?? item.minStockLevel ?? 0;
-                    const maxStock = item.maxStock ?? item.product?.maxStock ?? 0;
-                    const stockValue = qty * cost;
+                    const qty = item.onHandQty ?? item.availableQty ?? 0;
+                    const cost = item.purchasePrice ?? item.avgCostPrice ?? 0;
+                    const selling = item.sellingPrice ?? 0;
+                    const reorder = item.reorderPoint ?? 0;
+                    const maxStock = item.maxStock ?? 0;
+                    const stockValue = item.stockValue ?? qty * cost;
                     const expiry = expiryStyle(item.expiryDate);
                     const isExpired = expiry.row === "bg-red-100";
                     const isOutOfStock = qty === 0;

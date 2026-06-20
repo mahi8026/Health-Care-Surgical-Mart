@@ -51,44 +51,97 @@ router.get(
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    // No shopId filter — already connected to the correct shop DB
-    const query = {};
 
-    // Search filter
+    // Build match stage
+    const matchStage = {};
+
     if (search) {
-      query.$or = [
+      matchStage.$or = [
         { productName: { $regex: search, $options: 'i' } },
         { sku: { $regex: search, $options: 'i' } },
       ];
     }
 
-    // Category filter
     if (category) {
-      query.category = category;
+      matchStage.category = category;
     }
 
-    // Status filter
+    // Status filters — resolved after we know qty vs reorderPoint
+    // These are applied as a $match after $addFields
+    const postMatchStage = {};
     if (status === 'low_stock') {
-      query.$expr = { $lte: ['$availableQty', '$reorderPoint'] };
+      postMatchStage.$expr = { $and: [
+        { $gt: ['$onHandQty', 0] },
+        { $lte: ['$onHandQty', '$reorderPoint'] },
+      ]};
     } else if (status === 'out_of_stock') {
-      query.availableQty = 0;
+      postMatchStage.onHandQty = 0;
     } else if (status === 'in_stock') {
-      query.availableQty = { $gt: 0 };
+      postMatchStage.$expr = { $gt: ['$onHandQty', '$reorderPoint'] };
+    } else if (status === 'expiring_30d') {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + 30);
+      postMatchStage['product.expiryDate'] = { $lte: cutoff, $gte: new Date() };
+    } else if (status === 'expiring_60d') {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + 60);
+      postMatchStage['product.expiryDate'] = { $lte: cutoff, $gte: new Date() };
+    } else if (status === 'expired') {
+      postMatchStage['product.expiryDate'] = { $lt: new Date() };
     }
 
-    // Sorting
     const sortDirection = sortOrder === 'desc' ? -1 : 1;
-    const sort = { [sortBy]: sortDirection };
 
-    const snapshots = await shopDb
-      .collection('stock_snapshots')
-      .find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .toArray();
+    const pipeline = [
+      { $match: matchStage },
+      // Join product details
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'productId',
+          foreignField: '_id',
+          as: 'product',
+        },
+      },
+      { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
+      // Merge useful product fields into the snapshot for easy access
+      {
+        $addFields: {
+          purchasePrice: { $ifNull: ['$product.purchasePrice', '$avgCostPrice', 0] },
+          sellingPrice: { $ifNull: ['$product.sellingPrice', 0] },
+          batchNo: { $ifNull: ['$product.batchNo', '$batchNo', ''] },
+          lotNo: { $ifNull: ['$product.lotNo', '$lotNo', ''] },
+          expiryDate: { $ifNull: ['$product.expiryDate', null] },
+          maxStock: { $ifNull: ['$product.maxStock', null] },
+          stockValue: {
+            $multiply: [
+              '$onHandQty',
+              { $ifNull: ['$product.purchasePrice', '$avgCostPrice', 0] },
+            ],
+          },
+        },
+      },
+    ];
 
-    const total = await shopDb.collection('stock_snapshots').countDocuments(query);
+    // Apply status post-filter if set
+    if (Object.keys(postMatchStage).length > 0) {
+      pipeline.push({ $match: postMatchStage });
+    }
+
+    // Count total before pagination
+    const countPipeline = [...pipeline, { $count: 'total' }];
+    const countResult = await shopDb.collection('stock_snapshots').aggregate(countPipeline).toArray();
+    const total = countResult[0]?.total || 0;
+
+    // Sort, paginate, and remove embedded product sub-doc
+    pipeline.push(
+      { $sort: { [sortBy]: sortDirection } },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+      { $project: { product: 0 } },  // strip raw product sub-doc — fields are merged above
+    );
+
+    const snapshots = await shopDb.collection('stock_snapshots').aggregate(pipeline).toArray();
 
     res.json({
       success: true,
