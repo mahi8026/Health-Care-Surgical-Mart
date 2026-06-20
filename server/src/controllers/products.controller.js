@@ -299,35 +299,63 @@ class ProductsController extends BaseController {
 
   /**
    * Fetch products with stock information
+   * Uses stock_snapshots as the single source of truth for stock quantities.
+   * Falls back to the legacy stock collection if no snapshot exists.
    */
   async _fetchProductsWithStock(shopDb, matchStage) {
     return await shopDb
       .collection('products')
       .aggregate([
         { $match: matchStage },
+        // Primary: join stock_snapshots (new event-sourced system)
+        {
+          $lookup: {
+            from: 'stock_snapshots',
+            localField: '_id',
+            foreignField: 'productId',
+            as: 'snapshot',
+          },
+        },
+        // Fallback: join legacy stock collection
         {
           $lookup: {
             from: 'stock',
             localField: '_id',
             foreignField: 'productId',
-            as: 'stock',
+            as: 'legacyStock',
           },
         },
         {
           $addFields: {
+            // Use snapshot.onHandQty if available, fall back to legacy stock.currentQty
             stockQuantity: {
-              $ifNull: [{ $arrayElemAt: ['$stock.currentQty', 0] }, 0],
+              $cond: {
+                if: { $gt: [{ $size: '$snapshot' }, 0] },
+                then: { $ifNull: [{ $arrayElemAt: ['$snapshot.onHandQty', 0] }, 0] },
+                else: { $ifNull: [{ $arrayElemAt: ['$legacyStock.currentQty', 0] }, 0] },
+              },
             },
             isLowStock: {
               $cond: {
-                if: { $gt: [{ $size: '$stock' }, 0] },
+                if: { $gt: [{ $size: '$snapshot' }, 0] },
                 then: {
                   $lte: [
-                    { $arrayElemAt: ['$stock.currentQty', 0] },
+                    { $ifNull: [{ $arrayElemAt: ['$snapshot.onHandQty', 0] }, 0] },
                     '$minStockLevel',
                   ],
                 },
-                else: true,
+                else: {
+                  $cond: {
+                    if: { $gt: [{ $size: '$legacyStock' }, 0] },
+                    then: {
+                      $lte: [
+                        { $ifNull: [{ $arrayElemAt: ['$legacyStock.currentQty', 0] }, 0] },
+                        '$minStockLevel',
+                      ],
+                    },
+                    else: true,
+                  },
+                },
               },
             },
             category: {
@@ -336,7 +364,7 @@ class ProductsController extends BaseController {
             },
           },
         },
-        { $project: { stock: 0 } },
+        { $project: { snapshot: 0, legacyStock: 0 } },
         { $sort: { name: 1 } },
       ])
       .toArray();
@@ -463,35 +491,44 @@ class ProductsController extends BaseController {
   }
 
   /**
-   * Update stock record when product is updated
+   * Update stock record when product name/minStockLevel changes
    */
   async _updateStockRecord(shopDb, productId, name, minStockLevel) {
     if (!name && minStockLevel === undefined) {
       return; // Nothing to update
     }
 
-    const stockUpdate = { lastUpdated: new Date() };
+    const legacyUpdate = { lastUpdated: new Date() };
+    const snapshotUpdate = { updatedAt: new Date() };
 
     if (name) {
-      stockUpdate.productName = name;
+      legacyUpdate.productName = name;
+      snapshotUpdate.productName = name;
     }
 
     if (minStockLevel !== undefined) {
-      stockUpdate.minStockLevel = parseInt(minStockLevel);
+      const parsedLevel = parseInt(minStockLevel);
+      legacyUpdate.minStockLevel = parsedLevel;
+      snapshotUpdate.reorderPoint = parsedLevel;
 
-      // Update isLowStock flag
-      const stock = await shopDb.collection('stock').findOne({
+      // Update isLowStock on legacy collection based on current qty
+      const legacyStock = await shopDb.collection('stock').findOne({
         productId: new ObjectId(productId),
       });
-
-      if (stock) {
-        stockUpdate.isLowStock = stock.currentQty <= parseInt(minStockLevel);
+      if (legacyStock) {
+        legacyUpdate.isLowStock = legacyStock.currentQty <= parsedLevel;
       }
     }
 
+    // Update legacy stock collection
     await shopDb
       .collection('stock')
-      .updateOne({ productId: new ObjectId(productId) }, { $set: stockUpdate });
+      .updateOne({ productId: new ObjectId(productId) }, { $set: legacyUpdate });
+
+    // Update stock_snapshots to keep in sync
+    await shopDb
+      .collection('stock_snapshots')
+      .updateOne({ productId: new ObjectId(productId) }, { $set: snapshotUpdate });
   }
 }
 

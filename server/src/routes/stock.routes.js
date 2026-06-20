@@ -51,7 +51,8 @@ router.get(
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const query = { shopId: req.user.shopId };
+    // No shopId filter — already connected to the correct shop DB
+    const query = {};
 
     // Search filter
     if (search) {
