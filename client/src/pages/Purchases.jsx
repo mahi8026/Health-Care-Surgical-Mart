@@ -4,6 +4,9 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import SearchableProductSelect from "../components/SearchableProductSelect";
 
 const Purchases = () => {
+  // Tab state
+  const [activeTab, setActiveTab] = useState("new");
+
   // State management
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -12,6 +15,13 @@ const Purchases = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+
+  // Purchase History state
+  const [purchaseHistory, setPurchaseHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [receiveModal, setReceiveModal] = useState({ isOpen: false, purchase: null });
+  const [receivingLoading, setReceivingLoading] = useState(false);
 
   // Purchase Form State
   const [purchaseData, setPurchaseData] = useState({
@@ -78,6 +88,49 @@ const Purchases = () => {
     fetchProducts();
     fetchSuppliers();
   }, []);
+
+  // Fetch purchase history
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const response = await api.get("/purchases?limit=50&sortBy=purchaseDate&sortOrder=desc");
+      if (response.success) {
+        setPurchaseHistory(response.data || []);
+      } else {
+        setHistoryError(response.message || "Failed to load purchase history");
+      }
+    } catch (err) {
+      setHistoryError(err.message || "Failed to load purchase history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Receive a purchase order (update stock)
+  const receivePurchase = async (purchaseId) => {
+    setReceivingLoading(true);
+    try {
+      const response = await api.put(`/purchases/${purchaseId}/receive`, {});
+      if (response.success) {
+        setReceiveModal({ isOpen: false, purchase: null });
+        fetchHistory();
+        alert("✅ Stock received successfully! Inventory has been updated.");
+      } else {
+        alert("❌ Failed: " + (response.message || "Unknown error"));
+      }
+    } catch (err) {
+      alert("❌ Error: " + (err.response?.data?.message || err.message));
+    } finally {
+      setReceivingLoading(false);
+    }
+  };
+
+  // Switch to history tab and load data
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === "history") fetchHistory();
+  };
 
   // Handle form changes
   const handlePurchaseDataChange = (field, value) => {
@@ -255,7 +308,7 @@ const Purchases = () => {
       const response = await api.post("/purchases", purchaseOrderData);
 
       if (response.success) {
-        alert("Purchase order created successfully!");
+        alert("Purchase order created successfully!\n\nSwitch to 'Purchase History' tab to receive the stock.");
         clearPurchase();
         setError("");
         // Refresh products to update stock
@@ -300,7 +353,207 @@ const Purchases = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
-      {/* Header */}
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => handleTabChange("new")}
+          className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+            activeTab === "new"
+              ? "bg-purple-600 text-white shadow-md"
+              : "bg-white text-gray-600 hover:bg-purple-50 border border-gray-200"
+          }`}
+        >
+          <i className="fas fa-plus mr-2"></i>New Purchase
+        </button>
+        <button
+          onClick={() => handleTabChange("history")}
+          className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+            activeTab === "history"
+              ? "bg-purple-600 text-white shadow-md"
+              : "bg-white text-gray-600 hover:bg-purple-50 border border-gray-200"
+          }`}
+        >
+          <i className="fas fa-list mr-2"></i>Purchase History
+        </button>
+      </div>
+
+      {/* ── Purchase History Tab ── */}
+      {activeTab === "history" && (
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="flex items-center justify-between bg-gradient-to-r from-purple-500 to-indigo-500 px-6 py-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <i className="fas fa-history"></i> Purchase Orders
+            </h2>
+            <button
+              onClick={fetchHistory}
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+            >
+              <i className="fas fa-sync-alt mr-1"></i>Refresh
+            </button>
+          </div>
+
+          {historyError && (
+            <div className="m-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+              <i className="fas fa-exclamation-circle mr-2"></i>{historyError}
+            </div>
+          )}
+
+          {historyLoading ? (
+            <div className="flex justify-center py-16"><LoadingSpinner /></div>
+          ) : purchaseHistory.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              <i className="fas fa-shopping-basket text-5xl mb-4 opacity-30"></i>
+              <p className="text-lg font-medium">No purchase orders yet</p>
+              <p className="text-sm mt-1">Create your first purchase order to get started</p>
+              <button
+                onClick={() => handleTabChange("new")}
+                className="mt-4 bg-purple-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700"
+              >
+                <i className="fas fa-plus mr-2"></i>New Purchase
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">PO Number</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Supplier</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Items</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Total</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {purchaseHistory.map((po) => {
+                    const isPending = !po.status || po.status === "pending" || po.status === "Pending";
+                    const isReceived = po.status === "received" || po.status === "Received";
+                    const isCancelled = po.status === "cancelled" || po.status === "Cancelled";
+                    return (
+                      <tr key={po._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-sm font-semibold text-purple-700">
+                            {po.purchaseNo || po.invoiceNo || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {po.supplier?.name || po.supplierName || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {po.purchaseDate ? new Date(po.purchaseDate).toLocaleDateString("en-BD", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center justify-center w-7 h-7 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
+                            {po.items?.length || 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold text-gray-800">
+                          ৳{(po.totalAmount || po.grandTotal || 0).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            isReceived ? "bg-green-100 text-green-700" :
+                            isCancelled ? "bg-red-100 text-red-700" :
+                            "bg-yellow-100 text-yellow-700"
+                          }`}>
+                            {isReceived ? "✓ Received" : isCancelled ? "✗ Cancelled" : "⏳ Pending"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {isPending ? (
+                            <button
+                              onClick={() => setReceiveModal({ isOpen: true, purchase: po })}
+                              className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 mx-auto"
+                            >
+                              <i className="fas fa-truck-loading"></i>
+                              Receive Stock
+                            </button>
+                          ) : (
+                            <span className="text-sm text-gray-400 italic">
+                              {isReceived ? `Received ${po.receivedAt ? new Date(po.receivedAt).toLocaleDateString() : ""}` : "—"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Receive Stock Confirmation Modal ── */}
+      {receiveModal.isOpen && receiveModal.purchase && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4 rounded-t-xl">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <i className="fas fa-truck-loading"></i>
+                Receive Stock
+              </h3>
+              <p className="text-green-100 text-sm mt-0.5">
+                PO: {receiveModal.purchase.purchaseNo || receiveModal.purchase.invoiceNo}
+              </p>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 text-sm mb-4">
+                The following items will be added to your inventory:
+              </p>
+              <div className="border border-gray-200 rounded-lg overflow-hidden mb-5">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Product</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Qty</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Unit Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {(receiveModal.purchase.items || []).map((item, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2 font-medium text-gray-800">{item.name || item.productName || "Product"}</td>
+                        <td className="px-3 py-2 text-right text-green-600 font-bold">+{item.qty}</td>
+                        <td className="px-3 py-2 text-right text-gray-600">৳{(item.rate || item.unitCost || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5 text-sm text-amber-800">
+                <i className="fas fa-info-circle mr-2"></i>
+                Stock levels will be updated immediately after confirmation.
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setReceiveModal({ isOpen: false, purchase: null })}
+                  disabled={receivingLoading}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => receivePurchase(receiveModal.purchase._id)}
+                  disabled={receivingLoading}
+                  className="px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-semibold text-sm flex items-center gap-2"
+                >
+                  {receivingLoading ? (
+                    <><LoadingSpinner size="sm" /> Receiving...</>
+                  ) : (
+                    <><i className="fas fa-check"></i> Confirm &amp; Update Stock</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Purchase Tab ── */}
+      {activeTab === "new" && (<>
       <div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-4 rounded-t-lg">
         <div className="grid grid-cols-5 gap-4 text-white">
           <div>
@@ -908,6 +1161,8 @@ const Purchases = () => {
           }}
         />
       )}
+      {/* ── End New Purchase Tab ── */}
+      </>)}
     </div>
   );
 };
