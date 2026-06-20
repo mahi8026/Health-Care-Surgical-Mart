@@ -1,6 +1,6 @@
 /**
  * Stock Routes (New Event-Sourced System)
- * 
+ *
  * Read endpoints for stock management:
  * - GET /snapshots - All products with current stock
  * - GET /snapshots/:id - Single product snapshot
@@ -51,7 +51,7 @@ router.get(
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    let query = { shopId: req.user.shopId };
+    const query = { shopId: req.user.shopId };
 
     // Search filter
     if (search) {
@@ -139,7 +139,7 @@ router.get(
     const { page = 1, limit = 50, startDate, endDate, movementType } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    let query = {
+    const query = {
       productId: new ObjectId(req.params.productId),
       shopId: req.user.shopId,
     };
@@ -147,8 +147,8 @@ router.get(
     // Date range filter
     if (startDate || endDate) {
       query.timestamp = {};
-      if (startDate) query.timestamp.$gte = new Date(startDate);
-      if (endDate) query.timestamp.$lte = new Date(endDate);
+      if (startDate) {query.timestamp.$gte = new Date(startDate);}
+      if (endDate) {query.timestamp.$lte = new Date(endDate);}
     }
 
     // Movement type filter
@@ -197,7 +197,7 @@ router.get(
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    let query = { shopId: req.user.shopId };
+    const query = { shopId: req.user.shopId };
 
     if (productId) {
       query.productId = new ObjectId(productId);
@@ -408,7 +408,7 @@ router.get(
 /**
  * GET /api/stock/events
  * SSE endpoint for real-time stock updates
- * 
+ *
  * Note: EventSource API doesn't support custom headers,
  * so we accept token via query parameter for this endpoint only.
  * The authenticate middleware will check req.query.token automatically.
@@ -494,7 +494,7 @@ router.get(
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
     thresholdDate.setHours(23, 59, 59, 999);
@@ -703,31 +703,31 @@ router.post(
   requirePermission(PERMISSIONS.MANAGE_STOCK),
   asyncHandler(async (req, res) => {
     const { productId, adjustmentType, quantity, reason, notes } = req.body;
-    
+
     // Validation
     if (!productId || !adjustmentType || quantity === undefined) {
       throw createError.badRequest('Missing required fields: productId, adjustmentType, quantity');
     }
-    
+
     if (!['ADD', 'SUBTRACT', 'SET'].includes(adjustmentType)) {
       throw createError.badRequest('Invalid adjustmentType. Must be: ADD, SUBTRACT, or SET');
     }
-    
+
     if (adjustmentType !== 'SET' && quantity <= 0) {
       throw createError.badRequest('Quantity must be positive for ADD/SUBTRACT');
     }
-    
+
     if (adjustmentType === 'SET' && quantity < 0) {
       throw createError.badRequest('Quantity cannot be negative for SET');
     }
-    
+
     // Map adjustment type to movement type
     const movementType = {
       'ADD': 'ADJUSTMENT_ADD',
       'SUBTRACT': 'ADJUSTMENT_SUB',
       'SET': 'ADJUSTMENT_SET'
     }[adjustmentType];
-    
+
     // Record adjustment
     const result = await stockCommand.recordMovement({
       shopId: req.user.shopId,
@@ -743,7 +743,7 @@ router.post(
         adjustedBy: req.user.name
       }
     });
-    
+
     logger.info('Stock adjustment recorded', {
       shopId: req.user.shopId,
       productId,
@@ -751,7 +751,7 @@ router.post(
       quantity,
       user: req.user.name
     });
-    
+
     res.json({
       success: true,
       message: 'Stock adjusted successfully',
@@ -773,20 +773,20 @@ router.post(
   requirePermission(PERMISSIONS.MANAGE_STOCK),
   asyncHandler(async (req, res) => {
     const { items } = req.body; // Array of { productId, quantity, costPrice, notes }
-    
+
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw createError.badRequest('Items array is required');
     }
-    
+
     const results = [];
     const errors = [];
-    
+
     for (const item of items) {
       try {
         if (!item.productId || item.quantity === undefined) {
           throw new Error('Missing productId or quantity');
         }
-        
+
         const result = await stockCommand.recordMovement({
           shopId: req.user.shopId,
           productId: new ObjectId(item.productId),
@@ -801,7 +801,7 @@ router.post(
             importedBy: req.user.name
           }
         });
-        
+
         results.push({
           productId: item.productId,
           success: true,
@@ -815,7 +815,7 @@ router.post(
         });
       }
     }
-    
+
     logger.info('Opening stock created', {
       shopId: req.user.shopId,
       totalItems: items.length,
@@ -823,7 +823,7 @@ router.post(
       failed: errors.length,
       user: req.user.name
     });
-    
+
     res.json({
       success: true,
       message: `Opening stock created for ${results.length} of ${items.length} products`,
@@ -842,25 +842,25 @@ router.post(
   requirePermission(PERMISSIONS.MANAGE_STOCK),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    
+
     // Get all products
     const products = await shopDb.collection('products').find({}).toArray();
-    
+
     let created = 0;
     let skipped = 0;
     const results = [];
-    
+
     for (const product of products) {
       // Check if snapshot exists
       const existingSnapshot = await shopDb.collection('stock_snapshots').findOne({
         productId: product._id
       });
-      
+
       if (existingSnapshot) {
         skipped++;
         continue;
       }
-      
+
       // Create snapshot with current stock quantity from product record
       const snapshot = {
         productId: product._id,
@@ -883,10 +883,10 @@ router.post(
         updatedAt: new Date(),
         createdAt: new Date(),
       };
-      
+
       await shopDb.collection('stock_snapshots').insertOne(snapshot);
       created++;
-      
+
       results.push({
         productId: product._id,
         productName: product.name,
@@ -894,7 +894,7 @@ router.post(
         initialQty: product.stockQuantity || 0
       });
     }
-    
+
     logger.info('Missing snapshots initialized', {
       shopId: req.user.shopId,
       totalProducts: products.length,
@@ -902,7 +902,7 @@ router.post(
       snapshotsSkipped: skipped,
       user: req.user.name
     });
-    
+
     res.json({
       success: true,
       message: `Initialized ${created} missing stock snapshots (${skipped} already existed)`,

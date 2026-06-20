@@ -3,20 +3,19 @@
  * CRUD operations for expense category management
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
+const { ObjectId } = require('mongodb');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
-const { logger } = require('../config/logging');
-const { cacheResponse } = require("../middleware/cache.middleware");
-const { cacheService, TTL } = require("../services/cache.service");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
+const { cacheResponse } = require('../middleware/cache.middleware');
+const { cacheService, TTL } = require('../services/cache.service');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -191,17 +190,17 @@ router.use(checkShopStatus);
  * Get all expense categories for the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_EXPENSE_CATEGORIES),
   cacheResponse(TTL.EXPENSE_CATS, (req) => `expense-cats:${req.user.shopId}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { includeInactive = false } = req.query;
 
-    const query = includeInactive === "true" ? {} : { isActive: true };
+    const query = includeInactive === 'true' ? {} : { isActive: true };
 
     const categories = await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .find(query)
       .sort({ name: 1 })
       .toArray();
@@ -218,16 +217,16 @@ router.get(
  * Get expense category by ID
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_EXPENSE_CATEGORIES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const category = await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!category) {
-      throw createError.notFound("Expense category not found");
+      throw createError.notFound('Expense category not found');
     }
 
     res.json({
@@ -242,7 +241,7 @@ router.get(
  * Create new expense category
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_EXPENSE_CATEGORY),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -250,36 +249,36 @@ router.post(
 
     // Validate required fields
     if (!name || !type) {
-      throw createError.badRequest("Name and type are required");
+      throw createError.badRequest('Name and type are required');
     }
 
     // Validate type
-    const validTypes = ["Fixed", "Variable", "One-time"];
+    const validTypes = ['Fixed', 'Variable', 'One-time'];
     if (!validTypes.includes(type)) {
       throw createError.badRequest(
-        "Type must be one of: Fixed, Variable, One-time",
+        'Type must be one of: Fixed, Variable, One-time',
       );
     }
 
     // Validate name length
     if (name.length < 1 || name.length > 100) {
-      throw createError.badRequest("Name must be between 1 and 100 characters");
+      throw createError.badRequest('Name must be between 1 and 100 characters');
     }
 
     // Validate description length if provided
     if (description && description.length > 500) {
       throw createError.badRequest(
-        "Description must be less than 500 characters",
+        'Description must be less than 500 characters',
       );
     }
 
     // Check if category name already exists
     const existingCategory = await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .findOne({ name: name.trim() });
 
     if (existingCategory) {
-      throw createError.conflict("Category with this name already exists");
+      throw createError.conflict('Category with this name already exists');
     }
 
     const categoryData = {
@@ -293,15 +292,15 @@ router.post(
     };
 
     const result = await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .insertOne(categoryData);
 
     // Invalidate expense categories cache
-    cacheService.invalidateShopCache(req.user.shopId, "expense-cats");
+    cacheService.invalidateShopCache(req.user.shopId, 'expense-cats');
 
     res.status(201).json({
       success: true,
-      message: "Expense category created successfully",
+      message: 'Expense category created successfully',
       data: { _id: result.insertedId, ...categoryData },
     });
   }),
@@ -312,7 +311,7 @@ router.post(
  * Update expense category
  */
 router.put(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.EDIT_EXPENSE_CATEGORY),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -320,46 +319,46 @@ router.put(
 
     // Validate required fields
     if (!name || !type) {
-      throw createError.badRequest("Name and type are required");
+      throw createError.badRequest('Name and type are required');
     }
 
     // Validate type
-    const validTypes = ["Fixed", "Variable", "One-time"];
+    const validTypes = ['Fixed', 'Variable', 'One-time'];
     if (!validTypes.includes(type)) {
       throw createError.badRequest(
-        "Type must be one of: Fixed, Variable, One-time",
+        'Type must be one of: Fixed, Variable, One-time',
       );
     }
 
     // Validate name length
     if (name.length < 1 || name.length > 100) {
-      throw createError.badRequest("Name must be between 1 and 100 characters");
+      throw createError.badRequest('Name must be between 1 and 100 characters');
     }
 
     // Validate description length if provided
     if (description && description.length > 500) {
       throw createError.badRequest(
-        "Description must be less than 500 characters",
+        'Description must be less than 500 characters',
       );
     }
 
     // Check if category exists
     const existingCategory = await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!existingCategory) {
-      throw createError.notFound("Expense category not found");
+      throw createError.notFound('Expense category not found');
     }
 
     // Check if name is taken by another category
-    const nameCheck = await shopDb.collection("expenseCategories").findOne({
+    const nameCheck = await shopDb.collection('expenseCategories').findOne({
       name: name.trim(),
       _id: { $ne: new ObjectId(req.params.id) },
     });
 
     if (nameCheck) {
-      throw createError.conflict("Category name is already taken");
+      throw createError.conflict('Category name is already taken');
     }
 
     const updateData = {
@@ -370,15 +369,15 @@ router.put(
     };
 
     await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
     // Invalidate expense categories cache
-    cacheService.invalidateShopCache(req.user.shopId, "expense-cats");
+    cacheService.invalidateShopCache(req.user.shopId, 'expense-cats');
 
     res.json({
       success: true,
-      message: "Expense category updated successfully",
+      message: 'Expense category updated successfully',
     });
   }),
 );
@@ -388,45 +387,45 @@ router.put(
  * Soft delete expense category (deactivate)
  */
 router.delete(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.DELETE_EXPENSE_CATEGORY),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     // Check if category exists
     const category = await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!category) {
-      throw createError.notFound("Expense category not found");
+      throw createError.notFound('Expense category not found');
     }
 
     // Check if category has any expenses
     const expenseCount = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .countDocuments({ categoryId: new ObjectId(req.params.id) });
 
     if (expenseCount > 0) {
       throw createError.conflict(
-        "Cannot delete category with existing expenses. Please reassign expenses to another category first.",
+        'Cannot delete category with existing expenses. Please reassign expenses to another category first.',
       );
     }
 
     // Soft delete - set isActive to false
     await shopDb
-      .collection("expenseCategories")
+      .collection('expenseCategories')
       .updateOne(
         { _id: new ObjectId(req.params.id) },
         { $set: { isActive: false, updatedAt: new Date() } },
       );
 
     // Invalidate expense categories cache
-    cacheService.invalidateShopCache(req.user.shopId, "expense-cats");
+    cacheService.invalidateShopCache(req.user.shopId, 'expense-cats');
 
     res.json({
       success: true,
-      message: "Expense category deactivated successfully",
+      message: 'Expense category deactivated successfully',
     });
   }),
 );

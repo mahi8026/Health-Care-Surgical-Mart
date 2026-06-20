@@ -3,17 +3,16 @@
  * Handles dashboard and reporting functionality
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler } = require("../config/error-handling");
-const { logger } = require('../config/logging');
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler } = require('../config/error-handling');
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -190,7 +189,7 @@ router.use(checkShopStatus);
  * Get dashboard statistics
  */
 router.get(
-  "/dashboard",
+  '/dashboard',
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -207,20 +206,20 @@ router.get(
 
     // Get today's sales
     const todaySales = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalSales: { $sum: "$grandTotal" },
+            totalSales: { $sum: '$grandTotal' },
             totalOrders: { $sum: 1 },
-            avgOrderValue: { $avg: "$grandTotal" },
+            avgOrderValue: { $avg: '$grandTotal' },
           },
         },
       ])
@@ -228,18 +227,18 @@ router.get(
 
     // Get weekly sales
     const weeklySales = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfWeek },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalSales: { $sum: "$grandTotal" },
+            totalSales: { $sum: '$grandTotal' },
             totalOrders: { $sum: 1 },
           },
         },
@@ -248,18 +247,18 @@ router.get(
 
     // Get monthly sales
     const monthlySales = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfMonth },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalSales: { $sum: "$grandTotal" },
+            totalSales: { $sum: '$grandTotal' },
             totalOrders: { $sum: 1 },
           },
         },
@@ -268,14 +267,14 @@ router.get(
 
     // Get total products count
     const totalProducts = await shopDb
-      .collection("products")
+      .collection('products')
       .countDocuments({ isActive: true });
 
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     // Get low stock products
     const lowStockProducts = await shopDb
-      .collection("stock")
+      .collection('stock')
       .aggregate([
         {
           $match: {
@@ -285,22 +284,22 @@ router.get(
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
         {
-          $unwind: "$product",
+          $unwind: '$product',
         },
         {
           $match: {
-            "product.isActive": true,
+            'product.isActive': true,
           },
         },
         {
           $project: {
-            productName: "$product.name",
+            productName: '$product.name',
             currentQty: 1,
             minStockLevel: 1,
             product: {
@@ -324,23 +323,23 @@ router.get(
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const topProducts = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: thirtyDaysAgo },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
-          $unwind: "$items",
+          $unwind: '$items',
         },
         {
           $group: {
-            _id: "$items.productId",
-            totalQuantity: { $sum: "$items.qty" },
-            totalRevenue: { $sum: "$items.total" },
-            productName: { $first: "$items.name" },
+            _id: '$items.productId',
+            totalQuantity: { $sum: '$items.qty' },
+            totalRevenue: { $sum: '$items.total' },
+            productName: { $first: '$items.name' },
           },
         },
         {
@@ -354,7 +353,7 @@ router.get(
 
     // Get today's expenses
     const todayExpenses = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -364,9 +363,9 @@ router.get(
         {
           $group: {
             _id: null,
-            totalExpenses: { $sum: "$amount" },
+            totalExpenses: { $sum: '$amount' },
             totalCount: { $sum: 1 },
-            avgExpenseAmount: { $avg: "$amount" },
+            avgExpenseAmount: { $avg: '$amount' },
           },
         },
       ])
@@ -374,7 +373,7 @@ router.get(
 
     // Get weekly expenses
     const weeklyExpenses = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -384,7 +383,7 @@ router.get(
         {
           $group: {
             _id: null,
-            totalExpenses: { $sum: "$amount" },
+            totalExpenses: { $sum: '$amount' },
             totalCount: { $sum: 1 },
           },
         },
@@ -393,7 +392,7 @@ router.get(
 
     // Get monthly expenses
     const monthlyExpenses = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -403,7 +402,7 @@ router.get(
         {
           $group: {
             _id: null,
-            totalExpenses: { $sum: "$amount" },
+            totalExpenses: { $sum: '$amount' },
             totalCount: { $sum: 1 },
           },
         },
@@ -411,11 +410,11 @@ router.get(
       .toArray();
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName('expenseCategories');
 
     // Get top expense categories (current month)
     const topExpenseCategories = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -425,18 +424,18 @@ router.get(
         {
           $lookup: {
             from: expenseCategoriesCollectionName,
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "category",
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'category',
           },
         },
-        { $unwind: "$category" },
+        { $unwind: '$category' },
         {
           $group: {
-            _id: "$categoryId",
-            categoryName: { $first: "$category.name" },
-            categoryType: { $first: "$category.type" },
-            totalAmount: { $sum: "$amount" },
+            _id: '$categoryId',
+            categoryName: { $first: '$category.name' },
+            categoryType: { $first: '$category.type' },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
           },
         },
@@ -507,46 +506,46 @@ router.get(
  * Get stock valuation report
  */
 router.get(
-  "/stock-valuation",
+  '/stock-valuation',
   requirePermission(PERMISSIONS.VIEW_STOCK_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     const stockValuation = await shopDb
-      .collection("stock")
+      .collection('stock')
       .aggregate([
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
         {
-          $unwind: "$product",
+          $unwind: '$product',
         },
         {
           $match: {
-            "product.isActive": true,
+            'product.isActive': true,
             currentQty: { $gt: 0 },
           },
         },
         {
           $project: {
-            productName: "$product.name",
-            sku: "$product.sku",
-            category: "$product.category",
+            productName: '$product.name',
+            sku: '$product.sku',
+            category: '$product.category',
             currentQty: 1,
-            purchasePrice: "$product.purchasePrice",
-            sellingPrice: "$product.sellingPrice",
+            purchasePrice: '$product.purchasePrice',
+            sellingPrice: '$product.sellingPrice',
             purchaseValue: {
-              $multiply: ["$currentQty", "$product.purchasePrice"],
+              $multiply: ['$currentQty', '$product.purchasePrice'],
             },
             sellingValue: {
-              $multiply: ["$currentQty", "$product.sellingPrice"],
+              $multiply: ['$currentQty', '$product.sellingPrice'],
             },
           },
         },
@@ -590,34 +589,34 @@ router.get(
  * Get stock report
  */
 router.get(
-  "/stock",
+  '/stock',
   requirePermission(PERMISSIONS.VIEW_STOCK_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { category, lowStock } = req.query;
 
     const matchStage = {};
-    if (lowStock === "true") {
+    if (lowStock === 'true') {
       matchStage.isLowStock = true;
     }
 
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     const pipeline = [
       {
         $lookup: {
           from: productsCollectionName,
-          localField: "productId",
-          foreignField: "_id",
-          as: "product",
+          localField: 'productId',
+          foreignField: '_id',
+          as: 'product',
         },
       },
       {
-        $unwind: "$product",
+        $unwind: '$product',
       },
       {
         $match: {
-          "product.isActive": true,
+          'product.isActive': true,
           ...matchStage,
         },
       },
@@ -626,7 +625,7 @@ router.get(
     if (category) {
       pipeline.push({
         $match: {
-          "product.category": category,
+          'product.category': category,
         },
       });
     }
@@ -634,19 +633,19 @@ router.get(
     pipeline.push(
       {
         $project: {
-          productName: "$product.name",
-          sku: "$product.sku",
-          category: "$product.category",
-          brand: "$product.brand",
-          unit: "$product.unit",
+          productName: '$product.name',
+          sku: '$product.sku',
+          category: '$product.category',
+          brand: '$product.brand',
+          unit: '$product.unit',
           currentQty: 1,
           minStockLevel: 1,
           isLowStock: 1,
           lastUpdated: 1,
           lastSaleDate: 1,
           lastPurchaseDate: 1,
-          sellingPrice: "$product.sellingPrice",
-          purchasePrice: "$product.purchasePrice",
+          sellingPrice: '$product.sellingPrice',
+          purchasePrice: '$product.purchasePrice',
         },
       },
       {
@@ -655,7 +654,7 @@ router.get(
     );
 
     const stockReport = await shopDb
-      .collection("stock")
+      .collection('stock')
       .aggregate(pipeline)
       .toArray();
 
@@ -672,34 +671,34 @@ router.get(
  * Get stock alerts and critical items
  */
 router.get(
-  "/stock-alerts",
+  '/stock-alerts',
   requirePermission(PERMISSIONS.VIEW_STOCK_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     const pipeline = [
       {
         $lookup: {
           from: productsCollectionName,
-          localField: "productId",
-          foreignField: "_id",
-          as: "product",
+          localField: 'productId',
+          foreignField: '_id',
+          as: 'product',
         },
       },
       {
-        $unwind: "$product",
+        $unwind: '$product',
       },
       {
         $match: {
-          "product.isActive": true,
+          'product.isActive': true,
           $or: [
             { currentQty: 0 }, // Out of stock
             { isLowStock: true }, // Low stock
             {
               $expr: {
-                $lte: ["$currentQty", { $multiply: ["$minStockLevel", 0.5] }],
+                $lte: ['$currentQty', { $multiply: ['$minStockLevel', 0.5] }],
               },
             }, // Critical stock (50% of min level)
           ],
@@ -707,11 +706,11 @@ router.get(
       },
       {
         $project: {
-          productName: "$product.name",
-          sku: "$product.sku",
-          category: "$product.category",
-          brand: "$product.brand",
-          unit: "$product.unit",
+          productName: '$product.name',
+          sku: '$product.sku',
+          category: '$product.category',
+          brand: '$product.brand',
+          unit: '$product.unit',
           currentQty: 1,
           minStockLevel: 1,
           isLowStock: 1,
@@ -719,18 +718,18 @@ router.get(
           lastPurchaseDate: 1,
           alertType: {
             $cond: {
-              if: { $eq: ["$currentQty", 0] },
-              then: "out_of_stock",
+              if: { $eq: ['$currentQty', 0] },
+              then: 'out_of_stock',
               else: {
                 $cond: {
                   if: {
                     $lte: [
-                      "$currentQty",
-                      { $multiply: ["$minStockLevel", 0.5] },
+                      '$currentQty',
+                      { $multiply: ['$minStockLevel', 0.5] },
                     ],
                   },
-                  then: "critical",
-                  else: "low_stock",
+                  then: 'critical',
+                  else: 'low_stock',
                 },
               },
             },
@@ -746,17 +745,17 @@ router.get(
     ];
 
     const stockAlerts = await shopDb
-      .collection("stock")
+      .collection('stock')
       .aggregate(pipeline)
       .toArray();
 
     // Group by alert type
     const groupedAlerts = {
       outOfStock: stockAlerts.filter(
-        (item) => item.alertType === "out_of_stock",
+        (item) => item.alertType === 'out_of_stock',
       ),
-      critical: stockAlerts.filter((item) => item.alertType === "critical"),
-      lowStock: stockAlerts.filter((item) => item.alertType === "low_stock"),
+      critical: stockAlerts.filter((item) => item.alertType === 'critical'),
+      lowStock: stockAlerts.filter((item) => item.alertType === 'low_stock'),
     };
 
     res.json({
@@ -780,18 +779,18 @@ router.get(
  * Get all product categories for filtering
  */
 router.get(
-  "/categories",
+  '/categories',
   requirePermission(PERMISSIONS.VIEW_PRODUCTS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     const categories = await shopDb
-      .collection("products")
-      .distinct("category", { isActive: true });
+      .collection('products')
+      .distinct('category', { isActive: true });
 
     res.json({
       success: true,
-      data: categories.filter((cat) => cat && cat.trim() !== ""),
+      data: categories.filter((cat) => cat && cat.trim() !== ''),
     });
   }),
 );
@@ -801,35 +800,35 @@ router.get(
  * Get profit and loss statement
  */
 router.get(
-  "/financial/profit-loss",
+  '/financial/profit-loss',
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { startDate, endDate } = req.query;
 
     const dateFilter = {};
-    if (startDate) dateFilter.$gte = new Date(startDate);
-    if (endDate) dateFilter.$lte = new Date(endDate);
+    if (startDate) {dateFilter.$gte = new Date(startDate);}
+    if (endDate) {dateFilter.$lte = new Date(endDate);}
 
     // Get sales data
     const salesData = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             ...(Object.keys(dateFilter).length > 0 && {
               saleDate: dateFilter,
             }),
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
             totalSales: { $sum: 1 },
-            grossRevenue: { $sum: "$totalAmount" },
-            totalVAT: { $sum: "$vatAmount" },
-            totalDiscount: { $sum: "$discountAmount" },
+            grossRevenue: { $sum: '$totalAmount' },
+            totalVAT: { $sum: '$vatAmount' },
+            totalDiscount: { $sum: '$discountAmount' },
           },
         },
       ])
@@ -837,21 +836,21 @@ router.get(
 
     // Get returns data
     const returnsData = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             ...(Object.keys(dateFilter).length > 0 && {
               returnDate: dateFilter,
             }),
-            status: "Approved",
+            status: 'Approved',
           },
         },
         {
           $group: {
             _id: null,
             totalReturns: { $sum: 1 },
-            totalRefund: { $sum: "$refundAmount" },
+            totalRefund: { $sum: '$refundAmount' },
           },
         },
       ])
@@ -859,7 +858,7 @@ router.get(
 
     // Get expenses data
     const expensesData = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -869,42 +868,42 @@ router.get(
         {
           $group: {
             _id: null,
-            totalExpenses: { $sum: "$amount" },
+            totalExpenses: { $sum: '$amount' },
           },
         },
       ])
       .toArray();
 
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     // Get COGS (Cost of Goods Sold)
     const cogsData = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             ...(Object.keys(dateFilter).length > 0 && {
               saleDate: dateFilter,
             }),
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "items.productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
-        { $unwind: "$product" },
+        { $unwind: '$product' },
         {
           $group: {
             _id: null,
             totalCOGS: {
               $sum: {
-                $multiply: ["$items.quantity", "$product.purchasePrice"],
+                $multiply: ['$items.quantity', '$product.purchasePrice'],
               },
             },
           },
@@ -972,7 +971,7 @@ router.get(
  * Get daily financial summary
  */
 router.get(
-  "/financial/daily-summary",
+  '/financial/daily-summary',
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -985,27 +984,27 @@ router.get(
 
     // Get today's sales
     const salesData = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
             count: { $sum: 1 },
-            revenue: { $sum: "$totalAmount" },
+            revenue: { $sum: '$totalAmount' },
             cash: {
               $sum: {
-                $cond: [{ $eq: ["$paymentMethod", "Cash"] }, "$totalAmount", 0],
+                $cond: [{ $eq: ['$paymentMethod', 'Cash'] }, '$totalAmount', 0],
               },
             },
             bank: {
               $sum: {
-                $cond: [{ $eq: ["$paymentMethod", "Bank"] }, "$totalAmount", 0],
+                $cond: [{ $eq: ['$paymentMethod', 'Bank'] }, '$totalAmount', 0],
               },
             },
           },
@@ -1015,19 +1014,19 @@ router.get(
 
     // Get today's returns
     const returnsData = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: { $gte: startOfDay },
-            status: "Approved",
+            status: 'Approved',
           },
         },
         {
           $group: {
             _id: null,
             count: { $sum: 1 },
-            refund: { $sum: "$refundAmount" },
+            refund: { $sum: '$refundAmount' },
           },
         },
       ])
@@ -1035,29 +1034,29 @@ router.get(
 
     // Get hourly sales pattern
     const hourlySales = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $project: {
-            hour: { $hour: "$saleDate" },
+            hour: { $hour: '$saleDate' },
           },
         },
         {
           $group: {
-            _id: "$hour",
+            _id: '$hour',
             sales: { $sum: 1 },
           },
         },
         {
           $project: {
             _id: 0,
-            hour: "$_id",
+            hour: '$_id',
             sales: 1,
           },
         },
@@ -1067,21 +1066,21 @@ router.get(
 
     // Get top products today
     const topProducts = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $group: {
-            _id: "$items.productId",
-            productName: { $first: "$items.productName" },
-            totalQuantity: { $sum: "$items.quantity" },
-            totalRevenue: { $sum: "$items.subtotal" },
+            _id: '$items.productId',
+            productName: { $first: '$items.productName' },
+            totalQuantity: { $sum: '$items.quantity' },
+            totalRevenue: { $sum: '$items.subtotal' },
           },
         },
         { $sort: { totalRevenue: -1 } },
@@ -1113,39 +1112,39 @@ router.get(
  * Get product profitability analysis
  */
 router.get(
-  "/financial/product-profitability",
+  '/financial/product-profitability',
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     // Get product profitability
     const products = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
-        { $match: { paymentStatus: "Paid" } },
-        { $unwind: "$items" },
+        { $match: { paymentStatus: 'Paid' } },
+        { $unwind: '$items' },
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "items.productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
-        { $unwind: "$product" },
+        { $unwind: '$product' },
         {
           $group: {
-            _id: "$items.productId",
-            productName: { $first: "$items.productName" },
-            sku: { $first: "$product.sku" },
-            category: { $first: "$product.category" },
-            totalQuantitySold: { $sum: "$items.quantity" },
-            totalRevenue: { $sum: "$items.subtotal" },
+            _id: '$items.productId',
+            productName: { $first: '$items.productName' },
+            sku: { $first: '$product.sku' },
+            category: { $first: '$product.category' },
+            totalQuantitySold: { $sum: '$items.quantity' },
+            totalRevenue: { $sum: '$items.subtotal' },
             totalCost: {
               $sum: {
-                $multiply: ["$items.quantity", "$product.purchasePrice"],
+                $multiply: ['$items.quantity', '$product.purchasePrice'],
               },
             },
           },
@@ -1158,16 +1157,16 @@ router.get(
             totalQuantitySold: 1,
             totalRevenue: 1,
             totalCost: 1,
-            grossProfit: { $subtract: ["$totalRevenue", "$totalCost"] },
+            grossProfit: { $subtract: ['$totalRevenue', '$totalCost'] },
             profitMargin: {
               $cond: [
-                { $gt: ["$totalRevenue", 0] },
+                { $gt: ['$totalRevenue', 0] },
                 {
                   $multiply: [
                     {
                       $divide: [
-                        { $subtract: ["$totalRevenue", "$totalCost"] },
-                        "$totalRevenue",
+                        { $subtract: ['$totalRevenue', '$totalCost'] },
+                        '$totalRevenue',
                       ],
                     },
                     100,
@@ -1185,46 +1184,46 @@ router.get(
 
     // Get category profitability
     const categories = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
-        { $match: { paymentStatus: "Paid" } },
-        { $unwind: "$items" },
+        { $match: { paymentStatus: 'Paid' } },
+        { $unwind: '$items' },
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "items.productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
-        { $unwind: "$product" },
+        { $unwind: '$product' },
         {
           $group: {
-            _id: "$product.category",
-            productCount: { $addToSet: "$items.productId" },
-            totalRevenue: { $sum: "$items.subtotal" },
+            _id: '$product.category',
+            productCount: { $addToSet: '$items.productId' },
+            totalRevenue: { $sum: '$items.subtotal' },
             totalCost: {
               $sum: {
-                $multiply: ["$items.quantity", "$product.purchasePrice"],
+                $multiply: ['$items.quantity', '$product.purchasePrice'],
               },
             },
           },
         },
         {
           $project: {
-            productCount: { $size: "$productCount" },
+            productCount: { $size: '$productCount' },
             totalRevenue: 1,
             totalCost: 1,
-            grossProfit: { $subtract: ["$totalRevenue", "$totalCost"] },
+            grossProfit: { $subtract: ['$totalRevenue', '$totalCost'] },
             profitMargin: {
               $cond: [
-                { $gt: ["$totalRevenue", 0] },
+                { $gt: ['$totalRevenue', 0] },
                 {
                   $multiply: [
                     {
                       $divide: [
-                        { $subtract: ["$totalRevenue", "$totalCost"] },
-                        "$totalRevenue",
+                        { $subtract: ['$totalRevenue', '$totalCost'] },
+                        '$totalRevenue',
                       ],
                     },
                     100,
@@ -1254,26 +1253,26 @@ router.get(
  * Get return analysis
  */
 router.get(
-  "/financial/return-analysis",
+  '/financial/return-analysis',
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     // Get total sales for return rate calculation
-    const totalSales = await shopDb.collection("sales").countDocuments({
-      paymentStatus: "Paid",
+    const totalSales = await shopDb.collection('sales').countDocuments({
+      paymentStatus: 'Paid',
     });
 
     // Get returns summary
     const returnsSummary = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
-        { $match: { status: "Approved" } },
+        { $match: { status: 'Approved' } },
         {
           $group: {
             _id: null,
             totalReturns: { $sum: 1 },
-            totalRefund: { $sum: "$refundAmount" },
+            totalRefund: { $sum: '$refundAmount' },
           },
         },
       ])
@@ -1281,14 +1280,14 @@ router.get(
 
     // Get returns by reason
     const byReason = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
-        { $match: { status: "Approved" } },
+        { $match: { status: 'Approved' } },
         {
           $group: {
-            _id: "$reason",
+            _id: '$reason',
             count: { $sum: 1 },
-            totalRefund: { $sum: "$refundAmount" },
+            totalRefund: { $sum: '$refundAmount' },
           },
         },
         { $sort: { count: -1 } },
@@ -1297,17 +1296,17 @@ router.get(
 
     // Get returns by product
     const byProduct = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
-        { $match: { status: "Approved" } },
-        { $unwind: "$items" },
+        { $match: { status: 'Approved' } },
+        { $unwind: '$items' },
         {
           $group: {
-            _id: "$items.productId",
-            productName: { $first: "$items.productName" },
+            _id: '$items.productId',
+            productName: { $first: '$items.productName' },
             returnCount: { $sum: 1 },
-            totalQuantity: { $sum: "$items.quantity" },
-            totalRefund: { $sum: "$items.subtotal" },
+            totalQuantity: { $sum: '$items.quantity' },
+            totalRefund: { $sum: '$items.subtotal' },
           },
         },
         { $sort: { returnCount: -1 } },
@@ -1338,42 +1337,42 @@ router.get(
  * Get cash flow analysis
  */
 router.get(
-  "/financial/cash-flow",
+  '/financial/cash-flow',
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { startDate, endDate } = req.query;
 
     const dateFilter = {};
-    if (startDate) dateFilter.$gte = new Date(startDate);
-    if (endDate) dateFilter.$lte = new Date(endDate);
+    if (startDate) {dateFilter.$gte = new Date(startDate);}
+    if (endDate) {dateFilter.$lte = new Date(endDate);}
 
     // Get cash inflows (sales)
     const cashInflows = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             ...(Object.keys(dateFilter).length > 0 && {
               saleDate: dateFilter,
             }),
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: {
-              $dateToString: { format: "%Y-%m-%d", date: "$saleDate" },
+              $dateToString: { format: '%Y-%m-%d', date: '$saleDate' },
             },
-            totalInflow: { $sum: "$totalAmount" },
+            totalInflow: { $sum: '$totalAmount' },
             cash: {
               $sum: {
-                $cond: [{ $eq: ["$paymentMethod", "Cash"] }, "$totalAmount", 0],
+                $cond: [{ $eq: ['$paymentMethod', 'Cash'] }, '$totalAmount', 0],
               },
             },
             bank: {
               $sum: {
-                $cond: [{ $eq: ["$paymentMethod", "Bank"] }, "$totalAmount", 0],
+                $cond: [{ $eq: ['$paymentMethod', 'Bank'] }, '$totalAmount', 0],
               },
             },
           },
@@ -1384,7 +1383,7 @@ router.get(
 
     // Get cash outflows (expenses + purchases)
     const expenses = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -1393,8 +1392,8 @@ router.get(
         },
         {
           $group: {
-            _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-            totalExpenses: { $sum: "$amount" },
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+            totalExpenses: { $sum: '$amount' },
           },
         },
         { $sort: { _id: 1 } },
@@ -1402,7 +1401,7 @@ router.get(
       .toArray();
 
     const purchases = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .aggregate([
         {
           $match: {
@@ -1414,9 +1413,9 @@ router.get(
         {
           $group: {
             _id: {
-              $dateToString: { format: "%Y-%m-%d", date: "$purchaseDate" },
+              $dateToString: { format: '%Y-%m-%d', date: '$purchaseDate' },
             },
-            totalPurchases: { $sum: "$totalAmount" },
+            totalPurchases: { $sum: '$totalAmount' },
           },
         },
         { $sort: { _id: 1 } },

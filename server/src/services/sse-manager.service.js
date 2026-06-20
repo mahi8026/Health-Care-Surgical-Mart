@@ -1,15 +1,15 @@
 /**
  * Server-Sent Events (SSE) Manager
- * 
+ *
  * Manages real-time stock update broadcasts to connected clients
  * - Maintains shop-specific client connections
  * - Broadcasts stock updates to all clients in a shop
  * - Handles connection lifecycle (connect, heartbeat, disconnect)
- * - Works seamlessly across Firebase Hosting ↔ Render deployment
- * 
+ * - Works seamlessly across Firebase Hosting ? Render deployment
+ *
  * Why SSE over WebSockets:
  * - Works with Firebase Hosting without additional config
- * - One-directional (server → client) is all we need
+ * - One-directional (server ? client) is all we need
  * - Native browser support (EventSource API)
  * - Auto-reconnects on disconnect
  * - No additional libraries required
@@ -20,9 +20,9 @@ const { logger } = require('../config/logging');
 
 class SSEManager {
   constructor() {
-    // Map: shopId → Set of response objects
+    // Map: shopId ? Set of response objects
     this.clients = new Map();
-    
+
     // Connection statistics
     this.stats = {
       totalConnections: 0,
@@ -33,7 +33,7 @@ class SSEManager {
 
   /**
    * Add a new SSE client
-   * 
+   *
    * @param {string} shopId - Shop identifier
    * @param {Response} res - Express response object
    */
@@ -75,7 +75,7 @@ class SSEManager {
     const heartbeatInterval = setInterval(() => {
       try {
         res.write(': heartbeat\n\n');
-      } catch (error) {
+      } catch (_error) {
         // Connection closed, stop heartbeat
         clearInterval(heartbeatInterval);
       }
@@ -84,11 +84,11 @@ class SSEManager {
     // Cleanup on client disconnect
     res.on('close', () => {
       clearInterval(heartbeatInterval);
-      
+
       const shopClients = this.clients.get(shopId);
       if (shopClients) {
         shopClients.delete(res);
-        
+
         // Remove shop entry if no more clients
         if (shopClients.size === 0) {
           this.clients.delete(shopId);
@@ -112,13 +112,13 @@ class SSEManager {
 
   /**
    * Broadcast an event to all clients in a shop
-   * 
+   *
    * @param {string} shopId - Shop identifier
    * @param {Object} data - Event data to broadcast
    */
   broadcast(shopId, data) {
     const shopClients = this.clients.get(shopId);
-    
+
     if (!shopClients || shopClients.size === 0) {
       return; // No clients connected for this shop
     }
@@ -146,7 +146,7 @@ class SSEManager {
 
   /**
    * Send an event to a specific client
-   * 
+   *
    * @param {Response} res - Express response object
    * @param {Object} data - Event data
    */
@@ -158,13 +158,13 @@ class SSEManager {
   /**
    * Handle new SSE connection
    * Express route handler
-   * 
+   *
    * @param {Request} req - Express request object
    * @param {Response} res - Express response object
    */
   handleConnection(req, res) {
     const { shopId } = req.user;
-    
+
     if (!shopId) {
       res.status(403).json({
         success: false,
@@ -178,7 +178,7 @@ class SSEManager {
 
   /**
    * Broadcast stock update event
-   * 
+   *
    * @param {string} shopId
    * @param {string} productId
    * @param {Object} snapshot
@@ -197,7 +197,7 @@ class SSEManager {
 
   /**
    * Broadcast batch expiry alert
-   * 
+   *
    * @param {string} shopId
    * @param {Object} batch
    */
@@ -214,7 +214,7 @@ class SSEManager {
 
   /**
    * Broadcast low stock alert
-   * 
+   *
    * @param {string} shopId
    * @param {Object} snapshot
    */
@@ -230,7 +230,7 @@ class SSEManager {
 
   /**
    * Get connection statistics
-   * 
+   *
    * @returns {Object} Statistics
    */
   getStats() {
@@ -248,7 +248,7 @@ class SSEManager {
    */
   closeAll() {
     logger.info('Closing all SSE connections...');
-    
+
     for (const [shopId, clients] of this.clients.entries()) {
       for (const client of clients) {
         try {
@@ -257,15 +257,15 @@ class SSEManager {
             message: 'Server is shutting down. Will reconnect automatically.',
           });
           client.end();
-        } catch (error) {
+        } catch (_error) {
           // Ignore errors during shutdown
         }
       }
     }
-    
+
     this.clients.clear();
     this.stats.activeConnections = 0;
-    
+
     logger.info('All SSE connections closed');
   }
 }

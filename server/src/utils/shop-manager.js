@@ -1,17 +1,18 @@
 /**
  * Shop Manager
-const { logger } = require('../config/logging');
  * Handles shop creation, deletion, and management
  */
+
+const { logger } = require('../config/logging');
 
 const {
   getSystemDatabase,
   getShopDatabase,
   client,
-} = require("../config/database");
-const { initializeShopDatabase } = require("./database-initializer");
-const bcrypt = require("bcryptjs");
-const { ObjectId } = require("mongodb");
+} = require('../config/database');
+const { initializeShopDatabase } = require('./database-initializer');
+const bcrypt = require('bcryptjs');
+const { ObjectId } = require('mongodb');
 
 /**
  * Create a new shop with database and admin user
@@ -22,7 +23,7 @@ const { ObjectId } = require("mongodb");
  */
 async function createShop(shopData, adminData, createdBy) {
   const systemDb = getSystemDatabase();
-  const shopsCollection = systemDb.collection("shops");
+  const shopsCollection = systemDb.collection('shops');
 
   try {
     // Generate unique shop ID
@@ -34,7 +35,7 @@ async function createShop(shopData, adminData, createdBy) {
     });
 
     if (existingShop) {
-      throw new Error("Shop with this ID or owner email already exists");
+      throw new Error('Shop with this ID or owner email already exists');
     }
 
     // Create shop record in system database
@@ -43,15 +44,15 @@ async function createShop(shopData, adminData, createdBy) {
       shopName: shopData.shopName,
       ownerName: shopData.ownerName,
       ownerEmail: shopData.ownerEmail,
-      ownerPhone: shopData.ownerPhone || "",
-      address: shopData.address || "",
-      city: shopData.city || "",
-      state: shopData.state || "",
-      country: shopData.country || "",
-      licenseNo: shopData.licenseNo || "",
-      gstNo: shopData.gstNo || "",
-      status: "Active",
-      subscriptionPlan: shopData.subscriptionPlan || "Trial",
+      ownerPhone: shopData.ownerPhone || '',
+      address: shopData.address || '',
+      city: shopData.city || '',
+      state: shopData.state || '',
+      country: shopData.country || '',
+      licenseNo: shopData.licenseNo || '',
+      gstNo: shopData.gstNo || '',
+      status: 'Active',
+      subscriptionPlan: shopData.subscriptionPlan || 'Trial',
       subscriptionExpiry:
         shopData.subscriptionExpiry ||
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days trial
@@ -70,13 +71,13 @@ async function createShop(shopData, adminData, createdBy) {
 
     // Create shop admin user
     const passwordHash = await bcrypt.hash(adminData.password, 10);
-    const usersCollection = shopDb.collection("users");
+    const usersCollection = shopDb.collection('users');
 
     const adminUser = {
       name: adminData.name || shopData.ownerName,
       email: adminData.email || shopData.ownerEmail,
       passwordHash: passwordHash,
-      role: "SHOP_ADMIN",
+      role: 'SHOP_ADMIN',
       phone: adminData.phone || shopData.ownerPhone,
       shopId: shopId,
       isActive: true,
@@ -93,18 +94,18 @@ async function createShop(shopData, adminData, createdBy) {
         _id: shopResult.insertedId,
         shopId: shopId,
         shopName: shopData.shopName,
-        status: "Active",
+        status: 'Active',
       },
       admin: {
         _id: adminResult.insertedId,
         name: adminUser.name,
         email: adminUser.email,
-        role: "SHOP_ADMIN",
+        role: 'SHOP_ADMIN',
       },
       initialization: initResult,
     };
   } catch (error) {
-    logger.error("Error creating shop:", error);
+    logger.error('Error creating shop:', error);
     throw error;
   }
 }
@@ -117,8 +118,8 @@ async function createShop(shopData, adminData, createdBy) {
 function generateShopId(shopName) {
   const cleanName = shopName
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "_")
-    .replace(/_+/g, "_")
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_+/g, '_')
     .substring(0, 20);
 
   const timestamp = Date.now().toString(36);
@@ -132,7 +133,7 @@ function generateShopId(shopName) {
  */
 async function getShop(shopId) {
   const systemDb = getSystemDatabase();
-  const shopsCollection = systemDb.collection("shops");
+  const shopsCollection = systemDb.collection('shops');
 
   const shop = await shopsCollection.findOne({ shopId: shopId });
   return shop;
@@ -145,7 +146,7 @@ async function getShop(shopId) {
  */
 async function listShops(filter = {}) {
   const systemDb = getSystemDatabase();
-  const shopsCollection = systemDb.collection("shops");
+  const shopsCollection = systemDb.collection('shops');
 
   const shops = await shopsCollection
     .find(filter)
@@ -163,7 +164,7 @@ async function listShops(filter = {}) {
  */
 async function updateShopStatus(shopId, status) {
   const systemDb = getSystemDatabase();
-  const shopsCollection = systemDb.collection("shops");
+  const shopsCollection = systemDb.collection('shops');
 
   const result = await shopsCollection.updateOne(
     { shopId: shopId },
@@ -185,7 +186,7 @@ async function updateShopStatus(shopId, status) {
  */
 async function deleteShop(shopId) {
   const systemDb = getSystemDatabase();
-  const shopsCollection = systemDb.collection("shops");
+  const shopsCollection = systemDb.collection('shops');
 
   try {
     // Delete shop database
@@ -201,7 +202,7 @@ async function deleteShop(shopId) {
       deletedCount: result.deletedCount,
     };
   } catch (error) {
-    logger.error("Error deleting shop:", error);
+    logger.error('Error deleting shop:', error);
     throw error;
   }
 }
@@ -215,13 +216,13 @@ async function getShopStats(shopId) {
   const shopDb = getShopDatabase(shopId);
 
   const stats = {
-    products: await shopDb.collection("products").countDocuments(),
-    customers: await shopDb.collection("customers").countDocuments(),
-    sales: await shopDb.collection("sales").countDocuments(),
-    purchases: await shopDb.collection("purchases").countDocuments(),
-    users: await shopDb.collection("users").countDocuments(),
+    products: await shopDb.collection('products').countDocuments(),
+    customers: await shopDb.collection('customers').countDocuments(),
+    sales: await shopDb.collection('sales').countDocuments(),
+    purchases: await shopDb.collection('purchases').countDocuments(),
+    users: await shopDb.collection('users').countDocuments(),
     lowStock: await shopDb
-      .collection("stock")
+      .collection('stock')
       .countDocuments({ isLowStock: true }),
   };
 

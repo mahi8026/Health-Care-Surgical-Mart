@@ -1,6 +1,6 @@
 /**
  * Email Service
- * 
+ *
  * Handles all email operations using SendGrid.
  * Includes professional templates and error handling.
  */
@@ -19,7 +19,7 @@ class EmailService {
       this.enabled = false;
       logger.warn('EmailService: SENDGRID_API_KEY not configured, email sending disabled');
     }
-    
+
     this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@healthcaresurgicalmart.com';
   }
 
@@ -193,7 +193,7 @@ This is an automated message from Health Care Surgical Mart POS System.
   async sendPasswordResetEmail(to, resetCode, expiryMinutes = 15) {
     if (!this.enabled) {
       logger.warn('EmailService: Cannot send email, service not enabled');
-      
+
       // In development, log the code to console
       if (process.env.NODE_ENV === 'development') {
         logger.info('═══════════════════════════════════════════');
@@ -204,7 +204,7 @@ This is an automated message from Health Care Surgical Mart POS System.
         logger.info(`Valid for: ${expiryMinutes} minutes`);
         logger.info('═══════════════════════════════════════════');
       }
-      
+
       return false;
     }
 
@@ -232,10 +232,10 @@ This is an automated message from Health Care Surgical Mart POS System.
       };
 
       const response = await sgMail.send(msg);
-      
+
       logger.info(`EmailService: Password reset email sent to ${to} (Status: ${response[0].statusCode})`);
       return true;
-      
+
     } catch (error) {
       logger.error('EmailService: Failed to send password reset email:', {
         to,
@@ -243,7 +243,7 @@ This is an automated message from Health Care Surgical Mart POS System.
         code: error.code,
         response: error.response?.body
       });
-      
+
       // In development, still log the code as fallback
       if (process.env.NODE_ENV === 'development') {
         logger.info('═══════════════════════════════════════════');
@@ -254,7 +254,7 @@ This is an automated message from Health Care Surgical Mart POS System.
         logger.info(`Valid for: ${expiryMinutes} minutes`);
         logger.info('═══════════════════════════════════════════');
       }
-      
+
       return false;
     }
   }
@@ -292,7 +292,7 @@ This is an automated message from Health Care Surgical Mart POS System.
       await sgMail.send(msg);
       logger.info(`EmailService: Invoice email sent to ${to}`);
       return true;
-      
+
     } catch (error) {
       logger.error('EmailService: Failed to send invoice email:', error);
       return false;

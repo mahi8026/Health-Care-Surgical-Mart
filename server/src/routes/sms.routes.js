@@ -3,13 +3,13 @@
  * API endpoints for SMS gateway integration
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const SMSService = require("../services/sms/sms.service");
-const { authenticate } = require("../middleware/auth-multi-tenant");
-const { requirePermission, requireRole, ROLES } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler } = require("../config/error-handling");
+const SMSService = require('../services/sms/sms.service');
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { requirePermission, requireRole, ROLES } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler } = require('../config/error-handling');
 
 /**
  * @swagger
@@ -250,7 +250,7 @@ const { asyncHandler } = require("../config/error-handling");
  * GET /api/sms/config-status
  * Check SMS provider configuration status
  */
-router.get("/config-status", authenticate, (req, res) => {
+router.get('/config-status', authenticate, (req, res) => {
   const twilioConfigured =
     !!process.env.TWILIO_ACCOUNT_SID &&
     !!process.env.TWILIO_AUTH_TOKEN &&
@@ -258,10 +258,10 @@ router.get("/config-status", authenticate, (req, res) => {
 
   const msg91Configured = !!process.env.MSG91_API_KEY && !!process.env.MSG91_SENDER_ID;
 
-  const defaultProvider = process.env.SMS_DEFAULT_PROVIDER || "twilio";
+  const defaultProvider = process.env.SMS_DEFAULT_PROVIDER || 'twilio';
   const isConfigured =
-    (defaultProvider === "twilio" && twilioConfigured) ||
-    (defaultProvider === "msg91" && msg91Configured);
+    (defaultProvider === 'twilio' && twilioConfigured) ||
+    (defaultProvider === 'msg91' && msg91Configured);
 
   res.json({
     success: true,
@@ -281,7 +281,7 @@ router.get("/config-status", authenticate, (req, res) => {
  * Send a transactional SMS using a named template
  */
 router.post(
-  "/send",
+  '/send',
   authenticate,
   asyncHandler(async (req, res) => {
     const { to, templateName, variables } = req.body;
@@ -289,7 +289,7 @@ router.post(
     if (!to || !templateName) {
       return res.status(400).json({
         success: false,
-        message: "to and templateName are required",
+        message: 'to and templateName are required',
       });
     }
 
@@ -305,7 +305,7 @@ router.post(
       // Return a user-friendly error message
       return res.status(500).json({
         success: false,
-        message: error.message || "Failed to send SMS",
+        message: error.message || 'Failed to send SMS',
       });
     }
   }),
@@ -316,23 +316,23 @@ router.post(
  * Send bulk SMS (requires SEND_BULK_SMS permission)
  */
 router.post(
-  "/bulk",
+  '/bulk',
   authenticate,
-  requirePermission("SEND_BULK_SMS"),
+  requirePermission('SEND_BULK_SMS'),
   asyncHandler(async (req, res) => {
     const { recipients, message, scheduledAt } = req.body;
 
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "recipients must be a non-empty array",
+        message: 'recipients must be a non-empty array',
       });
     }
 
     if (!message) {
       return res.status(400).json({
         success: false,
-        message: "message is required",
+        message: 'message is required',
       });
     }
 
@@ -350,7 +350,7 @@ router.post(
  * Get SMS logs with optional filters (startDate, endDate, type, status)
  */
 router.get(
-  "/logs",
+  '/logs',
   authenticate,
   asyncHandler(async (req, res) => {
     const { startDate, endDate, type, status } = req.query;
@@ -360,15 +360,15 @@ router.get(
 
     if (startDate || endDate) {
       filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate);
-      if (endDate) filter.createdAt.$lte = new Date(endDate);
+      if (startDate) {filter.createdAt.$gte = new Date(startDate);}
+      if (endDate) {filter.createdAt.$lte = new Date(endDate);}
     }
 
-    if (type) filter.type = type;
-    if (status) filter.status = status;
+    if (type) {filter.type = type;}
+    if (status) {filter.status = status;}
 
     const logs = await db
-      .collection("sms_logs")
+      .collection('sms_logs')
       .find(filter)
       .sort({ createdAt: -1 })
       .limit(100)
@@ -383,7 +383,7 @@ router.get(
  * Get delivery status for a message (requires provider query param)
  */
 router.get(
-  "/status/:messageId",
+  '/status/:messageId',
   authenticate,
   asyncHandler(async (req, res) => {
     const { messageId } = req.params;
@@ -392,7 +392,7 @@ router.get(
     if (!provider) {
       return res.status(400).json({
         success: false,
-        message: "provider query parameter is required",
+        message: 'provider query parameter is required',
       });
     }
 
@@ -407,7 +407,7 @@ router.get(
  * Send OTP to a phone number
  */
 router.post(
-  "/otp",
+  '/otp',
   authenticate,
   asyncHandler(async (req, res) => {
     const { phoneNumber, otp } = req.body;
@@ -415,7 +415,7 @@ router.post(
     if (!phoneNumber || !otp) {
       return res.status(400).json({
         success: false,
-        message: "phoneNumber and otp are required",
+        message: 'phoneNumber and otp are required',
       });
     }
 
@@ -430,7 +430,7 @@ router.post(
  * List SMS templates (built-in + custom for the shop)
  */
 router.get(
-  "/templates",
+  '/templates',
   authenticate,
   asyncHandler(async (req, res) => {
     const templates = await SMSService.template.list(req.user.shopId);
@@ -444,7 +444,7 @@ router.get(
  * Create a custom SMS template
  */
 router.post(
-  "/templates",
+  '/templates',
   authenticate,
   asyncHandler(async (req, res) => {
     const { name, content, variables, category, dltId } = req.body;
@@ -452,7 +452,7 @@ router.post(
     if (!name || !content) {
       return res.status(400).json({
         success: false,
-        message: "name and content are required",
+        message: 'name and content are required',
       });
     }
 
@@ -460,14 +460,14 @@ router.post(
       name,
       content,
       variables: variables || [],
-      category: category || "transactional",
+      category: category || 'transactional',
       dltId: dltId || null,
       shopId: req.user.shopId,
     });
 
     res.status(201).json({
       success: true,
-      message: "Template created successfully",
+      message: 'Template created successfully',
     });
   }),
 );
@@ -477,7 +477,7 @@ router.post(
  * Get SMS queue statistics (admin only)
  */
 router.get(
-  "/queue/stats",
+  '/queue/stats',
   authenticate,
   requireRole([ROLES.SUPER_ADMIN, ROLES.SHOP_ADMIN]),
   asyncHandler(async (req, res) => {

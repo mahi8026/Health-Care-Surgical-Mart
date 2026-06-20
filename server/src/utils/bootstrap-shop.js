@@ -10,52 +10,52 @@
  * Edit the CONFIG section below before running.
  */
 
-require("dotenv").config();
+require('dotenv').config();
 
 // ─── CONFIG — edit these before running ────────────────────────────────────
 const CONFIG = {
   // The email address you use to log in via Firebase
-  ownerEmail: "mahimul8026@gmail.com",
+  ownerEmail: 'mahimul8026@gmail.com',
 
   // Shop details
-  shopName:    "Health Care Surgical Mart",
-  ownerName:   "Mahimul",
-  ownerPhone:  "",
-  address:     "",
+  shopName:    'Health Care Surgical Mart',
+  ownerName:   'Mahimul',
+  ownerPhone:  '',
+  address:     '',
 
   // The SHOP_ADMIN account that will be created in the shop DB.
   // Use the SAME email as ownerEmail so Firebase login auto-detects it.
-  adminName:     "Mahimul",
-  adminEmail:    "mahimul8026@gmail.com",
+  adminName:     'Mahimul',
+  adminEmail:    'mahimul8026@gmail.com',
   // Password is only used for the legacy /api/auth/login endpoint.
   // Firebase login ignores this field.
-  adminPassword: "Admin@12345",
+  adminPassword: 'Admin@12345',
 };
 // ───────────────────────────────────────────────────────────────────────────
 
-const { MongoClient, ObjectId } = require("mongodb");
-const bcrypt = require("bcryptjs");
-const { initializeShopDatabase } = require("./database-initializer");
+const { MongoClient, ObjectId } = require('mongodb');
+const bcrypt = require('bcryptjs');
+const { initializeShopDatabase } = require('./database-initializer');
 
 // Monkey-patch the database module so initializeShopDatabase can call
 // getShopDatabase without a running server
 const MONGO_URI = process.env.MONGODB_URI;
-const DB_NAME   = process.env.DB_NAME || "Health_Care_Shop_DB";
+const DB_NAME   = process.env.DB_NAME || 'Health_Care_Shop_DB';
 
 async function run() {
-  console.log("🚀 Bootstrap script starting…");
-  console.log(`   MongoDB URI : ${MONGO_URI?.split("@")[1] ?? MONGO_URI}`);
+  console.log('🚀 Bootstrap script starting…');
+  console.log(`   MongoDB URI : ${MONGO_URI?.split('@')[1] ?? MONGO_URI}`);
   console.log(`   System DB   : ${DB_NAME}`);
 
   const mongoClient = new MongoClient(MONGO_URI);
   await mongoClient.connect();
-  console.log("✅ Connected to MongoDB");
+  console.log('✅ Connected to MongoDB');
 
   const systemDb = mongoClient.db(DB_NAME);
 
   // ── 1. Check if shop already exists ────────────────────────────────────
   const existing = await systemDb
-    .collection("shops")
+    .collection('shops')
     .findOne({ ownerEmail: CONFIG.ownerEmail });
 
   if (existing) {
@@ -63,20 +63,20 @@ async function run() {
     // Still ensure the user exists — might have been missed by a failed first run
     const shopDbName = `shop_${existing.shopId}`;
     const shopDbRaw  = mongoClient.db(shopDbName);
-    const existingUser = await shopDbRaw.collection("users").findOne({ email: CONFIG.adminEmail });
+    const existingUser = await shopDbRaw.collection('users').findOne({ email: CONFIG.adminEmail });
     if (existingUser) {
       console.log(`✅ Admin user already exists: ${CONFIG.adminEmail}`);
-      console.log("\nBootstrap already complete — nothing to do.");
+      console.log('\nBootstrap already complete — nothing to do.');
     } else {
-      console.log("⚠️  Shop exists but admin user is missing — creating user now…");
+      console.log('⚠️  Shop exists but admin user is missing — creating user now…');
       const passwordHash = await bcrypt.hash(CONFIG.adminPassword, 10);
       const bootstrapId  = new ObjectId();
-      await shopDbRaw.collection("users").insertOne({
+      await shopDbRaw.collection('users').insertOne({
         name:         CONFIG.adminName,
         email:        CONFIG.adminEmail,
         passwordHash,
-        role:         "SHOP_ADMIN",
-        phone:        CONFIG.ownerPhone || "",
+        role:         'SHOP_ADMIN',
+        phone:        CONFIG.ownerPhone || '',
         shopId:       existing.shopId,
         isActive:     true,
         permissions:  [],
@@ -86,12 +86,12 @@ async function run() {
         updatedAt:    new Date(),
       });
       console.log(`✅ SHOP_ADMIN user created: ${CONFIG.adminEmail}`);
-      console.log("\n🎉 Bootstrap complete!");
-      console.log("─".repeat(50));
+      console.log('\n🎉 Bootstrap complete!');
+      console.log('─'.repeat(50));
       console.log(`   Shop ID  : ${existing.shopId}`);
       console.log(`   Email    : ${CONFIG.adminEmail}`);
-      console.log("─".repeat(50));
-      console.log("You can now log in via Firebase at http://localhost:5173");
+      console.log('─'.repeat(50));
+      console.log('You can now log in via Firebase at http://localhost:5173');
     }
     await mongoClient.close();
     return;
@@ -100,7 +100,7 @@ async function run() {
   // ── 2. Generate shopId OR reuse existing one ──────────────────────────
   let shopId;
   const partialShop = await systemDb
-    .collection("shops")
+    .collection('shops')
     .findOne({ ownerEmail: CONFIG.ownerEmail });
 
   if (partialShop) {
@@ -110,8 +110,8 @@ async function run() {
   } else {
     const cleanName = CONFIG.shopName
       .toLowerCase()
-      .replace(/[^a-z0-9]/g, "_")
-      .replace(/_+/g, "_")
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
       .substring(0, 20);
     shopId = `${cleanName}_${Date.now().toString(36)}`;
     console.log(`   Generated shopId: ${shopId}`);
@@ -128,8 +128,8 @@ async function run() {
     ownerEmail:      CONFIG.ownerEmail,
     ownerPhone:      CONFIG.ownerPhone,
     address:         CONFIG.address,
-    status:          "Active",
-    subscriptionPlan: "Professional",
+    status:          'Active',
+    subscriptionPlan: 'Professional',
     subscriptionExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     maxUsers:        10,
     currentUsers:    1,
@@ -138,12 +138,12 @@ async function run() {
     updatedAt:       new Date(),
   };
 
-  await systemDb.collection("shops").updateOne(
+  await systemDb.collection('shops').updateOne(
     { ownerEmail: CONFIG.ownerEmail },
     { $setOnInsert: shopRecord },
     { upsert: true }
   );
-  console.log("✅ Shop record ensured in system DB");
+  console.log('✅ Shop record ensured in system DB');
 
   // ── 5. Initialise the shop DB (collections + indexes) ─────────────────
   // We need to provide a db-like proxy that the initializer expects
@@ -153,8 +153,8 @@ async function run() {
   // Proxy wrapping to add getCollectionName helper used by some parts
   const shopDbProxy = new Proxy(shopDbRaw, {
     get(target, prop) {
-      if (prop === "getCollectionName") return (name) => `${shopDbName}.${name}`;
-      return typeof target[prop] === "function"
+      if (prop === 'getCollectionName') {return (name) => `${shopDbName}.${name}`;}
+      return typeof target[prop] === 'function'
         ? target[prop].bind(target)
         : target[prop];
     },
@@ -163,9 +163,9 @@ async function run() {
   const initResult = await initializeShopDatabase(shopDbProxy);
   const errors = initResult.errors ?? [];
   if (errors.length) {
-    console.warn("⚠️  Some init warnings:", errors);
+    console.warn('⚠️  Some init warnings:', errors);
   } else {
-    console.log("✅ Shop database initialised (collections + indexes)");
+    console.log('✅ Shop database initialised (collections + indexes)');
   }
 
   // ── 6. Insert SHOP_ADMIN user into the shop DB ──────────────────────────
@@ -174,8 +174,8 @@ async function run() {
     name:         CONFIG.adminName,
     email:        CONFIG.adminEmail,
     passwordHash,
-    role:         "SHOP_ADMIN",
-    phone:        CONFIG.ownerPhone || "",
+    role:         'SHOP_ADMIN',
+    phone:        CONFIG.ownerPhone || '',
     shopId,
     isActive:     true,
     permissions:  [],
@@ -186,7 +186,7 @@ async function run() {
   };
 
   // Upsert — safe to re-run if user already exists
-  await shopDbRaw.collection("users").updateOne(
+  await shopDbRaw.collection('users').updateOne(
     { email: CONFIG.adminEmail },
     { $setOnInsert: adminUser },
     { upsert: true }
@@ -194,19 +194,19 @@ async function run() {
   console.log(`✅ SHOP_ADMIN user created: ${CONFIG.adminEmail}`);
 
   // ── Done ───────────────────────────────────────────────────────────────
-  console.log("\n🎉 Bootstrap complete!");
-  console.log("─".repeat(50));
+  console.log('\n🎉 Bootstrap complete!');
+  console.log('─'.repeat(50));
   console.log(`   Shop ID  : ${shopId}`);
   console.log(`   Email    : ${CONFIG.adminEmail}`);
   console.log(`   Role     : SHOP_ADMIN`);
   console.log(`   Password : ${CONFIG.adminPassword}  (legacy login only)`);
-  console.log("─".repeat(50));
-  console.log("You can now log in via Firebase at http://localhost:5173");
+  console.log('─'.repeat(50));
+  console.log('You can now log in via Firebase at http://localhost:5173');
 
   await mongoClient.close();
 }
 
 run().catch((err) => {
-  console.error("❌ Bootstrap failed:", err.message);
+  console.error('❌ Bootstrap failed:', err.message);
   process.exit(1);
 });

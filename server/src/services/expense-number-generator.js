@@ -3,7 +3,7 @@
  * Generates unique expense numbers in format EXP-YYYY-NNN
  */
 
-const { logger } = require("../config/logging");
+const { logger } = require('../config/logging');
 
 /**
  * Generate next expense number for a shop
@@ -16,7 +16,7 @@ async function generateExpenseNumber(shopDb) {
     const yearPrefix = `EXP-${currentYear}-`;
 
     // Find the highest expense number for current year
-    const expensesCollection = shopDb.collection("expenses");
+    const expensesCollection = shopDb.collection('expenses');
 
     const lastExpense = await expensesCollection.findOne(
       { expenseNumber: { $regex: `^${yearPrefix}` } },
@@ -27,18 +27,18 @@ async function generateExpenseNumber(shopDb) {
 
     if (lastExpense && lastExpense.expenseNumber) {
       // Extract the number part and increment
-      const numberPart = lastExpense.expenseNumber.split("-")[2];
+      const numberPart = lastExpense.expenseNumber.split('-')[2];
       nextNumber = parseInt(numberPart, 10) + 1;
     }
 
     // Format with leading zeros (minimum 3 digits)
-    const formattedNumber = nextNumber.toString().padStart(3, "0");
+    const formattedNumber = nextNumber.toString().padStart(3, '0');
     const expenseNumber = `${yearPrefix}${formattedNumber}`;
 
     logger.debug(`Generated expense number: ${expenseNumber}`);
     return expenseNumber;
   } catch (error) {
-    logger.error("Error generating expense number:", error);
+    logger.error('Error generating expense number:', error);
     throw new Error(`Failed to generate expense number: ${error.message}`);
   }
 }
@@ -49,7 +49,7 @@ async function generateExpenseNumber(shopDb) {
  * @returns {boolean} Whether the format is valid
  */
 function validateExpenseNumberFormat(expenseNumber) {
-  if (!expenseNumber || typeof expenseNumber !== "string") {
+  if (!expenseNumber || typeof expenseNumber !== 'string') {
     return false;
   }
 
@@ -68,7 +68,7 @@ function extractYearFromExpenseNumber(expenseNumber) {
     return null;
   }
 
-  const parts = expenseNumber.split("-");
+  const parts = expenseNumber.split('-');
   return parseInt(parts[1], 10);
 }
 
@@ -82,7 +82,7 @@ function extractSequenceFromExpenseNumber(expenseNumber) {
     return null;
   }
 
-  const parts = expenseNumber.split("-");
+  const parts = expenseNumber.split('-');
   return parseInt(parts[2], 10);
 }
 

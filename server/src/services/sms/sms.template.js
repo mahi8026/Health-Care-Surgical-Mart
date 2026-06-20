@@ -7,48 +7,48 @@ class SMSTemplate {
   }
 
   loadTemplates() {
-    this.templates.set("test_sms", {
-      name: "test_sms",
-      content: "This is a test SMS from Health Care Surgical Mart. Your SMS system is working correctly!",
+    this.templates.set('test_sms', {
+      name: 'test_sms',
+      content: 'This is a test SMS from Health Care Surgical Mart. Your SMS system is working correctly!',
       variables: [],
       dltId: null,
-      category: "transactional",
+      category: 'transactional',
     });
 
-    this.templates.set("order_confirmation", {
-      name: "order_confirmation",
+    this.templates.set('order_confirmation', {
+      name: 'order_confirmation',
       content:
-        "Hi {{customerName}}, your order #{{orderNo}} has been confirmed. Total: ₹{{amount}}. Thank you!",
-      variables: ["customerName", "orderNo", "amount"],
-      dltId: "DLT_TEMPLATE_ID_1",
-      category: "transactional",
+        'Hi {{customerName}}, your order #{{orderNo}} has been confirmed. Total: ₹{{amount}}. Thank you!',
+      variables: ['customerName', 'orderNo', 'amount'],
+      dltId: 'DLT_TEMPLATE_ID_1',
+      category: 'transactional',
     });
 
-    this.templates.set("order_ready", {
-      name: "order_ready",
+    this.templates.set('order_ready', {
+      name: 'order_ready',
       content:
-        "Hi {{customerName}}, your order #{{orderNo}} is ready for pickup at {{storeName}}.",
-      variables: ["customerName", "orderNo", "storeName"],
-      dltId: "DLT_TEMPLATE_ID_2",
-      category: "transactional",
+        'Hi {{customerName}}, your order #{{orderNo}} is ready for pickup at {{storeName}}.',
+      variables: ['customerName', 'orderNo', 'storeName'],
+      dltId: 'DLT_TEMPLATE_ID_2',
+      category: 'transactional',
     });
 
-    this.templates.set("otp", {
-      name: "otp",
+    this.templates.set('otp', {
+      name: 'otp',
       content:
-        "Your OTP is {{otp}}. Valid for {{validity}} minutes. Do not share.",
-      variables: ["otp", "validity"],
-      dltId: "DLT_TEMPLATE_ID_3",
-      category: "transactional",
+        'Your OTP is {{otp}}. Valid for {{validity}} minutes. Do not share.',
+      variables: ['otp', 'validity'],
+      dltId: 'DLT_TEMPLATE_ID_3',
+      category: 'transactional',
     });
 
-    this.templates.set("promotional_offer", {
-      name: "promotional_offer",
+    this.templates.set('promotional_offer', {
+      name: 'promotional_offer',
       content:
-        "{{storeName}}: {{offerText}}. Valid till {{validTill}}. Visit us today!",
-      variables: ["storeName", "offerText", "validTill"],
-      dltId: "DLT_TEMPLATE_ID_4",
-      category: "promotional",
+        '{{storeName}}: {{offerText}}. Valid till {{validTill}}. Visit us today!',
+      variables: ['storeName', 'offerText', 'validTill'],
+      dltId: 'DLT_TEMPLATE_ID_4',
+      category: 'promotional',
     });
   }
 
@@ -79,8 +79,8 @@ class SMSTemplate {
       message = message.replace(`{{${key}}}`, value);
     }
 
-    if (message.includes("{{")) {
-      throw new Error("Missing template variables");
+    if (message.includes('{{')) {
+      throw new Error('Missing template variables');
     }
 
     return message;
@@ -92,10 +92,10 @@ class SMSTemplate {
    * @returns {Promise<void>}
    */
   async create(templateData) {
-    const { getShopDatabase } = require("../../config/database");
+    const { getShopDatabase } = require('../../config/database');
     const db = getShopDatabase(templateData.shopId);
 
-    await db.collection("sms_templates").insertOne({
+    await db.collection('sms_templates').insertOne({
       ...templateData,
       createdAt: new Date(),
     });
@@ -111,11 +111,11 @@ class SMSTemplate {
   async list(shopId) {
     const builtIn = Array.from(this.templates.values());
 
-    const { getShopDatabase } = require("../../config/database");
+    const { getShopDatabase } = require('../../config/database');
     const db = getShopDatabase(shopId);
 
     const custom = await db
-      .collection("sms_templates")
+      .collection('sms_templates')
       .find({ shopId })
       .toArray();
 
@@ -129,10 +129,10 @@ class SMSTemplate {
    * @returns {Promise<void>}
    */
   async delete(templateName, shopId) {
-    const { getShopDatabase } = require("../../config/database");
+    const { getShopDatabase } = require('../../config/database');
     const db = getShopDatabase(shopId);
 
-    await db.collection("sms_templates").deleteOne({ name: templateName, shopId });
+    await db.collection('sms_templates').deleteOne({ name: templateName, shopId });
   }
 }
 

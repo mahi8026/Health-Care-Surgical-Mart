@@ -1,31 +1,31 @@
 /**
  * Migration: Remove outstandingBalance field from customers
- * 
+ *
  * This migration handles the removal of the legacy outstandingBalance field.
  * For any customer where currentDue is 0 but outstandingBalance > 0,
  * it copies outstandingBalance to currentDue before removing the field.
- * 
+ *
  * Run with: node src/utils/migrations/remove-outstanding-balance.js
  */
 
-require("dotenv").config({ path: require("path").resolve(__dirname, "../../../.env") });
-const { MongoClient } = require("mongodb");
-const { logger } = require("../../config/logging");
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') });
+const { MongoClient } = require('mongodb');
+const { logger } = require('../../config/logging');
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.DB_NAME || "medical_store_system";
+const DB_NAME = process.env.DB_NAME || 'medical_store_system';
 
 async function migrateOutstandingBalance() {
   const client = new MongoClient(MONGODB_URI);
 
   try {
     await client.connect();
-    logger.info("Connected to MongoDB for outstandingBalance migration");
+    logger.info('Connected to MongoDB for outstandingBalance migration');
 
     const systemDb = client.db(DB_NAME);
-    
+
     // Get all shops
-    const shops = await systemDb.collection("shops").find({}).toArray();
+    const shops = await systemDb.collection('shops').find({}).toArray();
     logger.info(`Found ${shops.length} shops to migrate`);
 
     let totalUpdated = 0;
@@ -33,7 +33,7 @@ async function migrateOutstandingBalance() {
 
     for (const shop of shops) {
       const shopDb = client.db(`${shop.shopId}_db`);
-      const customersCollection = shopDb.collection("customers");
+      const customersCollection = shopDb.collection('customers');
 
       // Find customers where currentDue is 0 but outstandingBalance > 0
       const customersToUpdate = await customersCollection
@@ -69,7 +69,7 @@ async function migrateOutstandingBalance() {
       // Remove outstandingBalance field from all customers
       const removeResult = await customersCollection.updateMany(
         { outstandingBalance: { $exists: true } },
-        { $unset: { outstandingBalance: "" } }
+        { $unset: { outstandingBalance: '' } }
       );
 
       if (removeResult.modifiedCount > 0) {
@@ -80,15 +80,15 @@ async function migrateOutstandingBalance() {
       }
     }
 
-    logger.info("Migration completed successfully");
+    logger.info('Migration completed successfully');
     logger.info(`Total customers updated (currentDue copied): ${totalUpdated}`);
     logger.info(`Total customers with outstandingBalance removed: ${totalRemoved}`);
   } catch (error) {
-    logger.error("Migration failed:", error);
+    logger.error('Migration failed:', error);
     throw error;
   } finally {
     await client.close();
-    logger.info("Database connection closed");
+    logger.info('Database connection closed');
   }
 }
 
@@ -96,11 +96,11 @@ async function migrateOutstandingBalance() {
 if (require.main === module) {
   migrateOutstandingBalance()
     .then(() => {
-      console.log("✅ Migration completed successfully");
+      console.log('✅ Migration completed successfully');
       process.exit(0);
     })
     .catch((error) => {
-      console.error("❌ Migration failed:", error);
+      console.error('❌ Migration failed:', error);
       process.exit(1);
     });
 }

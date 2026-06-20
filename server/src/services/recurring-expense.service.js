@@ -3,10 +3,10 @@
  * Handles scheduled processing of recurring expenses
  */
 
-const { ObjectId } = require("mongodb");
-const { getShopDatabase } = require("../config/database");
-const { generateExpenseNumber } = require("./expense-number-generator");
-const { logger } = require("../config/logging");
+const { ObjectId } = require('mongodb');
+const { getShopDatabase } = require('../config/database');
+const { generateExpenseNumber } = require('./expense-number-generator');
+const { logger } = require('../config/logging');
 
 /**
  * Calculate next due date based on frequency and interval
@@ -19,16 +19,16 @@ function calculateNextDueDate(currentDate, frequency, interval = 1) {
   const nextDate = new Date(currentDate);
 
   switch (frequency) {
-    case "daily":
+    case 'daily':
       nextDate.setDate(nextDate.getDate() + interval);
       break;
-    case "weekly":
+    case 'weekly':
       nextDate.setDate(nextDate.getDate() + interval * 7);
       break;
-    case "monthly":
+    case 'monthly':
       nextDate.setMonth(nextDate.getMonth() + interval);
       break;
-    case "yearly":
+    case 'yearly':
       nextDate.setFullYear(nextDate.getFullYear() + interval);
       break;
     default:
@@ -79,14 +79,14 @@ async function createExpenseFromTemplate(template, shopDb, dueDate) {
     tags: [...(template.tags || [])],
     notes: template.notes
       ? `${template.notes} (Generated from recurring expense)`
-      : "Generated from recurring expense",
+      : 'Generated from recurring expense',
     createdBy: template.createdBy,
     createdAt: new Date(),
     updatedAt: new Date(),
     recurringTemplateId: template._id, // Reference to the template
   };
 
-  const result = await shopDb.collection("expenses").insertOne(newExpense);
+  const result = await shopDb.collection('expenses').insertOne(newExpense);
 
   return {
     _id: result.insertedId,
@@ -113,10 +113,10 @@ async function processShopRecurringExpenses(shopId, processDate = new Date()) {
   try {
     // Find all recurring expenses that are due
     const dueRecurringExpenses = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .find({
         isRecurring: true,
-        "recurringConfig.nextDueDate": { $lte: processDate },
+        'recurringConfig.nextDueDate': { $lte: processDate },
       })
       .toArray();
 
@@ -151,11 +151,11 @@ async function processShopRecurringExpenses(shopId, processDate = new Date()) {
         );
 
         // Update the template's next due date
-        await shopDb.collection("expenses").updateOne(
+        await shopDb.collection('expenses').updateOne(
           { _id: template._id },
           {
             $set: {
-              "recurringConfig.nextDueDate": nextDueDate,
+              'recurringConfig.nextDueDate': nextDueDate,
               updatedAt: new Date(),
             },
           },
@@ -203,7 +203,7 @@ async function processShopRecurringExpenses(shopId, processDate = new Date()) {
  * @returns {Object} Overall processing results
  */
 async function processAllRecurringExpenses(processDate = new Date()) {
-  const { MongoClient } = require("mongodb");
+  const { MongoClient } = require('mongodb');
   const client = new MongoClient(process.env.MONGODB_URI);
 
   const overallResults = {
@@ -216,12 +216,12 @@ async function processAllRecurringExpenses(processDate = new Date()) {
 
   try {
     await client.connect();
-    const adminDb = client.db("admin");
+    const adminDb = client.db('admin');
 
     // Get list of all shop databases
     const databases = await adminDb.admin().listDatabases();
     const shopDatabases = databases.databases.filter(
-      (db) => db.name.startsWith("shop_") && db.name !== "shop_template",
+      (db) => db.name.startsWith('shop_') && db.name !== 'shop_template',
     );
 
     logger.info(
@@ -229,7 +229,7 @@ async function processAllRecurringExpenses(processDate = new Date()) {
     );
 
     for (const dbInfo of shopDatabases) {
-      const shopId = dbInfo.name.replace("shop_", "");
+      const shopId = dbInfo.name.replace('shop_', '');
 
       try {
         const shopResults = await processShopRecurringExpenses(
@@ -249,7 +249,7 @@ async function processAllRecurringExpenses(processDate = new Date()) {
       }
     }
   } catch (error) {
-    logger.error("Error in processAllRecurringExpenses:", error);
+    logger.error('Error in processAllRecurringExpenses:', error);
     overallResults.errors.push({
       error: error.message,
     });
@@ -276,11 +276,11 @@ async function updateRecurringTemplate(shopId, templateId, updates) {
 
   // Validate template exists and is recurring
   const template = await shopDb
-    .collection("expenses")
+    .collection('expenses')
     .findOne({ _id: new ObjectId(templateId), isRecurring: true });
 
   if (!template) {
-    throw new Error("Recurring expense template not found");
+    throw new Error('Recurring expense template not found');
   }
 
   // Prepare update data
@@ -294,15 +294,15 @@ async function updateRecurringTemplate(shopId, templateId, updates) {
 
     // Validate frequency if provided
     if (recurringConfig.frequency) {
-      const validFrequencies = ["daily", "weekly", "monthly", "yearly"];
+      const validFrequencies = ['daily', 'weekly', 'monthly', 'yearly'];
       if (!validFrequencies.includes(recurringConfig.frequency)) {
-        throw new Error("Invalid recurring frequency");
+        throw new Error('Invalid recurring frequency');
       }
     }
 
     // Validate interval if provided
     if (recurringConfig.interval && recurringConfig.interval < 1) {
-      throw new Error("Recurring interval must be at least 1");
+      throw new Error('Recurring interval must be at least 1');
     }
 
     // Validate date range if provided
@@ -310,7 +310,7 @@ async function updateRecurringTemplate(shopId, templateId, updates) {
       if (
         new Date(recurringConfig.endDate) <= new Date(recurringConfig.startDate)
       ) {
-        throw new Error("Recurring end date must be after start date");
+        throw new Error('Recurring end date must be after start date');
       }
     }
 
@@ -333,14 +333,14 @@ async function updateRecurringTemplate(shopId, templateId, updates) {
 
   // Handle other field updates
   const allowedFields = [
-    "categoryId",
-    "categoryName",
-    "amount",
-    "description",
-    "paymentMethod",
-    "vendor",
-    "tags",
-    "notes",
+    'categoryId',
+    'categoryName',
+    'amount',
+    'description',
+    'paymentMethod',
+    'vendor',
+    'tags',
+    'notes',
   ];
 
   for (const field of allowedFields) {
@@ -351,7 +351,7 @@ async function updateRecurringTemplate(shopId, templateId, updates) {
 
   // Update the template
   const result = await shopDb
-    .collection("expenses")
+    .collection('expenses')
     .updateOne({ _id: new ObjectId(templateId) }, { $set: updateData });
 
   return {
@@ -371,19 +371,19 @@ async function stopRecurringExpense(shopId, templateId) {
 
   // Validate template exists and is recurring
   const template = await shopDb
-    .collection("expenses")
+    .collection('expenses')
     .findOne({ _id: new ObjectId(templateId), isRecurring: true });
 
   if (!template) {
-    throw new Error("Recurring expense template not found");
+    throw new Error('Recurring expense template not found');
   }
 
   // Set end date to today to stop future processing
-  const result = await shopDb.collection("expenses").updateOne(
+  const result = await shopDb.collection('expenses').updateOne(
     { _id: new ObjectId(templateId) },
     {
       $set: {
-        "recurringConfig.endDate": new Date(),
+        'recurringConfig.endDate': new Date(),
         updatedAt: new Date(),
       },
     },
@@ -417,39 +417,39 @@ async function getRecurringTemplates(shopId, filters = {}) {
     if (filters.isActive) {
       // Active means no end date or end date in future
       matchQuery.$or = [
-        { "recurringConfig.endDate": { $exists: false } },
-        { "recurringConfig.endDate": null },
-        { "recurringConfig.endDate": { $gt: new Date() } },
+        { 'recurringConfig.endDate': { $exists: false } },
+        { 'recurringConfig.endDate': null },
+        { 'recurringConfig.endDate': { $gt: new Date() } },
       ];
     } else {
       // Inactive means end date in past
-      matchQuery["recurringConfig.endDate"] = { $lte: new Date() };
+      matchQuery['recurringConfig.endDate'] = { $lte: new Date() };
     }
   }
 
   const templates = await shopDb
-    .collection("expenses")
+    .collection('expenses')
     .aggregate([
       { $match: matchQuery },
       {
         $lookup: {
-          from: "expenseCategories",
-          localField: "categoryId",
-          foreignField: "_id",
-          as: "category",
+          from: 'expenseCategories',
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'category',
         },
       },
-      { $unwind: "$category" },
+      { $unwind: '$category' },
       {
         $lookup: {
-          from: "users",
-          localField: "createdBy",
-          foreignField: "_id",
-          as: "createdByUser",
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdByUser',
         },
       },
-      { $unwind: "$createdByUser" },
-      { $sort: { "recurringConfig.nextDueDate": 1 } },
+      { $unwind: '$createdByUser' },
+      { $sort: { 'recurringConfig.nextDueDate': 1 } },
     ])
     .toArray();
 

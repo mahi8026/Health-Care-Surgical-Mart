@@ -1,14 +1,14 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 const { logger } = require('../config/logging');
-const csv = require("csv-parser");
-const XLSX = require("xlsx");
-const fs = require("fs");
-const path = require("path");
-const { ObjectId } = require("mongodb");
-const { authenticate } = require("../middleware/auth-multi-tenant");
-const { importUpload, processUploadedFiles } = require("../services/file-upload.service");
-const { cacheService } = require("../services/cache.service");
+const csv = require('csv-parser');
+const XLSX = require('xlsx');
+const fs = require('fs');
+const path = require('path');
+const { ObjectId: _ObjectId } = require('mongodb');
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { importUpload } = require('../services/file-upload.service');
+const { cacheService } = require('../services/cache.service');
 
 /**
  * @swagger
@@ -166,9 +166,9 @@ const parseCSV = (filePath) => {
     const results = [];
     fs.createReadStream(filePath)
       .pipe(csv())
-      .on("data", (data) => results.push(data))
-      .on("end", () => resolve(results))
-      .on("error", (error) => reject(error));
+      .on('data', (data) => results.push(data))
+      .on('end', () => resolve(results))
+      .on('error', (error) => reject(error));
   });
 };
 
@@ -181,7 +181,7 @@ const parseExcel = (filePath) => {
     const data = XLSX.utils.sheet_to_json(worksheet);
     return data;
   } catch (error) {
-    throw new Error("Failed to parse Excel file");
+    throw new Error('Failed to parse Excel file');
   }
 };
 
@@ -191,93 +191,93 @@ const mapProductColumns = (rawProduct) => {
   const columnMappings = {
     // Standard mappings
     name: [
-      "name",
-      "product_name",
-      "productname",
-      "item_name",
-      "itemname",
-      "product",
-      "item",
-      "description",
-      "product_description",
-      "product description",
+      'name',
+      'product_name',
+      'productname',
+      'item_name',
+      'itemname',
+      'product',
+      'item',
+      'description',
+      'product_description',
+      'product description',
     ],
     sku: [
-      "sku",
-      "code",
-      "product_code",
-      "productcode",
-      "item_code",
-      "itemcode",
-      "barcode",
-      "id",
-      "product_id",
-      "s/n",
-      "sn",
-      "serial",
-      "serial_number",
+      'sku',
+      'code',
+      'product_code',
+      'productcode',
+      'item_code',
+      'itemcode',
+      'barcode',
+      'id',
+      'product_id',
+      's/n',
+      'sn',
+      'serial',
+      'serial_number',
     ],
     category: [
-      "category",
-      "cat",
-      "type",
-      "group",
-      "product_category",
-      "item_category",
+      'category',
+      'cat',
+      'type',
+      'group',
+      'product_category',
+      'item_category',
     ],
     purchasePrice: [
-      "purchase_price",
-      "purchaseprice",
-      "cost_price",
-      "costprice",
-      "cost",
-      "buy_price",
-      "buyprice",
-      "wholesale_price",
-      "distributor price (tk)",
-      "distributor_price",
+      'purchase_price',
+      'purchaseprice',
+      'cost_price',
+      'costprice',
+      'cost',
+      'buy_price',
+      'buyprice',
+      'wholesale_price',
+      'distributor price (tk)',
+      'distributor_price',
     ],
     sellingPrice: [
-      "selling_price",
-      "sellingprice",
-      "sale_price",
-      "saleprice",
-      "price",
-      "retail_price",
-      "retailprice",
-      "mrp",
-      "price (tk)",
-      "price_tk",
+      'selling_price',
+      'sellingprice',
+      'sale_price',
+      'saleprice',
+      'price',
+      'retail_price',
+      'retailprice',
+      'mrp',
+      'price (tk)',
+      'price_tk',
     ],
     unit: [
-      "unit",
-      "uom",
-      "unit_of_measure",
-      "measure",
-      "qty_unit",
-      "quantity_unit",
-      "pack size",
-      "pack_size",
-      "packsize",
+      'unit',
+      'uom',
+      'unit_of_measure',
+      'measure',
+      'qty_unit',
+      'quantity_unit',
+      'pack size',
+      'pack_size',
+      'packsize',
     ],
     minStockLevel: [
-      "min_stock_level",
-      "minstocklevel",
-      "min_stock",
-      "minstock",
-      "reorder_level",
-      "reorderlevel",
-      "minimum_quantity",
-      "test/pack",
-      "test_pack",
+      'min_stock_level',
+      'minstocklevel',
+      'min_stock',
+      'minstock',
+      'reorder_level',
+      'reorderlevel',
+      'minimum_quantity',
+      'test/pack',
+      'test_pack',
     ],
     description: [
-      "description",
-      "desc",
-      "details",
-      "notes",
-      "remarks",
-      "product_details",
+      'description',
+      'desc',
+      'details',
+      'notes',
+      'remarks',
+      'product_details',
     ],
   };
 
@@ -316,13 +316,13 @@ const mapProductColumns = (rawProduct) => {
 
   // Special handling for your Excel format
   // If no category found, set a default
-  if (!mapped.category || mapped.category === null || mapped.category === "") {
-    mapped.category = "Medical Supplies"; // Default category
+  if (!mapped.category || mapped.category === null || mapped.category === '') {
+    mapped.category = 'Medical Supplies'; // Default category
   }
 
   // If SKU is just a number, create a proper SKU
   if (mapped.sku && !isNaN(mapped.sku)) {
-    mapped.sku = `BIO-${String(mapped.sku).padStart(3, "0")}`;
+    mapped.sku = `BIO-${String(mapped.sku).padStart(3, '0')}`;
   }
 
   return mapped;
@@ -332,15 +332,15 @@ const mapProductColumns = (rawProduct) => {
 const validateProductData = (product, rowIndex) => {
   const errors = [];
 
-  if (!product.name || product.name.trim() === "") {
+  if (!product.name || product.name.trim() === '') {
     errors.push(`Row ${rowIndex}: Product name is required`);
   }
 
-  if (!product.sku || product.sku.trim() === "") {
+  if (!product.sku || product.sku.trim() === '') {
     errors.push(`Row ${rowIndex}: SKU is required`);
   }
 
-  if (!product.category || product.category.trim() === "") {
+  if (!product.category || product.category.trim() === '') {
     errors.push(`Row ${rowIndex}: Category is required`);
   }
 
@@ -358,7 +358,7 @@ const validateProductData = (product, rowIndex) => {
     );
   }
 
-  if (!product.unit || product.unit.trim() === "") {
+  if (!product.unit || product.unit.trim() === '') {
     errors.push(`Row ${rowIndex}: Unit is required`);
   }
 
@@ -367,12 +367,12 @@ const validateProductData = (product, rowIndex) => {
 
 // Bulk import products
 router.post(
-  "/bulk-import",
+  '/bulk-import',
   (req, res, next) => {
     next();
   },
   authenticate,
-  importUpload.single("file"),
+  importUpload.single('file'),
   async (req, res) => {
     let filePath = null;
 
@@ -380,25 +380,25 @@ router.post(
 
       // Validate authentication
       if (!req.user || !req.user.shopId) {
-        logger.error("Bulk import - Missing user or shopId:", {
+        logger.error('Bulk import - Missing user or shopId:', {
           hasUser: !!req.user,
           shopId: req.user?.shopId,
         });
         return res.status(401).json({
           success: false,
-          message: "Authentication failed: Missing shop context",
+          message: 'Authentication failed: Missing shop context',
         });
       }
 
       if (!req.file) {
-        logger.error("Bulk import - No file in request:", {
+        logger.error('Bulk import - No file in request:', {
           hasFile: !!req.file,
           files: req.files,
           body: req.body,
         });
         return res.status(400).json({
           success: false,
-          message: "No file uploaded",
+          message: 'No file uploaded',
         });
       }
 
@@ -409,15 +409,15 @@ router.post(
       // Parse file based on type
       let products = [];
       try {
-        if (fileExtension === ".csv") {
+        if (fileExtension === '.csv') {
           products = await parseCSV(filePath);
-        } else if (fileExtension === ".xlsx" || fileExtension === ".xls") {
+        } else if (fileExtension === '.xlsx' || fileExtension === '.xls') {
           products = parseExcel(filePath);
         } else {
-          throw new Error("Unsupported file format");
+          throw new Error('Unsupported file format');
         }
       } catch (parseError) {
-        logger.error("File parsing error:", parseError);
+        logger.error('File parsing error:', parseError);
         throw new Error(`Failed to parse file: ${parseError.message}`);
       }
 
@@ -425,7 +425,7 @@ router.post(
       if (products.length === 0) {
         return res.status(400).json({
           success: false,
-          message: "No products found in file",
+          message: 'No products found in file',
         });
       }
 
@@ -456,7 +456,7 @@ router.post(
 
         try {
           // Check if product with same SKU exists
-          const existingProduct = await req.shopDb.collection("products").findOne({
+          const existingProduct = await req.shopDb.collection('products').findOne({
             sku: productData.sku.trim(),
           });
 
@@ -477,17 +477,17 @@ router.post(
             sellingPrice: parseFloat(productData.sellingPrice),
             unit: productData.unit.trim(),
             minStockLevel: parseInt(productData.minStockLevel) || 0,
-            description: productData.description?.trim() || "",
+            description: productData.description?.trim() || '',
             isActive: true,
             createdAt: new Date(),
             updatedAt: new Date(),
           };
 
-          const productResult = await req.shopDb.collection("products").insertOne(newProduct);
+          const productResult = await req.shopDb.collection('products').insertOne(newProduct);
           const newProductId = productResult.insertedId;
 
           // Create initial stock entry
-          await req.shopDb.collection("stock").insertOne({
+          await req.shopDb.collection('stock').insertOne({
             productId: newProductId,
             productName: newProduct.name,
             currentQty: 0,
@@ -507,7 +507,7 @@ router.post(
         } catch (error) {
           logger.error(`Row ${rowIndex} import error:`, error);
           results.errors.push(
-            `Row ${rowIndex}: ${error.message || "Failed to import product"}`,
+            `Row ${rowIndex}: ${error.message || 'Failed to import product'}`,
           );
           results.errorCount++;
         }
@@ -527,10 +527,10 @@ router.post(
 
       // Invalidate products cache after bulk import
       if (results.successCount > 0) {
-        cacheService.invalidateShopCache(req.user.shopId, "products");
+        cacheService.invalidateShopCache(req.user.shopId, 'products');
       }
     } catch (error) {
-      logger.error("Bulk import error:", {
+      logger.error('Bulk import error:', {
         message: error.message,
         stack: error.stack,
         name: error.name,
@@ -541,24 +541,24 @@ router.post(
         try {
           fs.unlinkSync(filePath);
         } catch (cleanupError) {
-          logger.error("Failed to cleanup file:", cleanupError);
+          logger.error('Failed to cleanup file:', cleanupError);
         }
       }
 
       // Ensure we always return a valid JSON response
       return res.status(500).json({
         success: false,
-        message: error.message || "Failed to import products",
-        error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+        message: error.message || 'Failed to import products',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
     }
   },
 );
 
 // Bulk export products
-router.get("/bulk-export", authenticate, async (req, res) => {
+router.get('/bulk-export', authenticate, async (req, res) => {
   try {
-    const products = await req.shopDb.collection("products").find({
+    const products = await req.shopDb.collection('products').find({
       isActive: true,
     }).project({
       name: 1, sku: 1, category: 1, purchasePrice: 1, sellingPrice: 1, unit: 1, minStockLevel: 1, description: 1,
@@ -566,40 +566,40 @@ router.get("/bulk-export", authenticate, async (req, res) => {
 
     // Convert to CSV format
     const csvHeader =
-      "name,sku,category,purchasePrice,sellingPrice,unit,minStockLevel,description\n";
+      'name,sku,category,purchasePrice,sellingPrice,unit,minStockLevel,description\n';
     const csvRows = products
       .map(
         (p) =>
-          `"${p.name}","${p.sku}","${p.category}",${p.purchasePrice},${p.sellingPrice},"${p.unit}",${p.minStockLevel},"${p.description || ""}"`,
+          `"${p.name}","${p.sku}","${p.category}",${p.purchasePrice},${p.sellingPrice},"${p.unit}",${p.minStockLevel},"${p.description || ''}"`,
       )
-      .join("\n");
+      .join('\n');
 
     const csv = csvHeader + csvRows;
 
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader('Content-Type', 'text/csv');
     res.setHeader(
-      "Content-Disposition",
+      'Content-Disposition',
       `attachment; filename=products-export-${Date.now()}.csv`,
     );
     res.send(csv);
   } catch (error) {
-    logger.error("Export error:", error);
+    logger.error('Export error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to export products",
+      message: 'Failed to export products',
     });
   }
 });
 
 // Bulk update products
-router.put("/bulk-update", authenticate, async (req, res) => {
+router.put('/bulk-update', authenticate, async (req, res) => {
   try {
     const { updates } = req.body;
 
     if (!Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No updates provided",
+        message: 'No updates provided',
       });
     }
 
@@ -620,7 +620,7 @@ router.put("/bulk-update", authenticate, async (req, res) => {
           continue;
         }
 
-        const product = await req.shopDb.collection("products").findOne({
+        const product = await req.shopDb.collection('products').findOne({
           sku: update.sku,
         });
 
@@ -634,15 +634,15 @@ router.put("/bulk-update", authenticate, async (req, res) => {
 
         // Build update fields
         const updateFields = { updatedAt: new Date() };
-        if (update.name) updateFields.name = update.name;
-        if (update.category) updateFields.category = update.category;
-        if (update.purchasePrice) updateFields.purchasePrice = parseFloat(update.purchasePrice);
-        if (update.sellingPrice) updateFields.sellingPrice = parseFloat(update.sellingPrice);
-        if (update.unit) updateFields.unit = update.unit;
-        if (update.minStockLevel !== undefined) updateFields.minStockLevel = parseInt(update.minStockLevel);
-        if (update.description !== undefined) updateFields.description = update.description;
+        if (update.name) {updateFields.name = update.name;}
+        if (update.category) {updateFields.category = update.category;}
+        if (update.purchasePrice) {updateFields.purchasePrice = parseFloat(update.purchasePrice);}
+        if (update.sellingPrice) {updateFields.sellingPrice = parseFloat(update.sellingPrice);}
+        if (update.unit) {updateFields.unit = update.unit;}
+        if (update.minStockLevel !== undefined) {updateFields.minStockLevel = parseInt(update.minStockLevel);}
+        if (update.description !== undefined) {updateFields.description = update.description;}
 
-        await req.shopDb.collection("products").updateOne(
+        await req.shopDb.collection('products').updateOne(
           { _id: product._id },
           { $set: updateFields },
         );
@@ -661,26 +661,26 @@ router.put("/bulk-update", authenticate, async (req, res) => {
 
     // Invalidate products cache after bulk update
     if (results.successCount > 0) {
-      cacheService.invalidateShopCache(req.user.shopId, "products");
+      cacheService.invalidateShopCache(req.user.shopId, 'products');
     }
   } catch (error) {
-    logger.error("Bulk update error:", error);
+    logger.error('Bulk update error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to update products",
+      message: 'Failed to update products',
     });
   }
 });
 
 // Bulk delete products
-router.post("/bulk-delete", authenticate, async (req, res) => {
+router.post('/bulk-delete', authenticate, async (req, res) => {
   try {
     const { skus } = req.body;
 
     if (!Array.isArray(skus) || skus.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No SKUs provided",
+        message: 'No SKUs provided',
       });
     }
 
@@ -695,7 +695,7 @@ router.post("/bulk-delete", authenticate, async (req, res) => {
       const sku = skus[i];
 
       try {
-        const product = await req.shopDb.collection("products").findOne({ sku });
+        const product = await req.shopDb.collection('products').findOne({ sku });
 
         if (!product) {
           results.errors.push(`SKU ${sku}: Product not found`);
@@ -704,7 +704,7 @@ router.post("/bulk-delete", authenticate, async (req, res) => {
         }
 
         // Soft delete
-        await req.shopDb.collection("products").updateOne(
+        await req.shopDb.collection('products').updateOne(
           { _id: product._id },
           { $set: { isActive: false, updatedAt: new Date() } },
         );
@@ -723,13 +723,13 @@ router.post("/bulk-delete", authenticate, async (req, res) => {
 
     // Invalidate products cache after bulk delete
     if (results.successCount > 0) {
-      cacheService.invalidateShopCache(req.user.shopId, "products");
+      cacheService.invalidateShopCache(req.user.shopId, 'products');
     }
   } catch (error) {
-    logger.error("Bulk delete error:", error);
+    logger.error('Bulk delete error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to delete products",
+      message: 'Failed to delete products',
     });
   }
 });

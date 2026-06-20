@@ -4,105 +4,105 @@
  */
 
 const ROLES = {
-  SUPER_ADMIN: "SUPER_ADMIN",
-  SHOP_ADMIN: "SHOP_ADMIN",
-  STAFF: "STAFF",
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  SHOP_ADMIN: 'SHOP_ADMIN',
+  STAFF: 'STAFF',
 };
 
 const PERMISSIONS = {
   // Shop Management (SUPER_ADMIN only)
-  CREATE_SHOP: "create_shop",
-  VIEW_ALL_SHOPS: "view_all_shops",
-  SUSPEND_SHOP: "suspend_shop",
-  DELETE_SHOP: "delete_shop",
-  VIEW_USAGE_STATS: "view_usage_stats",
+  CREATE_SHOP: 'create_shop',
+  VIEW_ALL_SHOPS: 'view_all_shops',
+  SUSPEND_SHOP: 'suspend_shop',
+  DELETE_SHOP: 'delete_shop',
+  VIEW_USAGE_STATS: 'view_usage_stats',
 
   // User Management (SUPER_ADMIN only)
-  CREATE_SHOP_ADMIN: "create_shop_admin",
-  CREATE_USER: "create_user",
-  CREATE_STAFF: "create_staff",
-  EDIT_USER: "edit_user",
-  DELETE_USER: "delete_user",
-  VIEW_USERS: "view_users",
+  CREATE_SHOP_ADMIN: 'create_shop_admin',
+  CREATE_USER: 'create_user',
+  CREATE_STAFF: 'create_staff',
+  EDIT_USER: 'edit_user',
+  DELETE_USER: 'delete_user',
+  VIEW_USERS: 'view_users',
 
   // Product Management
-  CREATE_PRODUCT: "create_product",
-  EDIT_PRODUCT: "edit_product",
-  DELETE_PRODUCT: "delete_product",
-  VIEW_PRODUCTS: "view_products",
+  CREATE_PRODUCT: 'create_product',
+  EDIT_PRODUCT: 'edit_product',
+  DELETE_PRODUCT: 'delete_product',
+  VIEW_PRODUCTS: 'view_products',
 
   // Stock Management
-  MANAGE_STOCK: "manage_stock",
-  VIEW_STOCK: "view_stock",
+  MANAGE_STOCK: 'manage_stock',
+  VIEW_STOCK: 'view_stock',
 
   // Sales
-  CREATE_SALE: "create_sale",
-  EDIT_SALE: "edit_sale",
-  DELETE_SALE: "delete_sale",
-  VIEW_SALES: "view_sales",
-  MANAGE_SALES: "manage_sales", // Admin-level sales management (edit, delete, send invoice)
+  CREATE_SALE: 'create_sale',
+  EDIT_SALE: 'edit_sale',
+  DELETE_SALE: 'delete_sale',
+  VIEW_SALES: 'view_sales',
+  MANAGE_SALES: 'manage_sales', // Admin-level sales management (edit, delete, send invoice)
 
   // Returns
-  CREATE_RETURN: "create_return",
-  EDIT_RETURN: "edit_return",
-  DELETE_RETURN: "delete_return",
-  VIEW_RETURNS: "view_returns",
-  APPROVE_RETURN: "approve_return",
+  CREATE_RETURN: 'create_return',
+  EDIT_RETURN: 'edit_return',
+  DELETE_RETURN: 'delete_return',
+  VIEW_RETURNS: 'view_returns',
+  APPROVE_RETURN: 'approve_return',
 
   // Purchases
-  CREATE_PURCHASE: "create_purchase",
-  EDIT_PURCHASE: "edit_purchase",
-  DELETE_PURCHASE: "delete_purchase",
-  VIEW_PURCHASES: "view_purchases",
+  CREATE_PURCHASE: 'create_purchase',
+  EDIT_PURCHASE: 'edit_purchase',
+  DELETE_PURCHASE: 'delete_purchase',
+  VIEW_PURCHASES: 'view_purchases',
 
   // Suppliers
-  CREATE_SUPPLIER: "create_supplier",
-  EDIT_SUPPLIER: "edit_supplier",
-  DELETE_SUPPLIER: "delete_supplier",
-  VIEW_SUPPLIERS: "view_suppliers",
+  CREATE_SUPPLIER: 'create_supplier',
+  EDIT_SUPPLIER: 'edit_supplier',
+  DELETE_SUPPLIER: 'delete_supplier',
+  VIEW_SUPPLIERS: 'view_suppliers',
 
   // Customers
-  CREATE_CUSTOMER: "create_customer",
-  EDIT_CUSTOMER: "edit_customer",
-  DELETE_CUSTOMER: "delete_customer",
-  VIEW_CUSTOMERS: "view_customers",
+  CREATE_CUSTOMER: 'create_customer',
+  EDIT_CUSTOMER: 'edit_customer',
+  DELETE_CUSTOMER: 'delete_customer',
+  VIEW_CUSTOMERS: 'view_customers',
 
   // Reports
-  VIEW_SALES_REPORT: "view_sales_report",
-  VIEW_PROFIT_REPORT: "view_profit_report",
-  VIEW_STOCK_REPORT: "view_stock_report",
-  VIEW_PURCHASE_REPORT: "view_purchase_report",
-  EXPORT_REPORTS: "export_reports",
+  VIEW_SALES_REPORT: 'view_sales_report',
+  VIEW_PROFIT_REPORT: 'view_profit_report',
+  VIEW_STOCK_REPORT: 'view_stock_report',
+  VIEW_PURCHASE_REPORT: 'view_purchase_report',
+  EXPORT_REPORTS: 'export_reports',
 
   // Expense Categories
-  CREATE_EXPENSE_CATEGORY: "create_expense_category",
-  EDIT_EXPENSE_CATEGORY: "edit_expense_category",
-  DELETE_EXPENSE_CATEGORY: "delete_expense_category",
-  VIEW_EXPENSE_CATEGORIES: "view_expense_categories",
+  CREATE_EXPENSE_CATEGORY: 'create_expense_category',
+  EDIT_EXPENSE_CATEGORY: 'edit_expense_category',
+  DELETE_EXPENSE_CATEGORY: 'delete_expense_category',
+  VIEW_EXPENSE_CATEGORIES: 'view_expense_categories',
 
   // Expenses
-  CREATE_EXPENSE: "create_expense",
-  EDIT_EXPENSE: "edit_expense",
-  DELETE_EXPENSE: "delete_expense",
-  VIEW_EXPENSES: "view_expenses",
-  UPLOAD_RECEIPT: "upload_receipt",
+  CREATE_EXPENSE: 'create_expense',
+  EDIT_EXPENSE: 'edit_expense',
+  DELETE_EXPENSE: 'delete_expense',
+  VIEW_EXPENSES: 'view_expenses',
+  UPLOAD_RECEIPT: 'upload_receipt',
 
   // Settings
-  VIEW_SETTINGS: "view_settings",
-  EDIT_SETTINGS: "edit_settings",
-  MANAGE_SETTINGS: "manage_settings",
+  VIEW_SETTINGS: 'view_settings',
+  EDIT_SETTINGS: 'edit_settings',
+  MANAGE_SETTINGS: 'manage_settings',
 
   // Customers (additional)
-  MANAGE_CUSTOMERS: "manage_customers",
+  MANAGE_CUSTOMERS: 'manage_customers',
 
   // Products (additional)
-  MANAGE_PRODUCTS: "manage_products",
+  MANAGE_PRODUCTS: 'manage_products',
 
   // Sales (additional)
-  MANAGE_SALES: "manage_sales",
+  MANAGE_SALES: 'manage_sales',
 
   // Reports (additional)
-  VIEW_REPORTS: "view_reports",
+  VIEW_REPORTS: 'view_reports',
 };
 
 // Role-Permission Mapping
@@ -284,14 +284,14 @@ function requirePermission(permission) {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Authentication required",
+        message: 'Authentication required',
       });
     }
 
     if (!userHasPermission(req.user, permission)) {
       return res.status(403).json({
         success: false,
-        message: "Insufficient permissions",
+        message: 'Insufficient permissions',
         required: permission,
         userRole: req.user.role,
       });
@@ -311,14 +311,14 @@ function requireRole(allowedRoles) {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Authentication required",
+        message: 'Authentication required',
       });
     }
 
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: "Insufficient role privileges",
+        message: 'Insufficient role privileges',
         required: allowedRoles,
         userRole: req.user.role,
       });

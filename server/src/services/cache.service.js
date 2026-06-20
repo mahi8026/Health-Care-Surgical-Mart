@@ -10,9 +10,9 @@
  * - Single Redis connection shared across the app (singleton)
  */
 
-const { logger } = require("../config/logging");
+const { logger } = require('../config/logging');
 
-const KEY_PREFIX = "hcsm:";
+const KEY_PREFIX = 'hcsm:';
 
 // TTL constants (seconds)
 const TTL = {
@@ -37,11 +37,11 @@ class CacheService {
    * Called once on first use — never blocks startup.
    */
   _init() {
-    if (this._client || this._connecting) return;
+    if (this._client || this._connecting) {return;}
     this._connecting = true;
 
     try {
-      const Redis = require("ioredis");
+      const Redis = require('ioredis');
 
       const redisUrl = process.env.REDIS_URL;
       let client;
@@ -54,12 +54,12 @@ class CacheService {
           connectTimeout: 3000,
           retryStrategy: (times) => {
             // Give up after 3 retries — cache is optional
-            if (times > 3) return null;
+            if (times > 3) {return null;}
             return Math.min(times * 500, 2000);
           },
         });
       } else {
-        const host = process.env.REDIS_HOST || "127.0.0.1";
+        const host = process.env.REDIS_HOST || '127.0.0.1';
         const port = parseInt(process.env.REDIS_PORT, 10) || 6379;
         const password = process.env.REDIS_PASSWORD || undefined;
 
@@ -72,36 +72,36 @@ class CacheService {
           maxRetriesPerRequest: 1,
           connectTimeout: 3000,
           retryStrategy: (times) => {
-            if (times > 3) return null;
+            if (times > 3) {return null;}
             return Math.min(times * 500, 2000);
           },
         });
       }
 
-      client.on("connect", () => {
+      client.on('connect', () => {
         this._available = true;
         this._warnedOnce = false;
-        logger.info("Cache service connected to Redis", {
-          file: "cache.service.js",
+        logger.info('Cache service connected to Redis', {
+          file: 'cache.service.js',
         });
       });
 
-      client.on("ready", () => {
+      client.on('ready', () => {
         this._available = true;
       });
 
-      client.on("error", (err) => {
+      client.on('error', (err) => {
         this._available = false;
         if (!this._warnedOnce) {
           this._warnedOnce = true;
-          logger.warn("Cache service: Redis unavailable — caching disabled", {
-            file: "cache.service.js",
+          logger.warn('Cache service: Redis unavailable — caching disabled', {
+            file: 'cache.service.js',
             error: err.message,
           });
         }
       });
 
-      client.on("close", () => {
+      client.on('close', () => {
         this._available = false;
       });
 
@@ -118,8 +118,8 @@ class CacheService {
       this._client = client;
     } catch (err) {
       // ioredis not available or config error — cache silently disabled
-      logger.warn("Cache service: could not initialize Redis client", {
-        file: "cache.service.js",
+      logger.warn('Cache service: could not initialize Redis client', {
+        file: 'cache.service.js',
         error: err.message,
       });
     } finally {
@@ -140,13 +140,13 @@ class CacheService {
    * @returns {Promise<any|null>} Parsed value or null on miss/error
    */
   async get(key) {
-    if (!this.isAvailable()) return null;
+    if (!this.isAvailable()) {return null;}
     try {
       const raw = await this._client.get(KEY_PREFIX + key);
-      if (raw === null) return null;
+      if (raw === null) {return null;}
       return JSON.parse(raw);
     } catch (err) {
-      logger.warn("Cache get error", { key, error: err.message });
+      logger.warn('Cache get error', { key, error: err.message });
       return null;
     }
   }
@@ -159,14 +159,14 @@ class CacheService {
    * @returns {Promise<boolean>} true on success, false on error
    */
   async set(key, value, ttlSeconds) {
-    if (!this.isAvailable()) return false;
+    if (!this.isAvailable()) {return false;}
     try {
       const serialized = JSON.stringify(value);
       const sizeInBytes = Buffer.byteLength(serialized, 'utf8');
       const maxSize = 1024 * 1024; // 1MB limit
 
       if (sizeInBytes > maxSize) {
-        logger.warn("Cache value exceeds 1MB limit, skipping cache", {
+        logger.warn('Cache value exceeds 1MB limit, skipping cache', {
           key,
           sizeInBytes,
           sizeMB: (sizeInBytes / (1024 * 1024)).toFixed(2)
@@ -177,12 +177,12 @@ class CacheService {
       await this._client.set(
         KEY_PREFIX + key,
         serialized,
-        "EX",
+        'EX',
         ttlSeconds
       );
       return true;
     } catch (err) {
-      logger.warn("Cache set error", { key, error: err.message });
+      logger.warn('Cache set error', { key, error: err.message });
       return false;
     }
   }
@@ -193,12 +193,12 @@ class CacheService {
    * @returns {Promise<boolean>}
    */
   async del(key) {
-    if (!this.isAvailable()) return false;
+    if (!this.isAvailable()) {return false;}
     try {
       await this._client.del(KEY_PREFIX + key);
       return true;
     } catch (err) {
-      logger.warn("Cache del error", { key, error: err.message });
+      logger.warn('Cache del error', { key, error: err.message });
       return false;
     }
   }
@@ -210,18 +210,18 @@ class CacheService {
    * @returns {Promise<number>} Number of keys deleted
    */
   async delPattern(pattern) {
-    if (!this.isAvailable()) return 0;
+    if (!this.isAvailable()) {return 0;}
     try {
       const fullPattern = KEY_PREFIX + pattern;
-      let cursor = "0";
+      let cursor = '0';
       let deleted = 0;
 
       do {
         const [nextCursor, keys] = await this._client.scan(
           cursor,
-          "MATCH",
+          'MATCH',
           fullPattern,
-          "COUNT",
+          'COUNT',
           100
         );
         cursor = nextCursor;
@@ -230,11 +230,11 @@ class CacheService {
           await this._client.del(...keys);
           deleted += keys.length;
         }
-      } while (cursor !== "0");
+      } while (cursor !== '0');
 
       return deleted;
     } catch (err) {
-      logger.warn("Cache delPattern error", { pattern, error: err.message });
+      logger.warn('Cache delPattern error', { pattern, error: err.message });
       return 0;
     }
   }
@@ -252,7 +252,7 @@ class CacheService {
     // Fire-and-forget — never await in route handlers
     setImmediate(async () => {
       try {
-        if (resource === "permissions" && userId) {
+        if (resource === 'permissions' && userId) {
           await this.del(`permissions:${userId}`);
         } else {
           await this.delPattern(`${resource}:${shopId}:*`);
@@ -260,7 +260,7 @@ class CacheService {
           await this.del(`${resource}:${shopId}`);
         }
       } catch (err) {
-        logger.warn("Cache invalidation error", { shopId, resource, error: err.message });
+        logger.warn('Cache invalidation error', { shopId, resource, error: err.message });
       }
     });
   }

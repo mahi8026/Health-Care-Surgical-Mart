@@ -4,12 +4,12 @@
  * SUPER_ADMIN: all shops. SHOP_ADMIN: own shop only.
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { authenticate } = require("../middleware/auth-multi-tenant");
-const { ROLES } = require("../utils/rbac");
-const auditLogService = require("../services/audit-log.service");
-const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { ROLES } = require('../utils/rbac');
+const auditLogService = require('../services/audit-log.service');
+const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
 
 router.use(authenticate);
 
@@ -101,15 +101,15 @@ router.use(authenticate);
  *       403: { $ref: '#/components/responses/ForbiddenError' }
  *       500: { $ref: '#/components/responses/ServerError' }
  */
-router.get("/", async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { role, shopId: userShopId } = req.user;
 
     // Only SUPER_ADMIN and SHOP_ADMIN can access audit logs
-    if (role !== ROLES.SUPER_ADMIN && role !== "SHOP_ADMIN") {
+    if (role !== ROLES.SUPER_ADMIN && role !== 'SHOP_ADMIN') {
       return res.status(403).json({
         success: false,
-        message: "Insufficient permissions to view audit logs",
+        message: 'Insufficient permissions to view audit logs',
       });
     }
 
@@ -151,11 +151,11 @@ router.get("/", async (req, res) => {
       availableActions: Object.values(AUDIT_ACTIONS),
     });
   } catch (error) {
-    const { logger } = require("../config/logging");
-    logger.error("Audit log query error:", { error: error.message });
+    const { logger } = require('../config/logging');
+    logger.error('Audit log query error:', { error: error.message });
     return res.status(500).json({
       success: false,
-      message: "Failed to retrieve audit logs",
+      message: 'Failed to retrieve audit logs',
     });
   }
 });

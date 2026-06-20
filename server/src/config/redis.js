@@ -1,6 +1,6 @@
 /**
  * Redis Configuration
- * 
+ *
  * Optional Redis connection for high-performance token blacklist.
  * Falls back gracefully if Redis is unavailable.
  */
@@ -23,7 +23,7 @@ async function initializeRedis() {
 
   try {
     logger.info('Redis: Attempting to connect...');
-    
+
     const client = redis.createClient({
       url: process.env.REDIS_URL,
       socket: {
@@ -58,7 +58,7 @@ async function initializeRedis() {
     // Connect with timeout
     await Promise.race([
       client.connect(),
-      new Promise((_, reject) => 
+      new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
       )
     ]);
@@ -66,7 +66,7 @@ async function initializeRedis() {
     logger.info('Redis: Connected successfully');
     redisClient = client;
     return client;
-    
+
   } catch (error) {
     logger.warn(`Redis: Connection failed (${error.message}), will use MongoDB fallback`);
     return null;

@@ -3,10 +3,10 @@
  * Handles business logic for customer management
  */
 
-const BaseController = require("./base.controller");
-const { ObjectId } = require("mongodb");
-const { logger } = require("../config/logging");
-const { getShopDatabase } = require("../config/database");
+const BaseController = require('./base.controller');
+const { ObjectId } = require('mongodb');
+const { logger } = require('../config/logging');
+const { getShopDatabase } = require('../config/database');
 
 class CustomersController extends BaseController {
   /**
@@ -15,13 +15,13 @@ class CustomersController extends BaseController {
   async getCustomers(req, res) {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
-      const { page = 1, limit = 50, search = "" } = req.query;
+      const { page = 1, limit = 50, search = '' } = req.query;
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
       const searchQuery = this._buildSearchQuery(search);
 
       const customers = await shopDb
-        .collection("customers")
+        .collection('customers')
         .find(searchQuery)
         .sort({ name: 1 })
         .skip(skip)
@@ -29,7 +29,7 @@ class CustomersController extends BaseController {
         .toArray();
 
       const total = await shopDb
-        .collection("customers")
+        .collection('customers')
         .countDocuments(searchQuery);
 
       const pagination = this.buildPagination(page, limit, total);
@@ -40,8 +40,8 @@ class CustomersController extends BaseController {
         pagination,
       });
     } catch (error) {
-      logger.error("Get customers error:", error);
-      this.sendError(res, "Failed to fetch customers", 500, error);
+      logger.error('Get customers error:', error);
+      this.sendError(res, 'Failed to fetch customers', 500, error);
     }
   }
 
@@ -52,17 +52,17 @@ class CustomersController extends BaseController {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
       const customer = await shopDb
-        .collection("customers")
+        .collection('customers')
         .findOne({ _id: new ObjectId(req.params.id) });
 
       if (!customer) {
-        return this.sendError(res, "Customer not found", 404);
+        return this.sendError(res, 'Customer not found', 404);
       }
 
-      this.sendSuccess(res, customer, "Customer fetched successfully");
+      this.sendSuccess(res, customer, 'Customer fetched successfully');
     } catch (error) {
-      logger.error("Get customer error:", error);
-      this.sendError(res, "Failed to fetch customer", 500, error);
+      logger.error('Get customer error:', error);
+      this.sendError(res, 'Failed to fetch customer', 500, error);
     }
   }
 
@@ -73,18 +73,18 @@ class CustomersController extends BaseController {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
       const {
-        name, phone, email, address, type = "Retail",
+        name, phone, email, address, type = 'Retail',
         creditEnabled = false, creditLimit = 0,
       } = req.body;
 
-      this.validateRequired(req.body, ["name", "phone"]);
+      this.validateRequired(req.body, ['name', 'phone']);
 
       const existingCustomer = await shopDb
-        .collection("customers")
+        .collection('customers')
         .findOne({ phone: phone.trim() });
 
       if (existingCustomer) {
-        return this.sendError(res, "Customer with this phone already exists", 400);
+        return this.sendError(res, 'Customer with this phone already exists', 400);
       }
 
       const customerData = this._buildCustomerObject(
@@ -92,17 +92,17 @@ class CustomersController extends BaseController {
         req.user,
       );
 
-      const result = await shopDb.collection("customers").insertOne(customerData);
+      const result = await shopDb.collection('customers').insertOne(customerData);
 
       this.sendSuccess(
         res,
         { _id: result.insertedId, ...customerData },
-        "Customer created successfully",
+        'Customer created successfully',
         201,
       );
     } catch (error) {
-      logger.error("Create customer error:", error);
-      this.sendError(res, error.message || "Failed to create customer", 400, error);
+      logger.error('Create customer error:', error);
+      this.sendError(res, error.message || 'Failed to create customer', 400, error);
     }
   }
 
@@ -117,23 +117,23 @@ class CustomersController extends BaseController {
         creditEnabled, creditLimit,
       } = req.body;
 
-      this.validateRequired(req.body, ["name", "phone"]);
+      this.validateRequired(req.body, ['name', 'phone']);
 
       const existingCustomer = await shopDb
-        .collection("customers")
+        .collection('customers')
         .findOne({ _id: new ObjectId(req.params.id) });
 
       if (!existingCustomer) {
-        return this.sendError(res, "Customer not found", 404);
+        return this.sendError(res, 'Customer not found', 404);
       }
 
-      const phoneCheck = await shopDb.collection("customers").findOne({
+      const phoneCheck = await shopDb.collection('customers').findOne({
         phone: phone.trim(),
         _id: { $ne: new ObjectId(req.params.id) },
       });
 
       if (phoneCheck) {
-        return this.sendError(res, "Phone number is already taken", 400);
+        return this.sendError(res, 'Phone number is already taken', 400);
       }
 
       const updateData = this._buildUpdateData(
@@ -142,13 +142,13 @@ class CustomersController extends BaseController {
       );
 
       await shopDb
-        .collection("customers")
+        .collection('customers')
         .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
-      this.sendSuccess(res, null, "Customer updated successfully");
+      this.sendSuccess(res, null, 'Customer updated successfully');
     } catch (error) {
-      logger.error("Update customer error:", error);
-      this.sendError(res, error.message || "Failed to update customer", 500, error);
+      logger.error('Update customer error:', error);
+      this.sendError(res, error.message || 'Failed to update customer', 500, error);
     }
   }
 
@@ -161,35 +161,35 @@ class CustomersController extends BaseController {
 
       // Check if customer exists
       const customer = await shopDb
-        .collection("customers")
+        .collection('customers')
         .findOne({ _id: new ObjectId(req.params.id) });
 
       if (!customer) {
-        return this.sendError(res, "Customer not found", 404);
+        return this.sendError(res, 'Customer not found', 404);
       }
 
       // Check if customer has any sales
       const salesCount = await shopDb
-        .collection("sales")
+        .collection('sales')
         .countDocuments({ customerId: req.params.id });
 
       if (salesCount > 0) {
         return this.sendError(
           res,
-          "Cannot delete customer with existing sales records",
+          'Cannot delete customer with existing sales records',
           400,
         );
       }
 
       // Delete customer
       await shopDb
-        .collection("customers")
+        .collection('customers')
         .deleteOne({ _id: new ObjectId(req.params.id) });
 
-      this.sendSuccess(res, null, "Customer deleted successfully");
+      this.sendSuccess(res, null, 'Customer deleted successfully');
     } catch (error) {
-      logger.error("Delete customer error:", error);
-      this.sendError(res, "Failed to delete customer", 500, error);
+      logger.error('Delete customer error:', error);
+      this.sendError(res, 'Failed to delete customer', 500, error);
     }
   }
 
@@ -205,9 +205,9 @@ class CustomersController extends BaseController {
 
     return {
       $or: [
-        { name: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
       ],
     };
   }
@@ -221,8 +221,8 @@ class CustomersController extends BaseController {
       phone: phone.trim(),
       email: email?.trim() || null,
       address: address?.trim() || null,
-      type: type || "Retail",
-      creditEnabled: creditEnabled === true || creditEnabled === "true",
+      type: type || 'Retail',
+      creditEnabled: creditEnabled === true || creditEnabled === 'true',
       creditLimit: parseFloat(creditLimit) || 0,
       currentDue: 0,
       totalPurchased: 0,
@@ -240,12 +240,12 @@ class CustomersController extends BaseController {
       phone: phone.trim(),
       email: email?.trim() || null,
       address: address?.trim() || null,
-      type: type || "Retail",
+      type: type || 'Retail',
       updatedAt: new Date(),
       updatedBy: user.id || user._id,
     };
-    if (creditEnabled !== undefined) update.creditEnabled = creditEnabled === true || creditEnabled === "true";
-    if (creditLimit !== undefined) update.creditLimit = parseFloat(creditLimit) || 0;
+    if (creditEnabled !== undefined) {update.creditEnabled = creditEnabled === true || creditEnabled === 'true';}
+    if (creditLimit !== undefined) {update.creditLimit = parseFloat(creditLimit) || 0;}
     return update;
   }
 }

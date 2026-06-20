@@ -3,22 +3,22 @@
  * Handles user management within shops
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const bcrypt = require("bcryptjs");
-const { ObjectId } = require("mongodb");
+const bcrypt = require('bcryptjs');
+const { ObjectId } = require('mongodb');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
 const { logger } = require('../config/logging');
-const auditLog = require("../services/audit-log.service");
-const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
-const { cacheService } = require("../services/cache.service");
+const auditLog = require('../services/audit-log.service');
+const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
+const { cacheService } = require('../services/cache.service');
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -266,13 +266,13 @@ router.use(checkShopStatus);
  * Get all users in the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_USERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     const users = await shopDb
-      .collection("users")
+      .collection('users')
       .find(
         {},
         {
@@ -297,12 +297,12 @@ router.get(
  * Get user by ID
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_USERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const user = await shopDb.collection("users").findOne(
+    const user = await shopDb.collection('users').findOne(
       { _id: new ObjectId(req.params.id) },
       {
         projection: {
@@ -313,7 +313,7 @@ router.get(
     );
 
     if (!user) {
-      throw createError.notFound("User not found");
+      throw createError.notFound('User not found');
     }
 
     res.json({
@@ -328,50 +328,50 @@ router.get(
  * Create new user (SUPER_ADMIN only)
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_USER),
   asyncHandler(async (req, res) => {
     // ── CRITICAL: Only SUPER_ADMIN can create users ──
-    if (req.user.role !== "SUPER_ADMIN") {
-      throw createError.forbidden("Only SUPER_ADMIN can create users");
+    if (req.user.role !== 'SUPER_ADMIN') {
+      throw createError.forbidden('Only SUPER_ADMIN can create users');
     }
 
     const shopDb = getShopDatabase(req.user.shopId);
-    const { name, email, password, role = "STAFF", isActive = true } = req.body;
+    const { name, email, password, role = 'STAFF', isActive = true } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
-      throw createError.badRequest("Name, email, and password are required");
+      throw createError.badRequest('Name, email, and password are required');
     }
 
     if (password.length < 6) {
-      throw createError.badRequest("Password must be at least 6 characters");
+      throw createError.badRequest('Password must be at least 6 characters');
     }
 
     // Only SUPER_ADMIN can create SUPER_ADMIN (though this should never happen in shop context)
-    if (role === "SUPER_ADMIN") {
-      throw createError.forbidden("Cannot create SUPER_ADMIN users through this endpoint");
+    if (role === 'SUPER_ADMIN') {
+      throw createError.forbidden('Cannot create SUPER_ADMIN users through this endpoint');
     }
 
     // Validate role is one of the allowed values
-    const validRoles = ["STAFF", "SHOP_ADMIN"];
+    const validRoles = ['STAFF', 'SHOP_ADMIN'];
     if (!validRoles.includes(role)) {
-      throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
+      throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
     }
 
     // Check if email already exists in MongoDB
     const existingUser = await shopDb
-      .collection("users")
+      .collection('users')
       .findOne({ email: email.toLowerCase() });
 
     if (existingUser) {
-      throw createError.conflict("User with this email already exists");
+      throw createError.conflict('User with this email already exists');
     }
 
     // ── Step 1: Create in Firebase Auth ──────────────────────────────────
     let firebaseUid = null;
     try {
-      const admin = require("../config/firebase-admin");
+      const admin = require('../config/firebase-admin');
       const firebaseUser = await admin.auth().createUser({
         email: email.toLowerCase().trim(),
         password,
@@ -382,10 +382,10 @@ router.post(
       logger.info(`Firebase user created: ${firebaseUid} (${email})`);
     } catch (firebaseErr) {
       // If Firebase user already exists, that's OK — just log it
-      if (firebaseErr.code === "auth/email-already-exists") {
+      if (firebaseErr.code === 'auth/email-already-exists') {
         logger.warn(`Firebase user already exists for ${email} — linking to MongoDB only`);
       } else {
-        logger.error("Failed to create Firebase user:", firebaseErr.message);
+        logger.error('Failed to create Firebase user:', firebaseErr.message);
         throw createError.internal(`Failed to create user in auth system: ${firebaseErr.message}`);
       }
     }
@@ -408,21 +408,21 @@ router.post(
       createdBy: req.user._id,
     };
 
-    const result = await shopDb.collection("users").insertOne(userData);
+    const result = await shopDb.collection('users').insertOne(userData);
 
     // Return user data without password
     const { password: _, ...userResponse } = userData;
     userResponse._id = result.insertedId;
 
     // Audit log
-    auditLog.log(req, AUDIT_ACTIONS.USER_CREATED, "user", result.insertedId.toString(),
+    auditLog.log(req, AUDIT_ACTIONS.USER_CREATED, 'user', result.insertedId.toString(),
       `Created user ${email} with role ${role}`,
       { after: { name, email, role, shopId: req.user.shopId } }
     );
 
     res.status(201).json({
       success: true,
-      message: "User created successfully",
+      message: 'User created successfully',
       data: userResponse,
     });
   }),
@@ -434,12 +434,12 @@ router.post(
  * Update user (SUPER_ADMIN only)
  */
 router.put(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.EDIT_USER),
   asyncHandler(async (req, res) => {
     // ── CRITICAL: Only SUPER_ADMIN can edit users ──
-    if (req.user.role !== "SUPER_ADMIN") {
-      throw createError.forbidden("Only SUPER_ADMIN can edit users");
+    if (req.user.role !== 'SUPER_ADMIN') {
+      throw createError.forbidden('Only SUPER_ADMIN can edit users');
     }
 
     const shopDb = getShopDatabase(req.user.shopId);
@@ -447,40 +447,40 @@ router.put(
 
     // Check if user exists
     const existingUser = await shopDb
-      .collection("users")
+      .collection('users')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!existingUser) {
-      throw createError.notFound("User not found");
+      throw createError.notFound('User not found');
     }
 
     // Prevent users from editing themselves (except password through dedicated endpoint)
     if (req.params.id === req.user._id?.toString() && (role || isActive !== undefined)) {
-      throw createError.forbidden("You cannot change your own role or status");
+      throw createError.forbidden('You cannot change your own role or status');
     }
 
     // Nobody can assign SUPER_ADMIN through this endpoint
-    if (role === "SUPER_ADMIN") {
-      throw createError.forbidden("Cannot assign SUPER_ADMIN role through this endpoint");
+    if (role === 'SUPER_ADMIN') {
+      throw createError.forbidden('Cannot assign SUPER_ADMIN role through this endpoint');
     }
 
     // Validate role if provided
     if (role) {
-      const validRoles = ["STAFF", "SHOP_ADMIN"];
+      const validRoles = ['STAFF', 'SHOP_ADMIN'];
       if (!validRoles.includes(role)) {
-        throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
+        throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
       }
     }
 
     // Check if email is taken by another user
     if (email && email !== existingUser.email) {
-      const emailCheck = await shopDb.collection("users").findOne({
+      const emailCheck = await shopDb.collection('users').findOne({
         email: email.toLowerCase(),
         _id: { $ne: new ObjectId(req.params.id) },
       });
 
       if (emailCheck) {
-        throw createError.conflict("Email is already taken");
+        throw createError.conflict('Email is already taken');
       }
     }
 
@@ -489,10 +489,10 @@ router.put(
       updatedBy: req.user._id,
     };
 
-    if (name) updateData.name = name.trim();
-    if (email) updateData.email = email.toLowerCase().trim();
-    if (role) updateData.role = role;
-    if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+    if (name) {updateData.name = name.trim();}
+    if (email) {updateData.email = email.toLowerCase().trim();}
+    if (role) {updateData.role = role;}
+    if (isActive !== undefined) {updateData.isActive = Boolean(isActive);}
 
     // Hash new password if provided
     if (password && password.trim()) {
@@ -500,14 +500,14 @@ router.put(
     }
 
     await shopDb
-      .collection("users")
+      .collection('users')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
     // Audit: user updated (role change gets its own action)
     const action = role && role !== existingUser.role
       ? AUDIT_ACTIONS.ROLE_CHANGED
       : AUDIT_ACTIONS.USER_UPDATED;
-    auditLog.log(req, action, "user", req.params.id,
+    auditLog.log(req, action, 'user', req.params.id,
       action === AUDIT_ACTIONS.ROLE_CHANGED
         ? `Changed role of ${existingUser.email} from ${existingUser.role} to ${role}`
         : `Updated user ${existingUser.email}`,
@@ -518,11 +518,11 @@ router.put(
     );
 
     // Invalidate this user's permissions cache (role/permissions may have changed)
-    cacheService.invalidateShopCache(req.user.shopId, "permissions", req.params.id);
+    cacheService.invalidateShopCache(req.user.shopId, 'permissions', req.params.id);
 
     res.json({
       success: true,
-      message: "User updated successfully",
+      message: 'User updated successfully',
     });
   }),
 );
@@ -532,42 +532,42 @@ router.put(
  * Delete user (SUPER_ADMIN only)
  */
 router.delete(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.DELETE_USER),
   asyncHandler(async (req, res) => {
     // ── CRITICAL: Only SUPER_ADMIN can delete users ──
-    if (req.user.role !== "SUPER_ADMIN") {
-      throw createError.forbidden("Only SUPER_ADMIN can delete users");
+    if (req.user.role !== 'SUPER_ADMIN') {
+      throw createError.forbidden('Only SUPER_ADMIN can delete users');
     }
 
     const shopDb = getShopDatabase(req.user.shopId);
 
     if (req.params.id === req.user.id) {
-      throw createError.forbidden("You cannot delete your own account");
+      throw createError.forbidden('You cannot delete your own account');
     }
 
     const user = await shopDb
-      .collection("users")
+      .collection('users')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!user) {
-      throw createError.notFound("User not found");
+      throw createError.notFound('User not found');
     }
 
     const salesCount = await shopDb
-      .collection("sales")
+      .collection('sales')
       .countDocuments({ createdBy: req.params.id });
 
     if (salesCount > 0) {
       throw createError.conflict(
-        "Cannot delete user with existing sales records. Deactivate instead.",
+        'Cannot delete user with existing sales records. Deactivate instead.',
       );
     }
 
     // Remove from Firebase Auth
     if (user.firebaseUid) {
       try {
-        const admin = require("../config/firebase-admin");
+        const admin = require('../config/firebase-admin');
         await admin.auth().deleteUser(user.firebaseUid);
         logger.info(`Firebase user deleted: ${user.firebaseUid}`);
       } catch (firebaseErr) {
@@ -576,16 +576,16 @@ router.delete(
       }
     }
 
-    await shopDb.collection("users").deleteOne({ _id: new ObjectId(req.params.id) });
+    await shopDb.collection('users').deleteOne({ _id: new ObjectId(req.params.id) });
 
-    auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, "user", req.params.id,
+    auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, 'user', req.params.id,
       `Deleted user ${user.email}`,
       { before: { name: user.name, email: user.email, role: user.role } }
     );
 
-    cacheService.invalidateShopCache(req.user.shopId, "permissions", req.params.id);
+    cacheService.invalidateShopCache(req.user.shopId, 'permissions', req.params.id);
 
-    res.json({ success: true, message: "User deleted successfully" });
+    res.json({ success: true, message: 'User deleted successfully' });
   }),
 );
 
@@ -595,36 +595,36 @@ router.delete(
  * Change user password
  */
 router.put(
-  "/:id/password",
+  '/:id/password',
   authenticate,
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { currentPassword, newPassword } = req.body;
 
-    if (req.params.id !== req.user._id?.toString() && req.user.role !== "SHOP_ADMIN") {
-      throw createError.forbidden("You can only change your own password");
+    if (req.params.id !== req.user._id?.toString() && req.user.role !== 'SHOP_ADMIN') {
+      throw createError.forbidden('You can only change your own password');
     }
 
     if (!newPassword || newPassword.length < 6) {
-      throw createError.badRequest("New password must be at least 6 characters");
+      throw createError.badRequest('New password must be at least 6 characters');
     }
 
     const user = await shopDb
-      .collection("users")
+      .collection('users')
       .findOne({ _id: new ObjectId(req.params.id) });
 
-    if (!user) throw createError.notFound("User not found");
+    if (!user) {throw createError.notFound('User not found');}
 
     if (req.params.id === req.user._id?.toString()) {
-      if (!currentPassword) throw createError.badRequest("Current password is required");
+      if (!currentPassword) {throw createError.badRequest('Current password is required');}
       const isValid = await bcrypt.compare(currentPassword, user.password);
-      if (!isValid) throw createError.unauthorized("Current password is incorrect");
+      if (!isValid) {throw createError.unauthorized('Current password is incorrect');}
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     // Update MongoDB
-    await shopDb.collection("users").updateOne(
+    await shopDb.collection('users').updateOne(
       { _id: new ObjectId(req.params.id) },
       { $set: { password: hashedPassword, updatedAt: new Date(), updatedBy: req.user._id } }
     );
@@ -632,7 +632,7 @@ router.put(
     // Update Firebase Auth
     if (user.firebaseUid) {
       try {
-        const admin = require("../config/firebase-admin");
+        const admin = require('../config/firebase-admin');
         await admin.auth().updateUser(user.firebaseUid, { password: newPassword });
         logger.info(`Firebase password updated for ${user.email}`);
       } catch (firebaseErr) {
@@ -641,7 +641,7 @@ router.put(
       }
     }
 
-    res.json({ success: true, message: "Password updated successfully" });
+    res.json({ success: true, message: 'Password updated successfully' });
   }),
 );
 
@@ -651,12 +651,12 @@ router.put(
  * Get current user profile
  */
 router.get(
-  "/profile/me",
+  '/profile/me',
   authenticate,
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const user = await shopDb.collection("users").findOne(
+    const user = await shopDb.collection('users').findOne(
       { _id: new ObjectId(req.user.id) },
       {
         projection: {
@@ -667,7 +667,7 @@ router.get(
     );
 
     if (!user) {
-      throw createError.notFound("User not found");
+      throw createError.notFound('User not found');
     }
 
     res.json({

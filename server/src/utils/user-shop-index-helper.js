@@ -1,9 +1,9 @@
 /**
  * User-Shop Index Helper
- * 
+ *
  * Maintains the user_shop_index collection for fast user lookups.
  * This index eliminates N+1 query problems when finding a user's shop.
- * 
+ *
  * Usage: Call updateUserShopIndex() whenever a user is created or updated.
  */
 
@@ -23,7 +23,7 @@ const { logger } = require('../config/logging');
 async function updateUserShopIndex({ email, shopId, userId, role, isActive = true }) {
   try {
     const systemDb = getSystemDatabase();
-    
+
     await systemDb.collection('user_shop_index').updateOne(
       { email },
       {
@@ -41,7 +41,7 @@ async function updateUserShopIndex({ email, shopId, userId, role, isActive = tru
       },
       { upsert: true }
     );
-    
+
     logger.debug('User-shop index updated', { email, shopId });
     return true;
   } catch (error) {
@@ -62,9 +62,9 @@ async function updateUserShopIndex({ email, shopId, userId, role, isActive = tru
 async function removeUserFromIndex(email) {
   try {
     const systemDb = getSystemDatabase();
-    
+
     await systemDb.collection('user_shop_index').deleteOne({ email });
-    
+
     logger.debug('User removed from shop index', { email });
     return true;
   } catch (error) {
@@ -84,7 +84,7 @@ async function removeUserFromIndex(email) {
 async function deactivateUserInIndex(email) {
   try {
     const systemDb = getSystemDatabase();
-    
+
     await systemDb.collection('user_shop_index').updateOne(
       { email },
       {
@@ -94,7 +94,7 @@ async function deactivateUserInIndex(email) {
         },
       }
     );
-    
+
     logger.debug('User deactivated in shop index', { email });
     return true;
   } catch (error) {
@@ -114,7 +114,7 @@ async function deactivateUserInIndex(email) {
 async function activateUserInIndex(email) {
   try {
     const systemDb = getSystemDatabase();
-    
+
     await systemDb.collection('user_shop_index').updateOne(
       { email },
       {
@@ -124,7 +124,7 @@ async function activateUserInIndex(email) {
         },
       }
     );
-    
+
     logger.debug('User activated in shop index', { email });
     return true;
   } catch (error) {
@@ -144,11 +144,11 @@ async function activateUserInIndex(email) {
 async function findUserShop(email) {
   try {
     const systemDb = getSystemDatabase();
-    
+
     const mapping = await systemDb
       .collection('user_shop_index')
       .findOne({ email, isActive: true });
-    
+
     return mapping;
   } catch (error) {
     logger.error('Failed to find user shop:', {
@@ -166,11 +166,11 @@ async function findUserShop(email) {
 async function getIndexStats() {
   try {
     const systemDb = getSystemDatabase();
-    
+
     const total = await systemDb.collection('user_shop_index').countDocuments();
     const active = await systemDb.collection('user_shop_index').countDocuments({ isActive: true });
     const inactive = await systemDb.collection('user_shop_index').countDocuments({ isActive: false });
-    
+
     return {
       total,
       active,

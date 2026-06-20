@@ -3,18 +3,18 @@
  * Handles sales/POS operations for shops
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const rateLimit = require("express-rate-limit");
+const rateLimit = require('express-rate-limit');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const salesController = require("../controllers/sales.controller");
-const auditLog = require("../services/audit-log.service");
-const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const salesController = require('../controllers/sales.controller');
+const auditLog = require('../services/audit-log.service');
+const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
 
 // Rate limiter for email sending (prevent spam)
 const emailRateLimiter = rateLimit({
@@ -22,7 +22,7 @@ const emailRateLimiter = rateLimit({
   max: 5, // 5 emails per 15 minutes per IP
   message: {
     success: false,
-    message: "Too many email requests. Please try again in 15 minutes.",
+    message: 'Too many email requests. Please try again in 15 minutes.',
   },
   standardHeaders: true, // Return rate limit info in headers
   legacyHeaders: false,
@@ -37,20 +37,20 @@ router.use(checkShopStatus);
  * Get next sequential invoice number
  */
 router.get(
-  "/next-invoice-number",
+  '/next-invoice-number',
   requirePermission(PERMISSIONS.CREATE_SALE),
   async (req, res) => {
     try {
       const invoiceNumberService = require('../services/invoice-number.service');
       const nextInvoiceNumber = await invoiceNumberService.getNextInvoiceNumber(req.user.shopId);
-      
+
       res.json({
         success: true,
         data: {
           invoiceNumber: nextInvoiceNumber
         }
       });
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({
         success: false,
         message: 'Failed to generate invoice number'
@@ -295,7 +295,7 @@ router.get(
  * Create new sale
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_SALE),
   salesController.createSale.bind(salesController),
 );
@@ -305,7 +305,7 @@ router.post(
  * Get all sales for the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_SALES),
   salesController.getSales.bind(salesController),
 );
@@ -315,7 +315,7 @@ router.get(
  * Get single sale by ID
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_SALES),
   salesController.getSaleById.bind(salesController),
 );
@@ -325,40 +325,40 @@ router.get(
  * Edit the previousDue amount recorded on a sale and recalculate totalOutstanding
  */
 router.patch(
-  "/:id/previous-due",
+  '/:id/previous-due',
   requirePermission(PERMISSIONS.MANAGE_SALES),
   async (req, res) => {
     try {
-      const { ObjectId } = require("mongodb");
-      const { logger } = require("../config/logging");
+      const { ObjectId } = require('mongodb');
+      const { logger } = require('../config/logging');
 
       const { previousDue } = req.body;
 
-      if (previousDue === undefined || previousDue === null || previousDue === "") {
-        return res.status(400).json({ success: false, message: "previousDue is required" });
+      if (previousDue === undefined || previousDue === null || previousDue === '') {
+        return res.status(400).json({ success: false, message: 'previousDue is required' });
       }
 
       const parsedPreviousDue = parseFloat(previousDue);
       if (isNaN(parsedPreviousDue) || parsedPreviousDue < 0) {
-        return res.status(400).json({ success: false, message: "previousDue must be a non-negative number" });
+        return res.status(400).json({ success: false, message: 'previousDue must be a non-negative number' });
       }
 
       let saleId;
       try {
         saleId = new ObjectId(req.params.id);
       } catch {
-        return res.status(400).json({ success: false, message: "Invalid sale ID" });
+        return res.status(400).json({ success: false, message: 'Invalid sale ID' });
       }
 
-      const sale = await req.shopDb.collection("sales").findOne({ _id: saleId });
+      const sale = await req.shopDb.collection('sales').findOne({ _id: saleId });
       if (!sale) {
-        return res.status(404).json({ success: false, message: "Sale not found" });
+        return res.status(404).json({ success: false, message: 'Sale not found' });
       }
 
       const dueAmount = sale.dueAmount || 0;
       const newTotalOutstanding = parsedPreviousDue + dueAmount;
 
-      await req.shopDb.collection("sales").updateOne(
+      await req.shopDb.collection('sales').updateOne(
         { _id: saleId },
         {
           $set: {
@@ -375,8 +375,8 @@ router.patch(
       try {
         auditLog.log(
           req,
-          AUDIT_ACTIONS.SALE_UPDATED || "SALE_UPDATED",
-          "sale",
+          AUDIT_ACTIONS.SALE_UPDATED || 'SALE_UPDATED',
+          'sale',
           req.params.id,
           `Previous due updated on sale ${sale.invoiceNo}: ৳${sale.previousDue || 0} → ৳${parsedPreviousDue}`,
           {
@@ -396,7 +396,7 @@ router.patch(
 
       return res.json({
         success: true,
-        message: "Previous due updated successfully",
+        message: 'Previous due updated successfully',
         data: {
           _id: sale._id,
           invoiceNo: sale.invoiceNo,
@@ -406,9 +406,9 @@ router.patch(
         },
       });
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Update previous due error:", { error: error.message, saleId: req.params.id });
-      return res.status(500).json({ success: false, message: "Failed to update previous due" });
+      const { logger } = require('../config/logging');
+      logger.error('Update previous due error:', { error: error.message, saleId: req.params.id });
+      return res.status(500).json({ success: false, message: 'Failed to update previous due' });
     }
   }
 );
@@ -418,31 +418,31 @@ router.patch(
  * Record a payment towards the due amount (reduces dueAmount and/or previousDue)
  */
 router.post(
-  "/:id/pay-due",
+  '/:id/pay-due',
   requirePermission(PERMISSIONS.MANAGE_SALES),
   async (req, res) => {
     try {
-      const { ObjectId } = require("mongodb");
-      const { logger } = require("../config/logging");
+      const { ObjectId } = require('mongodb');
+      const { logger } = require('../config/logging');
 
-      const { amount, paymentMethod = "cash" } = req.body;
+      const { amount, paymentMethod = 'cash' } = req.body;
 
       // Validate payment amount
-      if (amount === undefined || amount === null || amount === "") {
-        return res.status(400).json({ success: false, message: "Payment amount is required" });
+      if (amount === undefined || amount === null || amount === '') {
+        return res.status(400).json({ success: false, message: 'Payment amount is required' });
       }
 
       const parsedAmount = parseFloat(amount);
       if (isNaN(parsedAmount) || parsedAmount <= 0) {
-        return res.status(400).json({ success: false, message: "Payment amount must be a positive number" });
+        return res.status(400).json({ success: false, message: 'Payment amount must be a positive number' });
       }
 
       // Validate payment method
-      const validPaymentMethods = ["cash", "bank", "card"];
+      const validPaymentMethods = ['cash', 'bank', 'card'];
       if (!validPaymentMethods.includes(paymentMethod)) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `Invalid payment method. Must be one of: ${validPaymentMethods.join(", ")}` 
+        return res.status(400).json({
+          success: false,
+          message: `Invalid payment method. Must be one of: ${validPaymentMethods.join(', ')}`
         });
       }
 
@@ -451,13 +451,13 @@ router.post(
       try {
         saleId = new ObjectId(req.params.id);
       } catch {
-        return res.status(400).json({ success: false, message: "Invalid sale ID" });
+        return res.status(400).json({ success: false, message: 'Invalid sale ID' });
       }
 
       // Get the sale
-      const sale = await req.shopDb.collection("sales").findOne({ _id: saleId });
+      const sale = await req.shopDb.collection('sales').findOne({ _id: saleId });
       if (!sale) {
-        return res.status(404).json({ success: false, message: "Sale not found" });
+        return res.status(404).json({ success: false, message: 'Sale not found' });
       }
 
       // Calculate current due
@@ -467,9 +467,9 @@ router.post(
 
       // Validate payment doesn't exceed total due
       if (parsedAmount > totalDue) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `Payment amount (Tk ${parsedAmount.toFixed(2)}) exceeds total due (Tk ${totalDue.toFixed(2)})` 
+        return res.status(400).json({
+          success: false,
+          message: `Payment amount (Tk ${parsedAmount.toFixed(2)}) exceeds total due (Tk ${totalDue.toFixed(2)})`
         });
       }
 
@@ -502,11 +502,11 @@ router.post(
       };
 
       // Add payment to the appropriate paid field
-      if (paymentMethod === "cash") {
+      if (paymentMethod === 'cash') {
         updatedFields.cashPaid = (sale.cashPaid || 0) + parsedAmount;
-      } else if (paymentMethod === "bank") {
+      } else if (paymentMethod === 'bank') {
         updatedFields.bankPaid = (sale.bankPaid || 0) + parsedAmount;
-      } else if (paymentMethod === "card") {
+      } else if (paymentMethod === 'card') {
         // For card, add to bank paid (can be separated if needed)
         updatedFields.bankPaid = (sale.bankPaid || 0) + parsedAmount;
       }
@@ -516,22 +516,22 @@ router.post(
       const grandTotal = sale.grandTotal || 0;
 
       if (totalPaid >= grandTotal && newDueAmount === 0 && newPreviousDue === 0) {
-        updatedFields.paymentStatus = "Paid";
+        updatedFields.paymentStatus = 'Paid';
       } else if (totalPaid > 0) {
-        updatedFields.paymentStatus = "Partial";
+        updatedFields.paymentStatus = 'Partial';
       } else {
-        updatedFields.paymentStatus = "Credit";
+        updatedFields.paymentStatus = 'Credit';
       }
 
       // Update the sale
-      await req.shopDb.collection("sales").updateOne(
+      await req.shopDb.collection('sales').updateOne(
         { _id: saleId },
         { $set: updatedFields }
       );
 
       // Record payment in payment history (optional - create payments collection if needed)
       try {
-        await req.shopDb.collection("payments").insertOne({
+        await req.shopDb.collection('payments').insertOne({
           saleId,
           invoiceNo: sale.invoiceNo,
           customerId: sale.customerId,
@@ -540,12 +540,12 @@ router.post(
           paymentMethod,
           paymentDate: new Date(),
           recordedBy: new ObjectId(req.user.id),
-          recordedByName: req.user.name || "Unknown",
+          recordedByName: req.user.name || 'Unknown',
           notes: `Payment towards ${sale.invoiceNo}`,
           createdAt: new Date(),
         });
       } catch (paymentErr) {
-        logger.warn("Failed to record payment history:", { error: paymentErr.message });
+        logger.warn('Failed to record payment history:', { error: paymentErr.message });
         // Non-blocking - continue even if payment history fails
       }
 
@@ -553,19 +553,19 @@ router.post(
       try {
         auditLog.log(
           req,
-          AUDIT_ACTIONS.SALE_UPDATED || "SALE_UPDATED",
-          "sale",
+          AUDIT_ACTIONS.SALE_UPDATED || 'SALE_UPDATED',
+          'sale',
           req.params.id,
           `Payment received for sale ${sale.invoiceNo}: Tk ${parsedAmount.toFixed(2)} via ${paymentMethod}`,
           {
-            before: { 
-              dueAmount: currentDueAmount, 
+            before: {
+              dueAmount: currentDueAmount,
               previousDue: currentPreviousDue,
               totalOutstanding: totalDue,
               paymentStatus: sale.paymentStatus,
             },
-            after: { 
-              dueAmount: newDueAmount, 
+            after: {
+              dueAmount: newDueAmount,
               previousDue: newPreviousDue,
               totalOutstanding: newDueAmount + newPreviousDue,
               paymentStatus: updatedFields.paymentStatus,
@@ -589,7 +589,7 @@ router.post(
 
       return res.json({
         success: true,
-        message: "Payment recorded successfully",
+        message: 'Payment recorded successfully',
         data: {
           _id: sale._id,
           invoiceNo: sale.invoiceNo,
@@ -602,9 +602,9 @@ router.post(
         },
       });
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Pay due error:", { error: error.message, saleId: req.params.id });
-      return res.status(500).json({ success: false, message: "Failed to record payment" });
+      const { logger } = require('../config/logging');
+      logger.error('Pay due error:', { error: error.message, saleId: req.params.id });
+      return res.status(500).json({ success: false, message: 'Failed to record payment' });
     }
   }
 );
@@ -614,19 +614,19 @@ router.post(
  * Generate PDF invoice and stream directly to browser (no storage needed)
  */
 router.get(
-  "/:id/download-invoice",
+  '/:id/download-invoice',
   requirePermission(PERMISSIONS.VIEW_SALES),
   async (req, res) => {
     try {
-      const { ObjectId } = require("mongodb");
-      const EmailService = require("../services/email/email.service");
+      const { ObjectId } = require('mongodb');
+      const EmailService = require('../services/email/email.service');
 
-      const sale = await req.shopDb.collection("sales").findOne({
+      const sale = await req.shopDb.collection('sales').findOne({
         _id: new ObjectId(req.params.id),
       });
 
       if (!sale) {
-        return res.status(404).json({ success: false, message: "Sale not found" });
+        return res.status(404).json({ success: false, message: 'Sale not found' });
       }
 
       // Enrich sale with items product names if needed
@@ -635,14 +635,14 @@ router.get(
       const pdfBuffer = await EmailService.generateInvoicePDF(sale);
 
       const filename = `invoice-${sale.invoiceNo || req.params.id}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.setHeader("Content-Length", pdfBuffer.length);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
       return res.send(pdfBuffer);
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Download invoice error:", { error: error.message, saleId: req.params.id });
-      return res.status(500).json({ success: false, message: "Failed to generate invoice PDF" });
+      const { logger } = require('../config/logging');
+      logger.error('Download invoice error:', { error: error.message, saleId: req.params.id });
+      return res.status(500).json({ success: false, message: 'Failed to generate invoice PDF' });
     }
   }
 );
@@ -710,24 +710,24 @@ router.get(
  * Generate PDF invoice, upload to GCS, and email to customer
  */
 router.post(
-  "/:id/send-invoice",
+  '/:id/send-invoice',
   emailRateLimiter, // Rate limit: 5 emails per 15 minutes
   requirePermission(PERMISSIONS.MANAGE_SALES),
   async (req, res) => {
     try {
-      const { ObjectId } = require("mongodb");
-      const EmailService = require("../services/email/email.service");
-      const { logger } = require("../config/logging");
+      const { ObjectId } = require('mongodb');
+      const EmailService = require('../services/email/email.service');
+      const { logger } = require('../config/logging');
 
       // Fetch the sale
-      const sale = await req.shopDb.collection("sales").findOne({
+      const sale = await req.shopDb.collection('sales').findOne({
         _id: new ObjectId(req.params.id),
       });
 
       if (!sale) {
         return res.status(404).json({
           success: false,
-          message: "Sale not found",
+          message: 'Sale not found',
         });
       }
 
@@ -737,7 +737,7 @@ router.post(
       // Fetch customer if sale has a customerId
       let customer = null;
       if (sale.customerId) {
-        customer = await req.shopDb.collection("customers").findOne({
+        customer = await req.shopDb.collection('customers').findOne({
           _id: sale.customerId,
         });
       }
@@ -745,7 +745,7 @@ router.post(
       // Fall back to inline customer data from the sale record
       if (!customer) {
         customer = {
-          name: sale.customerName || "Walk-in Customer",
+          name: sale.customerName || 'Walk-in Customer',
           email: null,
           phone: sale.customerPhone || null,
         };
@@ -759,24 +759,24 @@ router.post(
       );
 
       // Persist the invoice URL back to the sale record
-      await req.shopDb.collection("sales").updateOne(
+      await req.shopDb.collection('sales').updateOne(
         { _id: sale._id },
         { $set: { invoiceUrl, invoiceGeneratedAt: new Date() } }
       );
 
       // Audit: invoice sent
-      auditLog.log(req, AUDIT_ACTIONS.INVOICE_SENT, "sale", req.params.id,
-        `Invoice ${sale.invoiceNo} generated${emailSent ? ` and emailed to ${customer.email}` : ""}`,
+      auditLog.log(req, AUDIT_ACTIONS.INVOICE_SENT, 'sale', req.params.id,
+        `Invoice ${sale.invoiceNo} generated${emailSent ? ` and emailed to ${customer.email}` : ''}`,
         { after: { invoiceNo: sale.invoiceNo, invoiceUrl, emailSent, storage } }
       );
 
       const message = emailSent
         ? `Invoice generated and sent to ${customer.email}`
         : customer?.email
-          ? "Invoice generated but email delivery failed"
-          : "Invoice generated (customer has no email address)";
+          ? 'Invoice generated but email delivery failed'
+          : 'Invoice generated (customer has no email address)';
 
-      logger.info("Invoice generated", {
+      logger.info('Invoice generated', {
         saleId: req.params.id,
         invoiceNo: sale.invoiceNo,
         shopId: req.user.shopId,
@@ -793,15 +793,15 @@ router.post(
         message,
       });
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Send invoice error:", {
+      const { logger } = require('../config/logging');
+      logger.error('Send invoice error:', {
         error: error.message,
         saleId: req.params.id,
         shopId: req.user?.shopId,
       });
       return res.status(500).json({
         success: false,
-        message: error.message || "Failed to generate invoice",
+        message: error.message || 'Failed to generate invoice',
       });
     }
   }

@@ -1,17 +1,17 @@
 /**
  * File Serving Routes
  * Serves uploaded files from local storage (GCS files use public URLs)
- * 
+ *
  * @version 1.0.0
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { authenticate } = require("../middleware/auth-multi-tenant");
-const { getFilePath, useGCS } = require("../services/file-upload.service");
-const { asyncHandler } = require("../config/error-handling");
-const { createError } = require("../config/error-handling");
-const { logger } = require("../config/logging");
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { getFilePath, useGCS } = require('../services/file-upload.service');
+const { asyncHandler } = require('../config/error-handling');
+const { createError } = require('../config/error-handling');
+const { logger } = require('../config/logging');
 
 /**
  * @swagger
@@ -67,30 +67,30 @@ const { logger } = require("../config/logging");
 /**
  * GET /api/files/:folder/:shopId/:filename
  * Serve files from local storage
- * 
+ *
  * Folders: receipts, invoices, imports, products
  */
 router.get(
-  "/:folder/:shopId/:filename",
+  '/:folder/:shopId/:filename',
   authenticate,
   asyncHandler(async (req, res) => {
     const { folder, shopId, filename } = req.params;
 
     // Validate folder
-    const allowedFolders = ["receipts", "invoices", "imports", "products"];
+    const allowedFolders = ['receipts', 'invoices', 'imports', 'products'];
     if (!allowedFolders.includes(folder)) {
       throw createError.badRequest(`Invalid folder: ${folder}`);
     }
 
     // Verify user has access to this shop's files
-    if (req.user.role !== "SUPER_ADMIN" && req.user.shopId !== shopId) {
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.shopId !== shopId) {
       throw createError.forbidden("Access denied to this shop's files");
     }
 
     // If using GCS, files are served via public URLs
     if (useGCS) {
       throw createError.badRequest(
-        "Files are stored in Google Cloud Storage. Use the public URL provided during upload."
+        'Files are stored in Google Cloud Storage. Use the public URL provided during upload.'
       );
     }
 
@@ -98,7 +98,7 @@ router.get(
     const filePath = getFilePath(shopId, filename, folder);
 
     if (!filePath) {
-      throw createError.notFound("File not found");
+      throw createError.notFound('File not found');
     }
 
     // Serve file
@@ -108,7 +108,7 @@ router.get(
         if (!res.headersSent) {
           res.status(404).json({
             success: false,
-            message: "File not found",
+            message: 'File not found',
           });
         }
       }

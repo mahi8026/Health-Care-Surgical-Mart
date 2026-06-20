@@ -1,6 +1,6 @@
 /**
  * Email Templates - entry point
- * 
+ *
  * Available templates:
  * - welcome_email: Welcome new users
  * - order_confirmation: Order/sale confirmation

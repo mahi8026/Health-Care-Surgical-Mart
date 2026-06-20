@@ -16,7 +16,7 @@ class CacheManager {
    */
   get(key) {
     const item = this.cache.get(key);
-    if (!item) return null;
+    if (!item) {return null;}
 
     if (Date.now() > item.expiry) {
       this.cache.delete(key);
@@ -55,7 +55,7 @@ class CacheManager {
    */
   getToken(token) {
     const item = this.tokenCache.get(token);
-    if (!item) return null;
+    if (!item) {return null;}
 
     if (Date.now() > item.expiry) {
       this.tokenCache.delete(token);
@@ -132,7 +132,7 @@ setInterval(
 function cacheMiddleware(ttl = 5 * 60 * 1000) {
   return (req, res, next) => {
     // Only cache GET requests
-    if (req.method !== "GET") {
+    if (req.method !== 'GET') {
       return next();
     }
 

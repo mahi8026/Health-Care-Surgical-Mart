@@ -11,12 +11,12 @@ if (!admin.apps.length) {
   try {
     // Try base64-encoded service account first (recommended for Render)
     const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-    
+
     if (serviceAccountBase64) {
       try {
         const serviceAccountJson = Buffer.from(serviceAccountBase64, 'base64').toString('utf-8');
         const serviceAccount = JSON.parse(serviceAccountJson);
-        
+
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
         });

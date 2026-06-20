@@ -23,7 +23,7 @@ const { requirePermission } = require('../utils/rbac');
 router.get('/', async (req, res) => {
   try {
     const isHealthy = await healthCheck();
-    
+
     if (isHealthy) {
       res.status(200).json({
         success: true,
@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
 router.get('/detailed', authenticate, requirePermission('VIEW_SETTINGS'), async (req, res) => {
   try {
     const healthData = await comprehensiveHealthCheck();
-    
+
     res.status(healthData.healthy ? 200 : 503).json({
       success: healthData.healthy,
       ...healthData

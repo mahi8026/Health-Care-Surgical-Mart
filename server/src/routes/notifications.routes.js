@@ -3,17 +3,17 @@
  * API endpoints for sending notifications
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const EmailService = require("../services/email/email.service");
-const SMSService = require("../services/sms/sms.service");
-const { authenticate } = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler } = require("../config/error-handling");
-const { ObjectId } = require("mongodb");
-const { logger } = require("../config/logging");
+const EmailService = require('../services/email/email.service');
+const SMSService = require('../services/sms/sms.service');
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler } = require('../config/error-handling');
+const { ObjectId } = require('mongodb');
+const { logger } = require('../config/logging');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -285,7 +285,7 @@ router.use(authenticate);
  * Test email configuration
  */
 router.post(
-  "/test-email",
+  '/test-email',
   requirePermission(PERMISSIONS.MANAGE_SETTINGS),
   asyncHandler(async (req, res) => {
     const { email } = req.body;
@@ -293,31 +293,31 @@ router.post(
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: "Email address is required",
+        message: 'Email address is required',
       });
     }
 
     try {
       const result = await EmailService.send({
         to: email,
-        subject: "Test Email from Health Care Surgical Mart",
-        templateName: "test_email",
+        subject: 'Test Email from Health Care Surgical Mart',
+        templateName: 'test_email',
         variables: {
           timestamp: new Date().toLocaleString(),
-          shopName: "Health Care Surgical Mart",
+          shopName: 'Health Care Surgical Mart',
         },
       });
 
       res.json({
         success: true,
-        message: "Test email sent successfully",
+        message: 'Test email sent successfully',
         data: result,
       });
     } catch (error) {
-      logger.error("Test email error:", error);
+      logger.error('Test email error:', error);
       res.status(500).json({
         success: false,
-        message: error.message || "Failed to send test email",
+        message: error.message || 'Failed to send test email',
       });
     }
   }),
@@ -328,7 +328,7 @@ router.post(
  * Test SMS configuration
  */
 router.post(
-  "/test-sms",
+  '/test-sms',
   requirePermission(PERMISSIONS.MANAGE_SETTINGS),
   asyncHandler(async (req, res) => {
     const { phone } = req.body;
@@ -336,14 +336,14 @@ router.post(
     if (!phone) {
       return res.status(400).json({
         success: false,
-        message: "Phone number is required",
+        message: 'Phone number is required',
       });
     }
 
     try {
       const result = await SMSService.send({
         to: phone,
-        templateName: "test_sms",
+        templateName: 'test_sms',
         variables: {
           time: new Date().toLocaleTimeString(),
         },
@@ -352,14 +352,14 @@ router.post(
 
       res.json({
         success: true,
-        message: "Test SMS sent successfully",
+        message: 'Test SMS sent successfully',
         data: result,
       });
     } catch (error) {
-      logger.error("Test SMS error:", error);
+      logger.error('Test SMS error:', error);
       res.status(500).json({
         success: false,
-        message: error.message || "Failed to send test SMS",
+        message: error.message || 'Failed to send test SMS',
       });
     }
   }),
@@ -370,7 +370,7 @@ router.post(
  * Test WhatsApp configuration (via Twilio)
  */
 router.post(
-  "/test-whatsapp",
+  '/test-whatsapp',
   requirePermission(PERMISSIONS.MANAGE_SETTINGS),
   asyncHandler(async (req, res) => {
     const { phone } = req.body;
@@ -378,7 +378,7 @@ router.post(
     if (!phone) {
       return res.status(400).json({
         success: false,
-        message: "Phone number is required",
+        message: 'Phone number is required',
       });
     }
 
@@ -386,7 +386,7 @@ router.post(
     try {
       const result = await SMSService.send({
         to: phone,
-        templateName: "test_whatsapp",
+        templateName: 'test_whatsapp',
         variables: {
           time: new Date().toLocaleTimeString(),
         },
@@ -395,14 +395,14 @@ router.post(
 
       res.json({
         success: true,
-        message: "Test WhatsApp message sent successfully",
+        message: 'Test WhatsApp message sent successfully',
         data: result,
       });
     } catch (error) {
-      logger.error("Test WhatsApp error:", error);
+      logger.error('Test WhatsApp error:', error);
       res.status(500).json({
         success: false,
-        message: error.message || "Failed to send test WhatsApp message",
+        message: error.message || 'Failed to send test WhatsApp message',
       });
     }
   }),
@@ -413,7 +413,7 @@ router.post(
  * Send promotional message to customers
  */
 router.post(
-  "/send-promotional",
+  '/send-promotional',
   requirePermission(PERMISSIONS.MANAGE_CUSTOMERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -422,7 +422,7 @@ router.post(
     if (!message || !message.text) {
       return res.status(400).json({
         success: false,
-        message: "Message text is required",
+        message: 'Message text is required',
       });
     }
 
@@ -430,7 +430,7 @@ router.post(
     let customers;
     if (customerIds && customerIds.length > 0) {
       customers = await shopDb
-        .collection("customers")
+        .collection('customers')
         .find({
           _id: { $in: customerIds.map((id) => new ObjectId(id)) },
         })
@@ -438,7 +438,7 @@ router.post(
     } else {
       // Send to all active customers
       customers = await shopDb
-        .collection("customers")
+        .collection('customers')
         .find({ isActive: true })
         .toArray();
     }
@@ -446,7 +446,7 @@ router.post(
     if (customers.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No customers found",
+        message: 'No customers found',
       });
     }
 
@@ -462,8 +462,8 @@ router.post(
           try {
             await EmailService.send({
               to: customer.email,
-              subject: message.subject || "Special Offer from Health Care Surgical Mart",
-              templateName: "promotional",
+              subject: message.subject || 'Special Offer from Health Care Surgical Mart',
+              templateName: 'promotional',
               variables: {
                 customerName: customer.name,
                 message: message.text,
@@ -485,7 +485,7 @@ router.post(
           try {
             await SMSService.send({
               to: customer.phone,
-              templateName: "promotional",
+              templateName: 'promotional',
               variables: {
                 customerName: customer.name,
                 message: message.text,
@@ -503,7 +503,7 @@ router.post(
 
     res.json({
       success: true,
-      message: "Promotional messages sent",
+      message: 'Promotional messages sent',
       data: results,
     });
   }),
@@ -514,30 +514,30 @@ router.post(
  * Send low stock alert to admins
  */
 router.post(
-  "/low-stock-alert",
+  '/low-stock-alert',
   requirePermission(PERMISSIONS.MANAGE_PRODUCTS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     // Get low stock products
     const products = await shopDb
-      .collection("products")
+      .collection('products')
       .aggregate([
         {
           $lookup: {
-            from: "stock",
-            localField: "_id",
-            foreignField: "productId",
-            as: "stockInfo",
+            from: 'stock',
+            localField: '_id',
+            foreignField: 'productId',
+            as: 'stockInfo',
           },
         },
         {
-          $unwind: "$stockInfo",
+          $unwind: '$stockInfo',
         },
         {
           $match: {
             $expr: {
-              $lte: ["$stockInfo.currentQty", "$minStockLevel"],
+              $lte: ['$stockInfo.currentQty', '$minStockLevel'],
             },
             isActive: true,
           },
@@ -546,7 +546,7 @@ router.post(
           $project: {
             name: 1,
             sku: 1,
-            stockQuantity: "$stockInfo.currentQty",
+            stockQuantity: '$stockInfo.currentQty',
             minStockLevel: 1,
             unit: 1,
           },
@@ -557,15 +557,15 @@ router.post(
     if (products.length === 0) {
       return res.json({
         success: true,
-        message: "No low stock products found",
+        message: 'No low stock products found',
       });
     }
 
     // Get admin users
     const admins = await shopDb
-      .collection("users")
+      .collection('users')
       .find({
-        role: { $in: ["admin", "super_admin"] },
+        role: { $in: ['admin', 'super_admin'] },
         isActive: true,
       })
       .toArray();
@@ -579,7 +579,7 @@ router.post(
           await EmailService.send({
             to: admin.email,
             subject: `⚠️ Low Stock Alert - ${products.length} Products`,
-            templateName: "low_stock_alert",
+            templateName: 'low_stock_alert',
             variables: {
               adminName: admin.name,
               productCount: products.length,
@@ -596,7 +596,7 @@ router.post(
 
     res.json({
       success: true,
-      message: "Low stock alerts sent",
+      message: 'Low stock alerts sent',
       data: results,
     });
   }),
@@ -607,7 +607,7 @@ router.post(
  * Send payment reminder to customer
  */
 router.post(
-  "/payment-reminder",
+  '/payment-reminder',
   requirePermission(PERMISSIONS.MANAGE_SALES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -616,19 +616,19 @@ router.post(
     if (!customerId || !dueAmount || !dueDate) {
       return res.status(400).json({
         success: false,
-        message: "Customer ID, due amount, and due date are required",
+        message: 'Customer ID, due amount, and due date are required',
       });
     }
 
     // Get customer
     const customer = await shopDb
-      .collection("customers")
+      .collection('customers')
       .findOne({ _id: new ObjectId(customerId) });
 
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Customer not found",
+        message: 'Customer not found',
       });
     }
 
@@ -640,7 +640,7 @@ router.post(
         await EmailService.send({
           to: customer.email,
           subject: `Payment Reminder - BDT ${dueAmount} Due`,
-          templateName: "payment_reminder",
+          templateName: 'payment_reminder',
           variables: {
             customerName: customer.name,
             dueAmount: dueAmount,
@@ -649,7 +649,7 @@ router.post(
         });
         results.email = true;
       } catch (error) {
-        logger.error("Failed to send payment reminder email:", error);
+        logger.error('Failed to send payment reminder email:', error);
       }
     }
 
@@ -658,7 +658,7 @@ router.post(
       try {
         await SMSService.send({
           to: customer.phone,
-          templateName: "payment_reminder",
+          templateName: 'payment_reminder',
           variables: {
             customerName: customer.name,
             dueAmount: dueAmount,
@@ -668,13 +668,13 @@ router.post(
         });
         results.sms = true;
       } catch (error) {
-        logger.error("Failed to send payment reminder SMS:", error);
+        logger.error('Failed to send payment reminder SMS:', error);
       }
     }
 
     res.json({
       success: true,
-      message: "Payment reminder sent",
+      message: 'Payment reminder sent',
       data: results,
     });
   }),
@@ -685,7 +685,7 @@ router.post(
  * Get notification history (if implemented)
  */
 router.get(
-  "/history",
+  '/history',
   requirePermission(PERMISSIONS.VIEW_REPORTS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -699,7 +699,7 @@ router.get(
     }
 
     const notifications = await shopDb
-      .collection("notification_history")
+      .collection('notification_history')
       .find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -707,7 +707,7 @@ router.get(
       .toArray();
 
     const total = await shopDb
-      .collection("notification_history")
+      .collection('notification_history')
       .countDocuments(query);
 
     res.json({

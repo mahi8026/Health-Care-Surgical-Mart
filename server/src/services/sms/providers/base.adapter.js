@@ -12,7 +12,7 @@ class BaseSMSAdapter {
    * @returns {Promise<{success: boolean, messageId?: string, status?: string, provider: string, cost?: number, error?: string}>}
    */
   async sendSMS(to, message, options = {}) {
-    throw new Error("sendSMS() must be implemented by subclass");
+    throw new Error('sendSMS() must be implemented by subclass');
   }
 
   /**
@@ -20,8 +20,8 @@ class BaseSMSAdapter {
    * @param {string} messageId - Provider-specific message identifier
    * @returns {Promise<{status: string, [key: string]: any}>}
    */
-  async getDeliveryStatus(messageId) {
-    throw new Error("getDeliveryStatus() must be implemented by subclass");
+  async getDeliveryStatus(_messageId) {
+    throw new Error('getDeliveryStatus() must be implemented by subclass');
   }
 
   /**
@@ -30,7 +30,7 @@ class BaseSMSAdapter {
    * @returns {number} Cost in USD
    */
   calculateCost(result) {
-    throw new Error("calculateCost() must be implemented by subclass");
+    throw new Error('calculateCost() must be implemented by subclass');
   }
 }
 

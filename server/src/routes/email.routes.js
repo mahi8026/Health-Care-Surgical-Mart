@@ -3,13 +3,13 @@
  * API endpoints for email integration (SendGrid + Mailchimp)
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const EmailService = require("../services/email/email.service");
-const { authenticate } = require("../middleware/auth-multi-tenant");
-const { requireRole, ROLES } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler } = require("../config/error-handling");
+const EmailService = require('../services/email/email.service');
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { requireRole, ROLES } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler } = require('../config/error-handling');
 
 /**
  * @swagger
@@ -245,7 +245,7 @@ const { asyncHandler } = require("../config/error-handling");
  * Send a transactional email using a named template
  */
 router.post(
-  "/send",
+  '/send',
   authenticate,
   asyncHandler(async (req, res) => {
     const { to, templateName, variables } = req.body;
@@ -253,7 +253,7 @@ router.post(
     if (!to || !templateName) {
       return res.status(400).json({
         success: false,
-        message: "to and templateName are required",
+        message: 'to and templateName are required',
       });
     }
 
@@ -272,7 +272,7 @@ router.post(
  * Create and send a marketing campaign via Mailchimp (admin only)
  */
 router.post(
-  "/campaign",
+  '/campaign',
   authenticate,
   requireRole([ROLES.SUPER_ADMIN, ROLES.SHOP_ADMIN]),
   asyncHandler(async (req, res) => {
@@ -282,7 +282,7 @@ router.post(
     if (!title || !subject || !content) {
       return res.status(400).json({
         success: false,
-        message: "title, subject, and content are required",
+        message: 'title, subject, and content are required',
       });
     }
 
@@ -305,7 +305,7 @@ router.post(
  * Sync opted-in customers to Mailchimp (admin only)
  */
 router.post(
-  "/sync-customers",
+  '/sync-customers',
   authenticate,
   requireRole([ROLES.SUPER_ADMIN, ROLES.SHOP_ADMIN]),
   asyncHandler(async (req, res) => {
@@ -322,7 +322,7 @@ router.post(
  * Get email logs with optional filters (startDate, endDate, type, status)
  */
 router.get(
-  "/logs",
+  '/logs',
   authenticate,
   asyncHandler(async (req, res) => {
     const { startDate, endDate, type, status } = req.query;
@@ -332,15 +332,15 @@ router.get(
 
     if (startDate || endDate) {
       filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate);
-      if (endDate) filter.createdAt.$lte = new Date(endDate);
+      if (startDate) {filter.createdAt.$gte = new Date(startDate);}
+      if (endDate) {filter.createdAt.$lte = new Date(endDate);}
     }
 
-    if (type) filter.type = type;
-    if (status) filter.status = status;
+    if (type) {filter.type = type;}
+    if (status) {filter.status = status;}
 
     const logs = await db
-      .collection("email_logs")
+      .collection('email_logs')
       .find(filter)
       .sort({ createdAt: -1 })
       .limit(100)
@@ -355,7 +355,7 @@ router.get(
  * List email templates (built-in + custom for the shop)
  */
 router.get(
-  "/templates",
+  '/templates',
   authenticate,
   asyncHandler(async (req, res) => {
     const templates = await EmailService.template.list(req.user.shopId);
@@ -369,7 +369,7 @@ router.get(
  * Create a custom email template
  */
 router.post(
-  "/templates",
+  '/templates',
   authenticate,
   asyncHandler(async (req, res) => {
     const { name, subject, html, variables, category } = req.body;
@@ -377,7 +377,7 @@ router.post(
     if (!name || !subject || !html) {
       return res.status(400).json({
         success: false,
-        message: "name, subject, and html are required",
+        message: 'name, subject, and html are required',
       });
     }
 
@@ -386,13 +386,13 @@ router.post(
       subject,
       html,
       variables: variables || [],
-      category: category || "transactional",
+      category: category || 'transactional',
       shopId: req.user.shopId,
     });
 
     res.status(201).json({
       success: true,
-      message: "Template created successfully",
+      message: 'Template created successfully',
     });
   }),
 );
@@ -402,7 +402,7 @@ router.post(
  * Preview a template rendered with sample data
  */
 router.get(
-  "/templates/:name/preview",
+  '/templates/:name/preview',
   authenticate,
   asyncHandler(async (req, res) => {
     const { name } = req.params;
@@ -427,7 +427,7 @@ router.get(
  * Send an order confirmation email to a customer
  */
 router.post(
-  "/order-confirmation",
+  '/order-confirmation',
   authenticate,
   asyncHandler(async (req, res) => {
     const { order, customer } = req.body;
@@ -435,7 +435,7 @@ router.post(
     if (!order || !customer) {
       return res.status(400).json({
         success: false,
-        message: "order and customer are required",
+        message: 'order and customer are required',
       });
     }
 

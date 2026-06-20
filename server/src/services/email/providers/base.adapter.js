@@ -13,7 +13,7 @@ class BaseEmailAdapter {
    * @returns {Promise<{success: boolean, messageId?: string, status?: string, provider: string, error?: string}>}
    */
   async sendEmail(to, subject, content, options = {}) {
-    throw new Error("sendEmail() must be implemented by subclass");
+    throw new Error('sendEmail() must be implemented by subclass');
   }
 
   /**
@@ -22,7 +22,7 @@ class BaseEmailAdapter {
    * @returns {Promise<{delivered: boolean, opened: boolean, clicked: boolean, bounced: boolean, [key: string]: any}>}
    */
   async getEmailStats(messageId) {
-    throw new Error("getEmailStats() must be implemented by subclass");
+    throw new Error('getEmailStats() must be implemented by subclass');
   }
 
   /**

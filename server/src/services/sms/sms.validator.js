@@ -18,17 +18,17 @@ function validatePhoneNumber(phone) {
  * @param {string} countryCode - Country dial code without '+', e.g. "91" for India
  * @returns {string} E.164 formatted number
  */
-function formatPhoneNumber(phone, countryCode = "91") {
+function formatPhoneNumber(phone, countryCode = '91') {
   // Remove all non-digit characters except leading +
-  let cleaned = phone.replace(/[^\d+]/g, "");
+  let cleaned = phone.replace(/[^\d+]/g, '');
 
   // Already has a + prefix — return as-is after stripping non-digits
-  if (cleaned.startsWith("+")) {
+  if (cleaned.startsWith('+')) {
     return cleaned;
   }
 
   // Remove leading zeros
-  cleaned = cleaned.replace(/^0+/, "");
+  cleaned = cleaned.replace(/^0+/, '');
 
   return `+${countryCode}${cleaned}`;
 }
@@ -43,9 +43,9 @@ function formatPhoneNumber(phone, countryCode = "91") {
 function isValidIndianNumber(phone) {
   // Strip country code if present
   let local = phone;
-  if (local.startsWith("+91")) {
+  if (local.startsWith('+91')) {
     local = local.slice(3);
-  } else if (local.startsWith("91") && local.length === 12) {
+  } else if (local.startsWith('91') && local.length === 12) {
     local = local.slice(2);
   }
 

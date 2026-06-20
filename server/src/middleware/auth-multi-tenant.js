@@ -3,11 +3,11 @@
  * Handles JWT authentication and shop context
  */
 
-const jwt = require("jsonwebtoken");
-const { getShopDatabase, getSystemDatabase } = require("../config/database");
-const { ObjectId } = require("mongodb");
-const { logger } = require("../config/logging");
-const TokenBlacklistService = require("../services/token-blacklist.service");
+const jwt = require('jsonwebtoken');
+const { getShopDatabase, getSystemDatabase } = require('../config/database');
+const { ObjectId } = require('mongodb');
+const { logger } = require('../config/logging');
+const TokenBlacklistService = require('../services/token-blacklist.service');
 
 // Initialize TokenBlacklistService (will be set up with Redis/MongoDB in server.js)
 let tokenBlacklistService = null;
@@ -71,15 +71,15 @@ async function isTokenBlacklisted(token) {
 // Lazy validation of JWT_SECRET (only when middleware is used)
 function getJWTSecret() {
   const JWT_SECRET = process.env.JWT_SECRET;
-  
+
   if (!JWT_SECRET || JWT_SECRET.length < 32) {
     throw new Error(
-      "FATAL: JWT_SECRET environment variable is missing or too short. " +
-      "JWT_SECRET must be at least 32 characters. " +
+      'FATAL: JWT_SECRET environment variable is missing or too short. ' +
+      'JWT_SECRET must be at least 32 characters. ' +
       "Generate a secure secret using: node -e \"require('crypto').randomBytes(32, (err, buf) => { if (err) throw err; process.stdout.write(buf.toString('hex')); })\""
     );
   }
-  
+
   return JWT_SECRET;
 }
 
@@ -94,9 +94,9 @@ async function authenticate(req, res, next) {
     // Try to get token from httpOnly cookie first (preferred, more secure)
     if (req.cookies?.jwt) {
       token = req.cookies.jwt;
-    } 
+    }
     // Fallback: Authorization header (for backward compatibility with mobile apps, etc.)
-    else if (req.headers.authorization?.startsWith("Bearer ")) {
+    else if (req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.substring(7);
     }
     // Fallback: Query parameter (for SSE EventSource which can't send custom headers)
@@ -107,7 +107,7 @@ async function authenticate(req, res, next) {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "No token provided",
+        message: 'No token provided',
       });
     }
 
@@ -116,7 +116,7 @@ async function authenticate(req, res, next) {
     if (blacklisted) {
       return res.status(401).json({
         success: false,
-        message: "Token has been revoked. Please login again.",
+        message: 'Token has been revoked. Please login again.',
       });
     }
 
@@ -125,16 +125,16 @@ async function authenticate(req, res, next) {
     try {
       decoded = jwt.verify(token, getJWTSecret());
     } catch (jwtError) {
-      if (jwtError.name === "JsonWebTokenError") {
+      if (jwtError.name === 'JsonWebTokenError') {
         return res.status(401).json({
           success: false,
-          message: "Invalid token",
+          message: 'Invalid token',
         });
       }
-      if (jwtError.name === "TokenExpiredError") {
+      if (jwtError.name === 'TokenExpiredError') {
         return res.status(401).json({
           success: false,
-          message: "Token expired",
+          message: 'Token expired',
         });
       }
       // Re-throw unexpected JWT errors to outer catch
@@ -142,29 +142,29 @@ async function authenticate(req, res, next) {
     }
 
     // Validate shopId for non-super-admin users
-    if (decoded.role !== "SUPER_ADMIN" && !decoded.shopId) {
+    if (decoded.role !== 'SUPER_ADMIN' && !decoded.shopId) {
       return res.status(401).json({
         success: false,
-        message: "Invalid token: missing shop context",
+        message: 'Invalid token: missing shop context',
       });
     }
 
     // Get user from appropriate database with nested try-catch for database errors
     let user;
     try {
-      if (decoded.role === "SUPER_ADMIN") {
+      if (decoded.role === 'SUPER_ADMIN') {
         const systemDb = getSystemDatabase();
-        user = await systemDb.collection("system_users").findOne({
+        user = await systemDb.collection('system_users').findOne({
           _id: new ObjectId(decoded.userId),
         });
       } else {
         const shopDb = getShopDatabase(decoded.shopId);
-        user = await shopDb.collection("users").findOne({
+        user = await shopDb.collection('users').findOne({
           _id: new ObjectId(decoded.userId),
         });
       }
     } catch (dbError) {
-      logger.error("Database error in authenticate middleware:", {
+      logger.error('Database error in authenticate middleware:', {
         error: dbError.message,
         stack: dbError.stack,
         userId: decoded?.userId,
@@ -174,21 +174,21 @@ async function authenticate(req, res, next) {
       });
       return res.status(500).json({
         success: false,
-        message: "Database connection failed",
+        message: 'Database connection failed',
       });
     }
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "User not found",
+        message: 'User not found',
       });
     }
 
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: "User account is inactive",
+        message: 'User account is inactive',
       });
     }
 
@@ -204,23 +204,23 @@ async function authenticate(req, res, next) {
 
     // For SUPER_ADMIN: optionally resolve shopId from request if provided
     // SUPER_ADMIN can access ALL shops or a specific shop
-    if (req.user.role === "SUPER_ADMIN") {
+    if (req.user.role === 'SUPER_ADMIN') {
       const requestedShopId =
         req.query.shopId ||
         req.body?.shopId ||
-        req.headers["x-shop-id"] ||
+        req.headers['x-shop-id'] ||
         null;
 
       if (requestedShopId) {
         // If SUPER_ADMIN specifies a shopId, validate it
         try {
           const systemDb = getSystemDatabase();
-          const shop = await systemDb.collection("shops").findOne({ 
-            shopId: requestedShopId 
+          const shop = await systemDb.collection('shops').findOne({
+            shopId: requestedShopId
           });
 
           if (!shop) {
-            logger.warn("SUPER_ADMIN attempted to access non-existent shop", {
+            logger.warn('SUPER_ADMIN attempted to access non-existent shop', {
               userId: req.user._id,
               email: req.user.email,
               shopId: requestedShopId,
@@ -232,8 +232,8 @@ async function authenticate(req, res, next) {
             });
           }
 
-          if (shop.status !== "Active") {
-            logger.warn("SUPER_ADMIN attempted to access inactive shop", {
+          if (shop.status !== 'Active') {
+            logger.warn('SUPER_ADMIN attempted to access inactive shop', {
               userId: req.user._id,
               email: req.user.email,
               shopId: requestedShopId,
@@ -248,7 +248,7 @@ async function authenticate(req, res, next) {
 
           req.user.shopId = requestedShopId;
         } catch (shopErr) {
-          logger.error("Shop validation error:", {
+          logger.error('Shop validation error:', {
             error: shopErr.message,
             stack: shopErr.stack,
             shopId: requestedShopId,
@@ -256,7 +256,7 @@ async function authenticate(req, res, next) {
           });
           return res.status(500).json({
             success: false,
-            message: "Failed to validate shop",
+            message: 'Failed to validate shop',
           });
         }
       }
@@ -269,7 +269,7 @@ async function authenticate(req, res, next) {
       try {
         req.shopDb = getShopDatabase(req.user.shopId);
       } catch (dbError) {
-        logger.error("Failed to get shop database in authenticate middleware:", {
+        logger.error('Failed to get shop database in authenticate middleware:', {
           error: dbError.message,
           stack: dbError.stack,
           userId: req.user._id,
@@ -278,7 +278,7 @@ async function authenticate(req, res, next) {
         });
         return res.status(500).json({
           success: false,
-          message: "Failed to connect to shop database",
+          message: 'Failed to connect to shop database',
         });
       }
     }
@@ -286,14 +286,14 @@ async function authenticate(req, res, next) {
     next();
   } catch (error) {
     // Catch-all for any unexpected errors
-    logger.error("Unexpected error in authenticate middleware:", {
+    logger.error('Unexpected error in authenticate middleware:', {
       error: error.message,
       stack: error.stack,
       path: req.path,
     });
     return res.status(500).json({
       success: false,
-      message: "Authentication failed",
+      message: 'Authentication failed',
     });
   }
 }
@@ -313,7 +313,7 @@ function generateToken(user) {
   };
 
   return jwt.sign(payload, getJWTSecret(), {
-    expiresIn: "24h",
+    expiresIn: '24h',
   });
 }
 
@@ -325,7 +325,7 @@ function verifyShopAccess(req, res, next) {
     req.params.shopId || req.body.shopId || req.query.shopId;
 
   // Super admin can access any shop
-  if (req.user.role === "SUPER_ADMIN") {
+  if (req.user.role === 'SUPER_ADMIN') {
     return next();
   }
 
@@ -333,7 +333,7 @@ function verifyShopAccess(req, res, next) {
   if (shopIdFromParams && shopIdFromParams !== req.user.shopId) {
     return res.status(403).json({
       success: false,
-      message: "Access denied: You do not have access to this shop",
+      message: 'Access denied: You do not have access to this shop',
     });
   }
 
@@ -346,23 +346,23 @@ function verifyShopAccess(req, res, next) {
 async function checkShopStatus(req, res, next) {
   try {
     // Skip for super admin
-    if (req.user.role === "SUPER_ADMIN") {
+    if (req.user.role === 'SUPER_ADMIN') {
       return next();
     }
 
     const systemDb = getSystemDatabase();
-    const shop = await systemDb.collection("shops").findOne({
+    const shop = await systemDb.collection('shops').findOne({
       shopId: req.user.shopId,
     });
 
     if (!shop) {
       return res.status(404).json({
         success: false,
-        message: "Shop not found",
+        message: 'Shop not found',
       });
     }
 
-    if (shop.status !== "Active") {
+    if (shop.status !== 'Active') {
       return res.status(403).json({
         success: false,
         message: `Shop is ${shop.status.toLowerCase()}. Please contact support.`,
@@ -376,16 +376,16 @@ async function checkShopStatus(req, res, next) {
     ) {
       return res.status(403).json({
         success: false,
-        message: "Subscription expired. Please renew to continue.",
+        message: 'Subscription expired. Please renew to continue.',
       });
     }
 
     next();
   } catch (error) {
-    logger.error("Shop status check error:", error);
+    logger.error('Shop status check error:', error);
     return res.status(500).json({
       success: false,
-      message: "Failed to verify shop status",
+      message: 'Failed to verify shop status',
     });
   }
 }

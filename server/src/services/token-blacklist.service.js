@@ -1,9 +1,9 @@
 /**
  * Token Blacklist Service
- * 
+ *
  * Manages revoked JWT tokens with persistent storage.
  * Supports Redis (primary) and MongoDB (fallback) backends.
- * 
+ *
  * Features:
  * - Automatic TTL expiration
  * - Graceful fallback to MongoDB if Redis unavailable
@@ -18,7 +18,7 @@ class TokenBlacklistService {
     this.redisClient = redisClient;
     this.mongoDb = mongoDb;
     this.collectionName = 'token_blacklist';
-    
+
     if (this.redisClient) {
       logger.info('TokenBlacklistService: Using Redis for token storage');
     } else if (this.mongoDb) {
@@ -36,19 +36,19 @@ class TokenBlacklistService {
   async ensureMongoIndexes() {
     try {
       const collection = this.mongoDb.collection(this.collectionName);
-      
+
       // Create TTL index (expires documents at 'expiry' time)
       await collection.createIndex(
         { expiry: 1 },
         { expireAfterSeconds: 0, name: 'expiry_ttl_idx' }
       );
-      
+
       // Create index on signature for fast lookups
       await collection.createIndex(
         { signature: 1 },
         { unique: true, name: 'signature_idx' }
       );
-      
+
       logger.info('TokenBlacklistService: MongoDB indexes created');
     } catch (error) {
       if (error.code === 85) {
@@ -83,7 +83,7 @@ class TokenBlacklistService {
       // If no expiration, default to 24 hours
       return 24 * 60 * 60;
     }
-    
+
     const ttl = Math.floor((decoded.exp * 1000 - Date.now()) / 1000);
     return Math.max(0, ttl); // Ensure non-negative
   }
@@ -97,14 +97,14 @@ class TokenBlacklistService {
     try {
       const signature = this.getTokenSignature(token);
       const decoded = jwt.decode(token);
-      
+
       if (!decoded) {
         logger.error('TokenBlacklistService: Unable to decode token for revocation');
         return false;
       }
-      
+
       const ttl = this.calculateTTL(decoded);
-      
+
       // Redis storage
       if (this.redisClient) {
         try {
@@ -116,7 +116,7 @@ class TokenBlacklistService {
           // Fall through to MongoDB
         }
       }
-      
+
       // MongoDB storage
       if (this.mongoDb) {
         try {
@@ -141,14 +141,14 @@ class TokenBlacklistService {
           // Fall through to in-memory
         }
       }
-      
+
       // In-memory fallback (NOT RECOMMENDED for production)
       if (this.inMemoryStore) {
         this.inMemoryStore.add(signature);
         logger.warn('TokenBlacklistService: Token revoked in-memory (NOT PERSISTENT)');
         return true;
       }
-      
+
       return false;
     } catch (error) {
       logger.error('TokenBlacklistService: Error revoking token:', error);
@@ -164,7 +164,7 @@ class TokenBlacklistService {
   async isBlacklisted(token) {
     try {
       const signature = this.getTokenSignature(token);
-      
+
       // Redis check
       if (this.redisClient) {
         try {
@@ -175,7 +175,7 @@ class TokenBlacklistService {
           // Fall through to MongoDB
         }
       }
-      
+
       // MongoDB check
       if (this.mongoDb) {
         try {
@@ -187,12 +187,12 @@ class TokenBlacklistService {
           // Fall through to in-memory
         }
       }
-      
+
       // In-memory check
       if (this.inMemoryStore) {
         return this.inMemoryStore.has(signature);
       }
-      
+
       // If all storage backends fail, deny access (fail-secure)
       logger.error('TokenBlacklistService: All storage backends unavailable');
       return false;
@@ -212,7 +212,7 @@ class TokenBlacklistService {
         backend: 'unknown',
         count: 0
       };
-      
+
       if (this.redisClient) {
         try {
           const keys = await this.redisClient.keys('blacklist:*');
@@ -223,7 +223,7 @@ class TokenBlacklistService {
           logger.error('TokenBlacklistService: Error getting Redis stats:', error);
         }
       }
-      
+
       if (this.mongoDb) {
         try {
           const collection = this.mongoDb.collection(this.collectionName);
@@ -235,13 +235,13 @@ class TokenBlacklistService {
           logger.error('TokenBlacklistService: Error getting MongoDB stats:', error);
         }
       }
-      
+
       if (this.inMemoryStore) {
         stats.backend = 'in-memory';
         stats.count = this.inMemoryStore.size;
         return stats;
       }
-      
+
       return stats;
     } catch (error) {
       logger.error('TokenBlacklistService: Error getting stats:', error);

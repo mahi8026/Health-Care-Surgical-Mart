@@ -3,38 +3,38 @@
  * Catches and formats all errors in the application
  */
 
-const { logger } = require("../config/logging");
-const { AppError } = require("../utils/errors");
+const { logger } = require('../config/logging');
+const { AppError } = require('../utils/errors');
 
 /**
  * Error handler middleware
  */
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res, _next) => {
   // Log error
-  logger.error("Error occurred:", {
+  logger.error('Error occurred:', {
     message: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
     ip: req.ip,
-    user: req.user?._id || "unauthenticated",
+    user: req.user?._id || 'unauthenticated',
   });
 
   // Default error values
   let statusCode = err.statusCode || 500;
-  let message = err.message || "Internal server error";
+  let message = err.message || 'Internal server error';
   let errors = err.errors || undefined;
 
   // Handle specific error types
-  if (err.name === "ValidationError" && err.errors) {
+  if (err.name === 'ValidationError' && err.errors) {
     // Mongoose validation error
     statusCode = 422;
-    message = "Validation failed";
+    message = 'Validation failed';
     errors = Object.values(err.errors).map((e) => ({
       field: e.path,
       message: e.message,
     }));
-  } else if (err.name === "CastError") {
+  } else if (err.name === 'CastError') {
     // MongoDB cast error (invalid ObjectId)
     statusCode = 400;
     message = `Invalid ${err.path}: ${err.value}`;
@@ -43,15 +43,15 @@ const errorHandler = (err, req, res, next) => {
     statusCode = 409;
     const field = Object.keys(err.keyPattern)[0];
     message = `Duplicate value for field: ${field}`;
-  } else if (err.name === "JsonWebTokenError") {
+  } else if (err.name === 'JsonWebTokenError') {
     // JWT error
     statusCode = 401;
-    message = "Invalid token";
-  } else if (err.name === "TokenExpiredError") {
+    message = 'Invalid token';
+  } else if (err.name === 'TokenExpiredError') {
     // JWT expired
     statusCode = 401;
-    message = "Token expired";
-  } else if (err.name === "MulterError") {
+    message = 'Token expired';
+  } else if (err.name === 'MulterError') {
     // File upload error
     statusCode = 400;
     message = `File upload error: ${err.message}`;
@@ -71,13 +71,13 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Add stack trace in development
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === 'development') {
     errorResponse.stack = err.stack;
     errorResponse.error = err;
   }
 
   // Add request info in development
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === 'development') {
     errorResponse.request = {
       method: req.method,
       path: req.path,

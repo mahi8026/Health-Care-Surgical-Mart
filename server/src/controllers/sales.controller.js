@@ -3,11 +3,11 @@
  * Handles business logic for sales/POS operations
  */
 
-const { ObjectId } = require("mongodb");
-const { logger } = require("../config/logging");
-const EmailService = require("../services/email/email.service");
-const { cacheService } = require("../services/cache.service");
-const { client: getMongoClient } = require("../config/database");
+const { ObjectId } = require('mongodb');
+const { logger } = require('../config/logging');
+const EmailService = require('../services/email/email.service');
+const { cacheService } = require('../services/cache.service');
+const { client: getMongoClient } = require('../config/database');
 
 class SalesController {
   /**
@@ -16,7 +16,7 @@ class SalesController {
   async createSale(req, res) {
     try {
       const {
-        invoiceNumber,
+        invoiceNumber: _invoiceNumber, // Auto-generated, not used from input
         customer,
         customerType,
         items,
@@ -26,38 +26,38 @@ class SalesController {
         grandTotal,
         cashPaid,
         bankPaid,
-        saleType,
+        saleType: _saleType, // Reserved for future use
         vatPercent,
         notes,
       } = req.body;
 
       // Validate required fields
       if (!items || items.length === 0) {
-        return res.status(400).json({ success: false, message: "Sale must have at least one item" });
+        return res.status(400).json({ success: false, message: 'Sale must have at least one item' });
       }
       if (!grandTotal || grandTotal <= 0) {
-        return res.status(400).json({ success: false, message: "Invalid sale amount" });
+        return res.status(400).json({ success: false, message: 'Invalid sale amount' });
       }
       if (!req.user || !req.user._id) {
-        return res.status(401).json({ success: false, message: "User authentication required" });
+        return res.status(401).json({ success: false, message: 'User authentication required' });
       }
 
-      // ── Credit sale validation ────────────────────────────────────────────
-      const paymentMethod = req.body.paymentMethod || "cash";
-      if (paymentMethod === "credit") {
+      // -- Credit sale validation --------------------------------------------
+      const paymentMethod = req.body.paymentMethod || 'cash';
+      if (paymentMethod === 'credit') {
         if (!customer || !customer.id) {
           return res.status(400).json({
             success: false,
-            message: "A customer must be selected for credit sales",
+            message: 'A customer must be selected for credit sales',
           });
         }
 
         const creditCustomer = await req.shopDb
-          .collection("customers")
+          .collection('customers')
           .findOne({ _id: new ObjectId(customer.id) });
 
         if (!creditCustomer) {
-          return res.status(404).json({ success: false, message: "Customer not found" });
+          return res.status(404).json({ success: false, message: 'Customer not found' });
         }
         if (!creditCustomer.creditEnabled) {
           return res.status(400).json({
@@ -74,7 +74,7 @@ class SalesController {
           const available = Math.max(0, creditLimit - currentDue);
           return res.status(400).json({
             success: false,
-            message: `Credit limit exceeded. Available credit: ৳${available.toFixed(2)} (Limit: ৳${creditLimit.toFixed(2)}, Current due: ৳${currentDue.toFixed(2)})`,
+            message: `Credit limit exceeded. Available credit: ?${available.toFixed(2)} (Limit: ?${creditLimit.toFixed(2)}, Current due: ?${currentDue.toFixed(2)})`,
           });
         }
       }
@@ -83,14 +83,14 @@ class SalesController {
       const invoiceNumberService = require('../services/invoice-number.service');
       const invoiceNo = await invoiceNumberService.generateInvoiceNumber(req.user.shopId);
 
-      // Enrich items with product details (outside transaction — read-only)
+      // Enrich items with product details (outside transaction � read-only)
       const enrichedItems = await this._enrichSaleItems(req.shopDb, items);
 
       // Fetch customer's previous due balance before this sale
       let previousDue = 0;
       if (customer?.id) {
         try {
-          const customerDoc = await req.shopDb.collection("customers").findOne(
+          const customerDoc = await req.shopDb.collection('customers').findOne(
             { _id: new ObjectId(customer.id) }
           );
           previousDue = customerDoc?.currentDue || 0;
@@ -110,14 +110,14 @@ class SalesController {
         grandTotal,
         cashPaid,
         bankPaid,
-        paymentMethod: req.body.paymentMethod || "cash",
+        paymentMethod: req.body.paymentMethod || 'cash',
         dueAmount: req.body.dueAmount,
         previousDue,
         notes,
         user: req.user,
       });
 
-      // ── Transactional writes ──────────────────────────────────────────────
+      // -- Transactional writes ----------------------------------------------
       let insertedId;
       const mongoClient = getMongoClient();
 
@@ -126,7 +126,7 @@ class SalesController {
         try {
           await session.withTransaction(async () => {
             // 1. Insert sale
-            const result = await req.shopDb.collection("sales").insertOne(sale, { session });
+            const result = await req.shopDb.collection('sales').insertOne(sale, { session });
             insertedId = result.insertedId;
 
             // 2. Update stock quantities
@@ -145,16 +145,16 @@ class SalesController {
             }
           });
         } catch (txError) {
-          // Replica-set not available — fall back to non-transactional writes
+          // Replica-set not available � fall back to non-transactional writes
           if (
-            txError.message?.includes("Transaction numbers are only allowed on a replica set") ||
-            txError.codeName === "IllegalOperation"
+            txError.message?.includes('Transaction numbers are only allowed on a replica set') ||
+            txError.codeName === 'IllegalOperation'
           ) {
             logger.warn(
-              "MongoDB transactions not supported (standalone node) — falling back to non-transactional writes",
+              'MongoDB transactions not supported (standalone node) � falling back to non-transactional writes',
               { error: txError.message },
             );
-            const result = await req.shopDb.collection("sales").insertOne(sale);
+            const result = await req.shopDb.collection('sales').insertOne(sale);
             insertedId = result.insertedId;
             await this._updateStockForSale(req.shopDb, enrichedItems, null, insertedId, req.user._id, req.user.shopId);
             if (customer?.id) {
@@ -169,9 +169,9 @@ class SalesController {
           await session.endSession();
         }
       } else {
-        // Client not yet available (e.g. test environment) — non-transactional
-        logger.warn("MongoDB client unavailable — using non-transactional sale insert");
-        const result = await req.shopDb.collection("sales").insertOne(sale);
+        // Client not yet available (e.g. test environment) � non-transactional
+        logger.warn('MongoDB client unavailable � using non-transactional sale insert');
+        const result = await req.shopDb.collection('sales').insertOne(sale);
         insertedId = result.insertedId;
         await this._updateStockForSale(req.shopDb, enrichedItems, null, insertedId, req.user._id, req.user.shopId);
         if (customer?.id) {
@@ -184,27 +184,27 @@ class SalesController {
       // Send notification (async, don't wait) - wrapped in try-catch
       setImmediate(() => {
         this._sendSaleNotification(req.shopDb, sale, customer).catch((err) =>
-          logger.error("Notification error:", err),
+          logger.error('Notification error:', err),
         );
       });
 
       // Audit: sale created (fire-and-forget)
       try {
-        const auditLog = require("../services/audit-log.service");
-        const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
-        auditLog.log(req, AUDIT_ACTIONS.SALE_CREATED, "sale", insertedId.toString(),
-          `Created sale ${sale.invoiceNo} — total ৳${sale.grandTotal}`,
+        const auditLog = require('../services/audit-log.service');
+        const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
+        auditLog.log(req, AUDIT_ACTIONS.SALE_CREATED, 'sale', insertedId.toString(),
+          `Created sale ${sale.invoiceNo} � total ?${sale.grandTotal}`,
           { after: { invoiceNo: sale.invoiceNo, grandTotal: sale.grandTotal, itemCount: enrichedItems.length } }
         );
       } catch (_) { /* never block the response */ }
 
       // Invalidate financial reports cache (sale affects P&L, daily-summary, cash-flow)
-      cacheService.invalidateShopCache(req.user.shopId, "reports");
+      cacheService.invalidateShopCache(req.user.shopId, 'reports');
 
       // Send response immediately
       return res.status(201).json({
         success: true,
-        message: "Sale created successfully",
+        message: 'Sale created successfully',
         data: {
           _id: insertedId,
           invoiceNo: sale.invoiceNo,
@@ -216,21 +216,21 @@ class SalesController {
         },
       });
     } catch (error) {
-      logger.error("Create sale error:", error);
+      logger.error('Create sale error:', error);
 
-      // Expired item or business rule violation → 400
-      if (error.message?.startsWith("Cannot sell expired item")) {
+      // Expired item or business rule violation ? 400
+      if (error.message?.startsWith('Cannot sell expired item')) {
         return res.status(400).json({ success: false, message: error.message });
       }
 
       if (error.code === 121) {
-        logger.error("Schema validation failed:", error.errInfo?.details);
+        logger.error('Schema validation failed:', error.errInfo?.details);
       }
 
       return res.status(500).json({
         success: false,
-        message: error.message || "Failed to create sale",
-        error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        message: error.message || 'Failed to create sale',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       });
     }
   }
@@ -259,9 +259,9 @@ class SalesController {
 
       // Run count and data fetch in parallel
       const [total, sales] = await Promise.all([
-        req.shopDb.collection("sales").countDocuments(filter),
+        req.shopDb.collection('sales').countDocuments(filter),
         req.shopDb
-          .collection("sales")
+          .collection('sales')
           .find(filter)
           .sort({ saleDate: -1 })
           .skip(skip)
@@ -284,10 +284,10 @@ class SalesController {
         },
       });
     } catch (error) {
-      logger.error("Get sales error:", error);
+      logger.error('Get sales error:', error);
       res.status(500).json({
         success: false,
-        message: "Failed to fetch sales",
+        message: 'Failed to fetch sales',
       });
     }
   }
@@ -297,14 +297,14 @@ class SalesController {
    */
   async getSaleById(req, res) {
     try {
-      const sale = await req.shopDb.collection("sales").findOne({
+      const sale = await req.shopDb.collection('sales').findOne({
         _id: new ObjectId(req.params.id),
       });
 
       if (!sale) {
         return res.status(404).json({
           success: false,
-          message: "Sale not found",
+          message: 'Sale not found',
         });
       }
 
@@ -313,10 +313,10 @@ class SalesController {
         data: sale,
       });
     } catch (error) {
-      logger.error("Get sale error:", error);
+      logger.error('Get sale error:', error);
       res.status(500).json({
         success: false,
-        message: "Failed to fetch sale",
+        message: 'Failed to fetch sale',
       });
     }
   }
@@ -333,9 +333,9 @@ class SalesController {
       // Handle custom items (no productId)
       if (!item.productId || item.productId === null) {
         if (!item.customName) {
-          throw new Error("Custom items must have a customName");
+          throw new Error('Custom items must have a customName');
         }
-        
+
         enrichedItems.push({
           productId: null,
           customName: item.customName,
@@ -348,7 +348,7 @@ class SalesController {
       }
 
       // Handle regular products
-      const product = await shopDb.collection("products").findOne({
+      const product = await shopDb.collection('products').findOne({
         _id: new ObjectId(item.productId),
       });
 
@@ -357,7 +357,7 @@ class SalesController {
       }
 
       // Check stock availability - WARNING ONLY
-      const stock = await shopDb.collection("stock").findOne({
+      const stock = await shopDb.collection('stock').findOne({
         productId: new ObjectId(item.productId),
       });
 
@@ -370,7 +370,7 @@ class SalesController {
       // Block sale of expired items (only if expiryDate is set)
       const stockExpiry = stock?.expiryDate || product.expiryDate;
       if (stockExpiry && new Date(stockExpiry) < new Date()) {
-        const expiredDate = new Date(stockExpiry).toLocaleDateString("en-BD");
+        const expiredDate = new Date(stockExpiry).toLocaleDateString('en-BD');
         throw new Error(
           `Cannot sell expired item: ${product.name} (expired ${expiredDate})`
         );
@@ -399,7 +399,7 @@ class SalesController {
     paymentMethod, dueAmount, previousDue = 0, notes, user,
   }) {
     const paid = (parseFloat(cashPaid) || 0) + (parseFloat(bankPaid) || 0);
-    const due = paymentMethod === "credit"
+    const due = paymentMethod === 'credit'
       ? parseFloat(grandTotal)
       : Math.max(0, parseFloat(grandTotal) - paid);
 
@@ -414,10 +414,10 @@ class SalesController {
     return {
       invoiceNo,
       customerId: customer?.id ? new ObjectId(customer.id) : null,
-      customerName: customer?.name || "Cash Customer",
+      customerName: customer?.name || 'Cash Customer',
       customerPhone: customer?.phone || customer?.mobile || null,
       customerAddress: customer?.address || null,
-      customerType: customerType || "Walk-in",
+      customerType: customerType || 'Walk-in',
       items: enrichedItems,
       subtotal: parsedSubtotal,
       discountAmount: discountAmount,
@@ -425,18 +425,18 @@ class SalesController {
       vatAmount: parseFloat(vatAmount) || 0,
       vatPercent: parseFloat(vatPercent) || 0,
       grandTotal: parseFloat(grandTotal),
-      cashPaid: paymentMethod === "credit" ? 0 : (parseFloat(cashPaid) || 0),
-      bankPaid: paymentMethod === "credit" ? 0 : (parseFloat(bankPaid) || 0),
-      returnAmount: paymentMethod === "credit" ? 0 : Math.max(0, paid - parseFloat(grandTotal)),
+      cashPaid: paymentMethod === 'credit' ? 0 : (parseFloat(cashPaid) || 0),
+      bankPaid: paymentMethod === 'credit' ? 0 : (parseFloat(bankPaid) || 0),
+      returnAmount: paymentMethod === 'credit' ? 0 : Math.max(0, paid - parseFloat(grandTotal)),
       dueAmount: due,
       previousDue: parseFloat(previousDue) || 0,
       totalOutstanding,
-      paymentMethod: paymentMethod || "cash",
-      paymentStatus: due > 0 ? (paymentMethod === "credit" ? "Credit" : "Partial") : "Paid",
+      paymentMethod: paymentMethod || 'cash',
+      paymentStatus: due > 0 ? (paymentMethod === 'credit' ? 'Credit' : 'Partial') : 'Paid',
       saleDate: new Date(),
       createdBy: new ObjectId(user._id),
       createdByName: user.name,
-      notes: notes || "",
+      notes: notes || '',
       createdAt: new Date(),
     };
   }
@@ -451,19 +451,19 @@ class SalesController {
         $set: { lastPurchaseDate: new Date(), updatedAt: new Date() },
       };
       // Add to currentDue for credit sales OR partial payments
-      if (paymentMethod === "credit") {
+      if (paymentMethod === 'credit') {
         update.$inc.currentDue = saleTotal;
       } else if (dueAmount > 0) {
         update.$inc.currentDue = dueAmount;
       }
       const options = session ? { session } : {};
-      await shopDb.collection("customers").updateOne(
+      await shopDb.collection('customers').updateOne(
         { _id: new ObjectId(customerId) },
         update,
         options,
       );
     } catch (err) {
-      logger.warn("Failed to update customer totals after sale:", err.message);
+      logger.warn('Failed to update customer totals after sale:', err.message);
     }
   }
 
@@ -536,14 +536,14 @@ class SalesController {
       }
 
       const customerData = await shopDb
-        .collection("customers")
+        .collection('customers')
         .findOne({ _id: new ObjectId(customer._id) });
 
       if (customerData && customerData.email) {
         await EmailService.send({
           to: customerData.email,
           subject: `Order Confirmation - Invoice #${sale.invoiceNo}`,
-          templateName: "order_confirmation",
+          templateName: 'order_confirmation',
           variables: {
             customerName: customerData.name,
             invoiceNo: sale.invoiceNo,
@@ -555,7 +555,7 @@ class SalesController {
       }
     } catch (error) {
       // Don't fail the sale if notification fails
-      logger.error("Failed to send sale notification:", error);
+      logger.error('Failed to send sale notification:', error);
     }
   }
 
@@ -567,8 +567,8 @@ class SalesController {
 
     if (startDate || endDate) {
       filter.saleDate = {};
-      if (startDate) filter.saleDate.$gte = new Date(startDate);
-      if (endDate) filter.saleDate.$lte = new Date(endDate);
+      if (startDate) {filter.saleDate.$gte = new Date(startDate);}
+      if (endDate) {filter.saleDate.$lte = new Date(endDate);}
     }
 
     if (customerId) {

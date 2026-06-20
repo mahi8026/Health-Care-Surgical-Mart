@@ -6,64 +6,64 @@
 const customerSchema = {
   validator: {
     $jsonSchema: {
-      bsonType: "object",
-      required: ["name", "phone", "type"],
+      bsonType: 'object',
+      required: ['name', 'phone', 'type'],
       properties: {
         _id: {
-          bsonType: "objectId",
+          bsonType: 'objectId',
         },
         name: {
-          bsonType: "string",
-          description: "Customer name - required",
+          bsonType: 'string',
+          description: 'Customer name - required',
         },
         phone: {
-          bsonType: "string",
-          pattern: "^[0-9]{10,15}$",
-          description: "Customer phone number - required",
+          bsonType: 'string',
+          pattern: '^[0-9]{10,15}$',
+          description: 'Customer phone number - required',
         },
         email: {
-          bsonType: "string",
-          pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-          description: "Customer email address",
+          bsonType: 'string',
+          pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
+          description: 'Customer email address',
         },
         address: {
-          bsonType: "string",
-          description: "Customer address",
+          bsonType: 'string',
+          description: 'Customer address',
         },
         type: {
-          enum: ["Walk-in", "Hospital/Clinic", "Diagnostic", "Wholesaler"],
-          description: "Customer type - Walk-in, Hospital/Clinic, Diagnostic, or Wholesaler - required",
+          enum: ['Walk-in', 'Hospital/Clinic', 'Diagnostic', 'Wholesaler'],
+          description: 'Customer type - Walk-in, Hospital/Clinic, Diagnostic, or Wholesaler - required',
         },
         creditLimit: {
-          bsonType: "double",
+          bsonType: 'double',
           minimum: 0,
-          description: "Maximum credit allowed (0 = no credit)",
+          description: 'Maximum credit allowed (0 = no credit)',
         },
         currentDue: {
-          bsonType: "double",
+          bsonType: 'double',
           minimum: 0,
-          description: "Current outstanding due balance",
+          description: 'Current outstanding due balance',
         },
         totalPurchased: {
-          bsonType: "double",
+          bsonType: 'double',
           minimum: 0,
-          description: "Lifetime total purchased amount",
+          description: 'Lifetime total purchased amount',
         },
         creditEnabled: {
-          bsonType: "bool",
-          description: "Whether credit sales are allowed for this customer",
+          bsonType: 'bool',
+          description: 'Whether credit sales are allowed for this customer',
         },
         isActive: {
-          bsonType: "bool",
-          description: "Customer active status",
+          bsonType: 'bool',
+          description: 'Customer active status',
         },
         createdAt: {
-          bsonType: "date",
-          description: "Record creation timestamp",
+          bsonType: 'date',
+          description: 'Record creation timestamp',
         },
         updatedAt: {
-          bsonType: "date",
-          description: "Record update timestamp",
+          bsonType: 'date',
+          description: 'Record update timestamp',
         },
       },
     },
@@ -71,16 +71,16 @@ const customerSchema = {
 };
 
 const customerIndexes = [
-  { key: { phone: 1 }, unique: true, name: "phone_unique" },
-  { key: { name: 1 }, name: "name_index" },
-  { key: { type: 1 }, name: "type_index" },
-  { key: { isActive: 1 }, name: "active_status_index" },
-  { key: { currentDue: -1 }, name: "current_due_desc" },
-  { key: { name: "text" }, name: "text_search_index" },
+  { key: { phone: 1 }, unique: true, name: 'phone_unique' },
+  { key: { name: 1 }, name: 'name_index' },
+  { key: { type: 1 }, name: 'type_index' },
+  { key: { isActive: 1 }, name: 'active_status_index' },
+  { key: { currentDue: -1 }, name: 'current_due_desc' },
+  { key: { name: 'text' }, name: 'text_search_index' },
   // Compound indexes for common query patterns
-  { key: { isActive: 1, type: 1 }, name: "active_type_compound" },
-  { key: { currentDue: -1, isActive: 1 }, name: "due_active_compound" },
-  { key: { type: 1, currentDue: -1 }, name: "type_due_compound" },
+  { key: { isActive: 1, type: 1 }, name: 'active_type_compound' },
+  { key: { currentDue: -1, isActive: 1 }, name: 'due_active_compound' },
+  { key: { type: 1, currentDue: -1 }, name: 'type_due_compound' },
 ];
 
 module.exports = { customerSchema, customerIndexes };

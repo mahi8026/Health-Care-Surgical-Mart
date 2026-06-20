@@ -3,18 +3,17 @@
  * CRUD operations for supplier management
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
+const { ObjectId } = require('mongodb');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
-const { logger } = require('../config/logging');
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -290,26 +289,26 @@ router.use(checkShopStatus);
  * Get all suppliers for the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_SUPPLIERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { page = 1, limit = 50, search = "" } = req.query;
+    const { page = 1, limit = 50, search = '' } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const searchQuery = search
       ? {
           $or: [
-            { name: { $regex: search, $options: "i" } },
-            { phone: { $regex: search, $options: "i" } },
-            { email: { $regex: search, $options: "i" } },
-            { company: { $regex: search, $options: "i" } },
+            { name: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { company: { $regex: search, $options: 'i' } },
           ],
         }
       : {};
 
     const suppliers = await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .find(searchQuery)
       .sort({ name: 1 })
       .skip(skip)
@@ -317,7 +316,7 @@ router.get(
       .toArray();
 
     const total = await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .countDocuments(searchQuery);
 
     res.json({
@@ -338,16 +337,16 @@ router.get(
  * Get supplier by ID
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_SUPPLIERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const supplier = await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!supplier) {
-      throw createError.notFound("Supplier not found");
+      throw createError.notFound('Supplier not found');
     }
 
     res.json({
@@ -362,7 +361,7 @@ router.get(
  * Create new supplier
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_SUPPLIER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -370,16 +369,16 @@ router.post(
 
     // Validate required fields
     if (!name || !phone) {
-      throw createError.badRequest("Name and phone are required");
+      throw createError.badRequest('Name and phone are required');
     }
 
     // Check if phone already exists
     const existingSupplier = await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .findOne({ phone });
 
     if (existingSupplier) {
-      throw createError.conflict("Supplier with this phone already exists");
+      throw createError.conflict('Supplier with this phone already exists');
     }
 
     const supplierData = {
@@ -397,11 +396,11 @@ router.post(
       createdBy: req.user.id,
     };
 
-    const result = await shopDb.collection("suppliers").insertOne(supplierData);
+    const result = await shopDb.collection('suppliers').insertOne(supplierData);
 
     res.status(201).json({
       success: true,
-      message: "Supplier created successfully",
+      message: 'Supplier created successfully',
       data: { _id: result.insertedId, ...supplierData },
     });
   }),
@@ -412,7 +411,7 @@ router.post(
  * Update supplier
  */
 router.put(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.EDIT_SUPPLIER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -421,26 +420,26 @@ router.put(
 
     // Validate required fields
     if (!name || !phone) {
-      throw createError.badRequest("Name and phone are required");
+      throw createError.badRequest('Name and phone are required');
     }
 
     // Check if supplier exists
     const existingSupplier = await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!existingSupplier) {
-      throw createError.notFound("Supplier not found");
+      throw createError.notFound('Supplier not found');
     }
 
     // Check if phone is taken by another supplier
-    const phoneCheck = await shopDb.collection("suppliers").findOne({
+    const phoneCheck = await shopDb.collection('suppliers').findOne({
       phone: phone.trim(),
       _id: { $ne: new ObjectId(req.params.id) },
     });
 
     if (phoneCheck) {
-      throw createError.conflict("Phone number is already taken");
+      throw createError.conflict('Phone number is already taken');
     }
 
     const updateData = {
@@ -456,12 +455,12 @@ router.put(
     };
 
     await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
     res.json({
       success: true,
-      message: "Supplier updated successfully",
+      message: 'Supplier updated successfully',
     });
   }),
 );
@@ -471,38 +470,38 @@ router.put(
  * Delete supplier
  */
 router.delete(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.DELETE_SUPPLIER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     // Check if supplier exists
     const supplier = await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!supplier) {
-      throw createError.notFound("Supplier not found");
+      throw createError.notFound('Supplier not found');
     }
 
     // Check if supplier has any purchases
     const purchasesCount = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .countDocuments({ supplierId: req.params.id });
 
     if (purchasesCount > 0) {
       throw createError.conflict(
-        "Cannot delete supplier with existing purchase records",
+        'Cannot delete supplier with existing purchase records',
       );
     }
 
     await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .deleteOne({ _id: new ObjectId(req.params.id) });
 
     res.json({
       success: true,
-      message: "Supplier deleted successfully",
+      message: 'Supplier deleted successfully',
     });
   }),
 );

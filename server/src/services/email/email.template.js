@@ -1,9 +1,9 @@
 // server/src/services/email/email.template.js
-const Handlebars = require("handlebars");
-const fs = require("fs");
-const path = require("path");
+const Handlebars = require('handlebars');
+const fs = require('fs');
+const path = require('path');
 
-const TEMPLATES_DIR = path.join(__dirname, "templates");
+const TEMPLATES_DIR = path.join(__dirname, 'templates');
 
 /**
  * Load an HTML file from the templates directory.
@@ -11,7 +11,7 @@ const TEMPLATES_DIR = path.join(__dirname, "templates");
  * @returns {string}
  */
 function loadHtml(filename) {
-  return fs.readFileSync(path.join(TEMPLATES_DIR, filename), "utf8");
+  return fs.readFileSync(path.join(TEMPLATES_DIR, filename), 'utf8');
 }
 
 class EmailTemplate {
@@ -22,30 +22,30 @@ class EmailTemplate {
   }
 
   loadTemplates() {
-    this.templates.set("order_confirmation", {
-      name: "order_confirmation",
-      subject: "Order Confirmation - #{{orderNo}}",
-      html: loadHtml("order_confirmation.html"),
-      variables: ["customerName", "orderNo", "orderDate", "items", "total"],
+    this.templates.set('order_confirmation', {
+      name: 'order_confirmation',
+      subject: 'Order Confirmation - #{{orderNo}}',
+      html: loadHtml('order_confirmation.html'),
+      variables: ['customerName', 'orderNo', 'orderDate', 'items', 'total'],
     });
 
-    this.templates.set("invoice_email", {
-      name: "invoice_email",
-      subject: "Invoice #{{invoiceNo}} from Healthcare Plus",
-      html: loadHtml("invoice_email.html"),
-      variables: ["customerName", "invoiceNo"],
+    this.templates.set('invoice_email', {
+      name: 'invoice_email',
+      subject: 'Invoice #{{invoiceNo}} from Healthcare Plus',
+      html: loadHtml('invoice_email.html'),
+      variables: ['customerName', 'invoiceNo'],
     });
 
-    this.templates.set("welcome_email", {
-      name: "welcome_email",
-      subject: "Welcome to {{storeName}}!",
-      html: loadHtml("welcome_email.html"),
-      variables: ["customerName", "storeName"],
+    this.templates.set('welcome_email', {
+      name: 'welcome_email',
+      subject: 'Welcome to {{storeName}}!',
+      html: loadHtml('welcome_email.html'),
+      variables: ['customerName', 'storeName'],
     });
 
-    this.templates.set("password_reset", {
-      name: "password_reset",
-      subject: "Reset Your Password",
+    this.templates.set('password_reset', {
+      name: 'password_reset',
+      subject: 'Reset Your Password',
       html: `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
@@ -76,7 +76,7 @@ class EmailTemplate {
   </table>
 </body>
 </html>`,
-      variables: ["customerName", "resetLink", "expiryMinutes"],
+      variables: ['customerName', 'resetLink', 'expiryMinutes'],
     });
   }
 
@@ -115,10 +115,10 @@ class EmailTemplate {
    * @returns {Promise<void>}
    */
   async create(templateData) {
-    const { getShopDatabase } = require("../../config/database");
+    const { getShopDatabase } = require('../../config/database');
     const db = getShopDatabase(templateData.shopId);
 
-    await db.collection("email_templates").insertOne({
+    await db.collection('email_templates').insertOne({
       ...templateData,
       createdAt: new Date(),
     });
@@ -137,11 +137,11 @@ class EmailTemplate {
       isBuiltIn: true,
     }));
 
-    const { getShopDatabase } = require("../../config/database");
+    const { getShopDatabase } = require('../../config/database');
     const db = getShopDatabase(shopId);
 
     const custom = await db
-      .collection("email_templates")
+      .collection('email_templates')
       .find({ shopId })
       .toArray();
 
@@ -156,11 +156,11 @@ class EmailTemplate {
    * @returns {Promise<void>}
    */
   async delete(templateName, shopId) {
-    const { getShopDatabase } = require("../../config/database");
+    const { getShopDatabase } = require('../../config/database');
     const db = getShopDatabase(shopId);
 
     await db
-      .collection("email_templates")
+      .collection('email_templates')
       .deleteOne({ name: templateName, shopId });
   }
 

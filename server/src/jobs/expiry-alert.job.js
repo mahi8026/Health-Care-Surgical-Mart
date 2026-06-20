@@ -1,14 +1,14 @@
 /**
  * Expiry Alert Cron Job
- * 
+ *
  * Runs daily at 8 AM to check for batches expiring soon
  * and sends email alerts to shop owners
- * 
+ *
  * Phase 3: FEFO Batch Tracking
  */
 
 const cron = require('node-cron');
-const { ObjectId } = require('mongodb');
+const { ObjectId: _ObjectId } = require('mongodb');
 const { getShopDatabase, getSharedDatabase } = require('../config/database');
 const EmailService = require('../services/email/email.service');
 const { logger } = require('../config/logging');
@@ -19,23 +19,23 @@ const { logger } = require('../config/logging');
 async function checkExpiryAlerts() {
   try {
     logger.info('Starting expiry alert job...');
-    
+
     // Get all active shops
     const sharedDb = getSharedDatabase();
-    const shops = await sharedDb.collection('shops').find({ 
-      status: 'Active' 
+    const shops = await sharedDb.collection('shops').find({
+      status: 'Active'
     }).toArray();
-    
+
     let totalAlertsProcessed = 0;
-    
+
     for (const shop of shops) {
       try {
         const shopDb = getShopDatabase(shop.shopId);
-        
+
         // Get batches expiring within next 30 days
         const thresholdDate = new Date();
         thresholdDate.setDate(thresholdDate.getDate() + 30);
-        
+
         const batches = await shopDb.collection('stock_batches')
           .aggregate([
             {
@@ -77,27 +77,27 @@ async function checkExpiryAlerts() {
             }
           ])
           .toArray();
-        
+
         if (batches.length === 0) {
           logger.info(`No expiring batches found for shop: ${shop.name} (${shop.shopId})`);
           continue;
         }
-        
+
         // Categorize batches by urgency
         const expired = batches.filter(b => b.daysLeft <= 0);
         const critical = batches.filter(b => b.daysLeft > 0 && b.daysLeft <= 7);
         const warning = batches.filter(b => b.daysLeft > 7 && b.daysLeft <= 30);
-        
+
         logger.info(`Expiry alert for shop ${shop.name} (${shop.shopId}):`, {
           expired: expired.length,
           critical: critical.length,
           warning: warning.length
         });
-        
+
         // Send email alert
         if (shop.ownerEmail || shop.email) {
           const emailTo = shop.ownerEmail || shop.email;
-          
+
           await EmailService.send({
             to: emailTo,
             subject: `⚠️ Stock Expiry Alert - ${shop.name}`,
@@ -115,21 +115,21 @@ async function checkExpiryAlerts() {
               })
             }
           });
-          
+
           totalAlertsProcessed++;
           logger.info(`Expiry alert email sent to ${emailTo} for shop ${shop.name}`);
         } else {
           logger.warn(`No email address found for shop: ${shop.name} (${shop.shopId})`);
         }
-        
+
       } catch (shopError) {
         logger.error(`Error processing expiry alerts for shop ${shop.shopId}:`, shopError);
         // Continue with next shop
       }
     }
-    
+
     logger.info(`Expiry alert job completed. Alerts sent: ${totalAlertsProcessed}`);
-    
+
   } catch (error) {
     logger.error('Expiry alert job failed:', error);
   }
@@ -157,7 +157,7 @@ function formatBatchForEmail(batch) {
 /**
  * Schedule cron job
  * Runs every day at 8:00 AM Bangladesh time (UTC+6)
- * 
+ *
  * Cron format: second minute hour day month weekday
  * '0 8 * * *' = At 8:00 AM every day
  */
@@ -170,7 +170,7 @@ function startExpiryAlertJob() {
     scheduled: true,
     timezone: 'Asia/Dhaka'
   });
-  
+
   logger.info('✅ Expiry alert cron job scheduled (daily at 8:00 AM Bangladesh time)');
 }
 

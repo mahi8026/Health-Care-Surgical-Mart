@@ -9,28 +9,28 @@
  * - Extracts context (shopId, userId, IP) from req automatically
  */
 
-const { logger } = require("../config/logging");
-const { AUDIT_LOG_COLLECTION } = require("../models/audit-log.schema");
+const { logger } = require('../config/logging');
+const { AUDIT_LOG_COLLECTION } = require('../models/audit-log.schema');
 
 // Fields that must never appear in before/after snapshots
 const SENSITIVE_FIELDS = new Set([
-  "password",
-  "passwordHash",
-  "hashedPassword",
-  "token",
-  "refreshToken",
-  "accessToken",
-  "idToken",
-  "firebaseToken",
-  "apiKey",
-  "api_key",
-  "secret",
-  "privateKey",
-  "private_key",
-  "creditCard",
-  "cardNumber",
-  "cvv",
-  "ssn",
+  'password',
+  'passwordHash',
+  'hashedPassword',
+  'token',
+  'refreshToken',
+  'accessToken',
+  'idToken',
+  'firebaseToken',
+  'apiKey',
+  'api_key',
+  'secret',
+  'privateKey',
+  'private_key',
+  'creditCard',
+  'cardNumber',
+  'cvv',
+  'ssn',
 ]);
 
 /**
@@ -39,15 +39,15 @@ const SENSITIVE_FIELDS = new Set([
  * @returns {*} Sanitized clone
  */
 function sanitize(obj) {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj !== "object") return obj;
-  if (Array.isArray(obj)) return obj.map(sanitize);
+  if (obj === null || obj === undefined) {return obj;}
+  if (typeof obj !== 'object') {return obj;}
+  if (Array.isArray(obj)) {return obj.map(sanitize);}
 
   const result = {};
   for (const [key, value] of Object.entries(obj)) {
     if (SENSITIVE_FIELDS.has(key)) {
-      result[key] = "[REDACTED]";
-    } else if (typeof value === "object" && value !== null) {
+      result[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null) {
       result[key] = sanitize(value);
     } else {
       result[key] = value;
@@ -62,12 +62,12 @@ function sanitize(obj) {
  * @returns {string}
  */
 function extractIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
+  const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
     // x-forwarded-for can be a comma-separated list; first is the client
-    return forwarded.split(",")[0].trim();
+    return forwarded.split(',')[0].trim();
   }
-  return req.ip || req.connection?.remoteAddress || "unknown";
+  return req.ip || req.connection?.remoteAddress || 'unknown';
 }
 
 class AuditLogService {
@@ -95,8 +95,8 @@ class AuditLogService {
       this._write(req, action, resource, resourceId, description, options).catch(
         (err) => {
           // Last-resort: log to Winston but never propagate
-          logger.error("AuditLogService: failed to write audit entry", {
-            file: "audit-log.service.js",
+          logger.error('AuditLogService: failed to write audit entry', {
+            file: 'audit-log.service.js',
             action,
             resource,
             error: err.message,
@@ -114,7 +114,7 @@ class AuditLogService {
     const {
       before,
       after,
-      status = "success",
+      status = 'success',
       errorMessage,
       shopId: overrideShopId,
       userId: overrideUserId,
@@ -138,7 +138,7 @@ class AuditLogService {
       resourceId: resourceId ? String(resourceId) : null,
       description,
       ipAddress: extractIp(req),
-      userAgent: req?.headers?.["user-agent"] || null,
+      userAgent: req?.headers?.['user-agent'] || null,
       before: before ? sanitize(before) : null,
       after: after ? sanitize(after) : null,
       status,
@@ -147,7 +147,7 @@ class AuditLogService {
     };
 
     // Write to the system database (not shop-prefixed)
-    const { getSystemDatabase } = require("../config/database");
+    const { getSystemDatabase } = require('../config/database');
     const db = getSystemDatabase();
     await db.collection(AUDIT_LOG_COLLECTION).insertOne(entry);
   }
@@ -180,14 +180,14 @@ class AuditLogService {
     } = filters;
 
     const query = {};
-    if (shopId)    query.shopId = shopId;
-    if (userId)    query.userId = userId;
-    if (action)    query.action = action;
-    if (resource)  query.resource = resource;
+    if (shopId)    {query.shopId = shopId;}
+    if (userId)    {query.userId = userId;}
+    if (action)    {query.action = action;}
+    if (resource)  {query.resource = resource;}
 
     if (startDate || endDate) {
       query.timestamp = {};
-      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (startDate) {query.timestamp.$gte = new Date(startDate);}
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
@@ -198,7 +198,7 @@ class AuditLogService {
     const skip = (Math.max(1, page) - 1) * Math.min(200, Math.max(1, limit));
     const safeLimit = Math.min(200, Math.max(1, limit));
 
-    const { getSystemDatabase } = require("../config/database");
+    const { getSystemDatabase } = require('../config/database');
     const db = getSystemDatabase();
     const col = db.collection(AUDIT_LOG_COLLECTION);
 
@@ -221,8 +221,8 @@ class AuditLogService {
    */
   async ensureIndexes() {
     try {
-      const { auditLogIndexes } = require("../models/audit-log.schema");
-      const { getSystemDatabase } = require("../config/database");
+      const { auditLogIndexes } = require('../models/audit-log.schema');
+      const { getSystemDatabase } = require('../config/database');
       const db = getSystemDatabase();
       const col = db.collection(AUDIT_LOG_COLLECTION);
 
@@ -231,13 +231,13 @@ class AuditLogService {
         await col.createIndex(key, { name, ...options });
       }
 
-      logger.info("Audit log indexes ensured", {
-        file: "audit-log.service.js",
+      logger.info('Audit log indexes ensured', {
+        file: 'audit-log.service.js',
         collection: AUDIT_LOG_COLLECTION,
       });
     } catch (err) {
       // Non-fatal — indexes are a performance optimization
-      logger.warn("AuditLogService: could not ensure indexes", {
+      logger.warn('AuditLogService: could not ensure indexes', {
         error: err.message,
       });
     }

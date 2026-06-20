@@ -1,8 +1,8 @@
 // server/src/services/sms/sms.service.js
-const TwilioAdapter = require("./providers/twilio.adapter");
-const MSG91Adapter = require("./providers/msg91.adapter");
-const { validatePhoneNumber } = require("./sms.validator");
-const { logger } = require("../../config/logging");
+const TwilioAdapter = require('./providers/twilio.adapter');
+const MSG91Adapter = require('./providers/msg91.adapter');
+const { validatePhoneNumber } = require('./sms.validator');
+const { logger } = require('../../config/logging');
 
 class SMSService {
   constructor() {
@@ -10,7 +10,7 @@ class SMSService {
       twilio: new TwilioAdapter(),
       msg91: new MSG91Adapter(),
     };
-    this.defaultProvider = process.env.SMS_DEFAULT_PROVIDER || "twilio";
+    this.defaultProvider = process.env.SMS_DEFAULT_PROVIDER || 'twilio';
 
     // Lazy-loaded to avoid circular dependency issues at startup
     // (SMSQueue and SMSTemplate are created in tasks 2.2 and 2.3)
@@ -20,7 +20,7 @@ class SMSService {
 
   get queue() {
     if (!this._queue) {
-      const SMSQueue = require("./sms.queue");
+      const SMSQueue = require('./sms.queue');
       this._queue = new SMSQueue();
     }
     return this._queue;
@@ -28,7 +28,7 @@ class SMSService {
 
   get template() {
     if (!this._template) {
-      const SMSTemplate = require("./sms.template");
+      const SMSTemplate = require('./sms.template');
       this._template = new SMSTemplate();
     }
     return this._template;
@@ -45,20 +45,20 @@ class SMSService {
     const message = this.template.render(tmpl, variables);
 
     if (!validatePhoneNumber(to)) {
-      throw new Error("Invalid phone number");
+      throw new Error('Invalid phone number');
     }
 
     if (await this.isDND(to)) {
-      logger.info("Number is on DND list, skipping promotional SMS", {
-        file: "sms.service.js",
-        function: "sendTransactionalSMS",
-        phoneNumber: to.substring(0, 5) + "***", // Partial phone for privacy
+      logger.info('Number is on DND list, skipping promotional SMS', {
+        file: 'sms.service.js',
+        function: 'sendTransactionalSMS',
+        phoneNumber: to.substring(0, 5) + '***', // Partial phone for privacy
       });
-      return { success: false, reason: "DND" };
+      return { success: false, reason: 'DND' };
     }
 
     return await this.send(to, message, {
-      type: "transactional",
+      type: 'transactional',
       templateId: tmpl.dltId,
     });
   }
@@ -73,7 +73,7 @@ class SMSService {
     const jobs = recipients.map((to) => ({
       to,
       message,
-      options: { ...options, type: "promotional" },
+      options: { ...options, type: 'promotional' },
     }));
 
     await this.queue.addBulk(jobs);
@@ -94,13 +94,13 @@ class SMSService {
     const message = `Your OTP is ${otp}. Valid for 10 minutes. Do not share with anyone.`;
 
     return await this.send(phoneNumber, message, {
-      type: "transactional",
+      type: 'transactional',
       validityPeriod: 600, // 10 minutes in seconds
     });
   }
 
   /**
-   * Core send method â€” selects provider, dispatches SMS, and logs result.
+   * Core send method — selects provider, dispatches SMS, and logs result.
    * @param {string} to - E.164 phone number
    * @param {string} message - SMS body
    * @param {object} options
@@ -127,7 +127,7 @@ class SMSService {
       status: result.status,
       messageId: result.messageId,
       cost: result.cost,
-      type: options.type || "transactional",
+      type: options.type || 'transactional',
       shopId: options.shopId,
     });
 
@@ -145,7 +145,7 @@ class SMSService {
 
   /**
    * Check whether a number is on the DND (Do Not Disturb) registry.
-   * Stub â€” always returns false until TRAI DND API integration is added.
+   * Stub — always returns false until TRAI DND API integration is added.
    * @param {string} phoneNumber
    * @returns {Promise<boolean>}
    */
@@ -159,10 +159,10 @@ class SMSService {
    * @param {object} data
    */
   async logSMS(data) {
-    const { getShopDatabase } = require("../../config/database");
-    const db = getShopDatabase(data.shopId || "main_store");
+    const { getShopDatabase } = require('../../config/database');
+    const db = getShopDatabase(data.shopId || 'main_store');
 
-    await db.collection("sms_logs").insertOne({
+    await db.collection('sms_logs').insertOne({
       ...data,
       createdAt: new Date(),
     });

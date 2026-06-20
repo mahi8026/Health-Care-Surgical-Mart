@@ -3,22 +3,20 @@
  * Handles system settings, shop configuration, and preferences
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
-const { logger } = require('../config/logging');
-const auditLog = require("../services/audit-log.service");
-const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
-const { cacheResponse } = require("../middleware/cache.middleware");
-const { cacheService, TTL } = require("../services/cache.service");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
+const auditLog = require('../services/audit-log.service');
+const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
+const { cacheResponse } = require('../middleware/cache.middleware');
+const { cacheService, TTL } = require('../services/cache.service');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -288,30 +286,30 @@ router.use(checkShopStatus);
  * Get shop settings
  */
 router.get(
-  "/shop",
+  '/shop',
   requirePermission(PERMISSIONS.VIEW_SETTINGS), // Shop admins can view shop settings
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:shop`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    let shopSettings = await shopDb.collection("settings").findOne({
-      type: "shop",
+    let shopSettings = await shopDb.collection('settings').findOne({
+      type: 'shop',
     });
 
     // If no settings exist, return defaults
     if (!shopSettings) {
       shopSettings = {
-        name: "Health Care Surgical Mart",
-        address: "",
-        phone: "",
-        email: "",
-        website: "",
-        logo: "",
-        description: "",
-        registrationNumber: "",
-        taxNumber: "",
-        currency: "BDT",
-        timezone: "Asia/Dhaka",
+        name: 'Health Care Surgical Mart',
+        address: '',
+        phone: '',
+        email: '',
+        website: '',
+        logo: '',
+        description: '',
+        registrationNumber: '',
+        taxNumber: '',
+        currency: 'BDT',
+        timezone: 'Asia/Dhaka',
       };
     }
 
@@ -327,7 +325,7 @@ router.get(
  * Update shop settings
  */
 router.put(
-  "/shop",
+  '/shop',
   requirePermission(PERMISSIONS.EDIT_SETTINGS), // Shop admins can edit shop settings
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -347,42 +345,42 @@ router.put(
 
     // Validate required fields
     if (!name || !address || !phone) {
-      throw createError.badRequest("Name, address, and phone are required");
+      throw createError.badRequest('Name, address, and phone are required');
     }
 
     const settingsData = {
-      type: "shop",
+      type: 'shop',
       name: name.trim(),
       address: address.trim(),
       phone: phone.trim(),
-      email: email?.trim() || "",
-      website: website?.trim() || "",
-      logo: logo?.trim() || "",
-      description: description?.trim() || "",
-      registrationNumber: registrationNumber?.trim() || "",
-      taxNumber: taxNumber?.trim() || "",
-      currency: currency || "BDT",
-      timezone: timezone || "Asia/Dhaka",
+      email: email?.trim() || '',
+      website: website?.trim() || '',
+      logo: logo?.trim() || '',
+      description: description?.trim() || '',
+      registrationNumber: registrationNumber?.trim() || '',
+      taxNumber: taxNumber?.trim() || '',
+      currency: currency || 'BDT',
+      timezone: timezone || 'Asia/Dhaka',
       updatedAt: new Date(),
       updatedBy: req.user.id,
     };
 
     await shopDb
-      .collection("settings")
-      .updateOne({ type: "shop" }, { $set: settingsData }, { upsert: true });
+      .collection('settings')
+      .updateOne({ type: 'shop' }, { $set: settingsData }, { upsert: true });
 
     // Audit: shop settings updated
-    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "shop",
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, 'settings', 'shop',
       `Updated shop settings for ${req.user.shopId}`,
       { after: { name: settingsData.name, currency: settingsData.currency, timezone: settingsData.timezone } }
     );
 
     // Invalidate settings cache
-    cacheService.invalidateShopCache(req.user.shopId, "settings");
+    cacheService.invalidateShopCache(req.user.shopId, 'settings');
 
     res.json({
       success: true,
-      message: "Shop settings updated successfully",
+      message: 'Shop settings updated successfully',
     });
   }),
 );
@@ -392,14 +390,14 @@ router.put(
  * Get tax settings
  */
 router.get(
-  "/tax",
+  '/tax',
   requirePermission(PERMISSIONS.VIEW_SETTINGS),
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:tax`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    let taxSettings = await shopDb.collection("settings").findOne({
-      type: "tax",
+    let taxSettings = await shopDb.collection('settings').findOne({
+      type: 'tax',
     });
 
     // If no settings exist, return defaults
@@ -407,8 +405,8 @@ router.get(
       taxSettings = {
         defaultTaxRate: 0,
         enableTax: false,
-        taxName: "VAT",
-        taxNumber: "",
+        taxName: 'VAT',
+        taxNumber: '',
         taxInclusive: false,
       };
     }
@@ -425,7 +423,7 @@ router.get(
  * Update tax settings
  */
 router.put(
-  "/tax",
+  '/tax',
   requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -433,32 +431,32 @@ router.put(
       req.body;
 
     const settingsData = {
-      type: "tax",
+      type: 'tax',
       defaultTaxRate: parseFloat(defaultTaxRate) || 0,
       enableTax: Boolean(enableTax),
-      taxName: taxName?.trim() || "VAT",
-      taxNumber: taxNumber?.trim() || "",
+      taxName: taxName?.trim() || 'VAT',
+      taxNumber: taxNumber?.trim() || '',
       taxInclusive: Boolean(taxInclusive),
       updatedAt: new Date(),
       updatedBy: req.user.id,
     };
 
     await shopDb
-      .collection("settings")
-      .updateOne({ type: "tax" }, { $set: settingsData }, { upsert: true });
+      .collection('settings')
+      .updateOne({ type: 'tax' }, { $set: settingsData }, { upsert: true });
 
     // Audit: tax settings updated
-    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "tax",
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, 'settings', 'tax',
       `Updated tax settings for ${req.user.shopId}`,
       { after: { enableTax: settingsData.enableTax, defaultTaxRate: settingsData.defaultTaxRate } }
     );
 
     // Invalidate settings cache
-    cacheService.invalidateShopCache(req.user.shopId, "settings");
+    cacheService.invalidateShopCache(req.user.shopId, 'settings');
 
     res.json({
       success: true,
-      message: "Tax settings updated successfully",
+      message: 'Tax settings updated successfully',
     });
   }),
 );
@@ -468,14 +466,14 @@ router.put(
  * Get system settings
  */
 router.get(
-  "/system",
+  '/system',
   requirePermission(PERMISSIONS.VIEW_SETTINGS),
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:system`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    let systemSettings = await shopDb.collection("settings").findOne({
-      type: "system",
+    let systemSettings = await shopDb.collection('settings').findOne({
+      type: 'system',
     });
 
     // If no settings exist, return defaults
@@ -483,15 +481,15 @@ router.get(
       systemSettings = {
         lowStockThreshold: 10,
         autoBackup: false,
-        backupFrequency: "daily",
+        backupFrequency: 'daily',
         emailNotifications: true,
         smsNotifications: false,
         printReceipts: true,
-        defaultPaymentMethod: "cash",
-        invoicePrefix: "INV",
+        defaultPaymentMethod: 'cash',
+        invoicePrefix: 'INV',
         invoiceStartNumber: 1,
-        dateFormat: "DD/MM/YYYY",
-        timeFormat: "12",
+        dateFormat: 'DD/MM/YYYY',
+        timeFormat: '12',
       };
     }
 
@@ -507,7 +505,7 @@ router.get(
  * Update system settings
  */
 router.put(
-  "/system",
+  '/system',
   requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -526,38 +524,38 @@ router.put(
     } = req.body;
 
     const settingsData = {
-      type: "system",
+      type: 'system',
       lowStockThreshold: parseInt(lowStockThreshold) || 10,
       autoBackup: Boolean(autoBackup),
-      backupFrequency: backupFrequency || "daily",
+      backupFrequency: backupFrequency || 'daily',
       emailNotifications: Boolean(emailNotifications),
       smsNotifications: Boolean(smsNotifications),
       printReceipts: Boolean(printReceipts),
-      defaultPaymentMethod: defaultPaymentMethod || "cash",
-      invoicePrefix: invoicePrefix?.trim() || "INV",
+      defaultPaymentMethod: defaultPaymentMethod || 'cash',
+      invoicePrefix: invoicePrefix?.trim() || 'INV',
       invoiceStartNumber: parseInt(invoiceStartNumber) || 1,
-      dateFormat: dateFormat || "DD/MM/YYYY",
-      timeFormat: timeFormat || "12",
+      dateFormat: dateFormat || 'DD/MM/YYYY',
+      timeFormat: timeFormat || '12',
       updatedAt: new Date(),
       updatedBy: req.user.id,
     };
 
     await shopDb
-      .collection("settings")
-      .updateOne({ type: "system" }, { $set: settingsData }, { upsert: true });
+      .collection('settings')
+      .updateOne({ type: 'system' }, { $set: settingsData }, { upsert: true });
 
     // Audit: system settings updated
-    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "system",
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, 'settings', 'system',
       `Updated system settings for ${req.user.shopId}`,
       { after: { lowStockThreshold: settingsData.lowStockThreshold, defaultPaymentMethod: settingsData.defaultPaymentMethod } }
     );
 
     // Invalidate settings cache
-    cacheService.invalidateShopCache(req.user.shopId, "settings");
+    cacheService.invalidateShopCache(req.user.shopId, 'settings');
 
     res.json({
       success: true,
-      message: "System settings updated successfully",
+      message: 'System settings updated successfully',
     });
   }),
 );
@@ -567,14 +565,14 @@ router.put(
  * Get receipt settings
  */
 router.get(
-  "/receipt",
+  '/receipt',
   requirePermission(PERMISSIONS.VIEW_SETTINGS),
   cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:receipt`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    let receiptSettings = await shopDb.collection("settings").findOne({
-      type: "receipt",
+    let receiptSettings = await shopDb.collection('settings').findOne({
+      type: 'receipt',
     });
 
     // If no settings exist, return defaults
@@ -585,9 +583,9 @@ router.get(
         showPhone: true,
         showEmail: true,
         showWebsite: false,
-        footerText: "Thank you for your business!",
-        headerText: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ",
-        paperSize: "80mm",
+        footerText: 'Thank you for your business!',
+        headerText: 'بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ',
+        paperSize: '80mm',
       };
     }
 
@@ -603,7 +601,7 @@ router.get(
  * Update receipt settings
  */
 router.put(
-  "/receipt",
+  '/receipt',
   requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -619,35 +617,35 @@ router.put(
     } = req.body;
 
     const settingsData = {
-      type: "receipt",
+      type: 'receipt',
       showLogo: Boolean(showLogo),
       showAddress: Boolean(showAddress),
       showPhone: Boolean(showPhone),
       showEmail: Boolean(showEmail),
       showWebsite: Boolean(showWebsite),
-      footerText: footerText?.trim() || "Thank you for your business!",
-      headerText: headerText?.trim() || "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ",
-      paperSize: paperSize || "80mm",
+      footerText: footerText?.trim() || 'Thank you for your business!',
+      headerText: headerText?.trim() || 'بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ',
+      paperSize: paperSize || '80mm',
       updatedAt: new Date(),
       updatedBy: req.user.id,
     };
 
     await shopDb
-      .collection("settings")
-      .updateOne({ type: "receipt" }, { $set: settingsData }, { upsert: true });
+      .collection('settings')
+      .updateOne({ type: 'receipt' }, { $set: settingsData }, { upsert: true });
 
     // Audit: receipt settings updated
-    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "settings", "receipt",
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, 'settings', 'receipt',
       `Updated receipt settings for ${req.user.shopId}`,
       { after: { paperSize: settingsData.paperSize, showLogo: settingsData.showLogo } }
     );
 
     // Invalidate settings cache
-    cacheService.invalidateShopCache(req.user.shopId, "settings");
+    cacheService.invalidateShopCache(req.user.shopId, 'settings');
 
     res.json({
       success: true,
-      message: "Receipt settings updated successfully",
+      message: 'Receipt settings updated successfully',
     });
   }),
 );
@@ -657,7 +655,7 @@ router.put(
  * Test backup functionality
  */
 router.post(
-  "/backup/test",
+  '/backup/test',
   requirePermission(PERMISSIONS.EDIT_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -666,27 +664,27 @@ router.post(
     const backupData = {
       shopId: req.user.shopId,
       timestamp: new Date(),
-      type: "manual",
-      status: "completed",
-      size: "2.5 MB", // Simulated size
+      type: 'manual',
+      status: 'completed',
+      size: '2.5 MB', // Simulated size
       collections: [
-        "products",
-        "customers",
-        "sales",
-        "purchases",
-        "stock",
-        "users",
-        "settings",
+        'products',
+        'customers',
+        'sales',
+        'purchases',
+        'stock',
+        'users',
+        'settings',
       ],
       createdBy: req.user.id,
     };
 
     // Log backup in history
-    await shopDb.collection("backup_history").insertOne(backupData);
+    await shopDb.collection('backup_history').insertOne(backupData);
 
     res.json({
       success: true,
-      message: "Backup completed successfully",
+      message: 'Backup completed successfully',
       data: backupData,
     });
   }),
@@ -697,13 +695,13 @@ router.post(
  * Get backup history
  */
 router.get(
-  "/backup/history",
+  '/backup/history',
   requirePermission(PERMISSIONS.VIEW_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     const backupHistory = await shopDb
-      .collection("backup_history")
+      .collection('backup_history')
       .find({})
       .sort({ timestamp: -1 })
       .limit(20)
@@ -721,7 +719,7 @@ router.get(
  * Get system information
  */
 router.get(
-  "/system-info",
+  '/system-info',
   requirePermission(PERMISSIONS.VIEW_SETTINGS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -734,15 +732,15 @@ router.get(
       purchasesCount,
       usersCount,
     ] = await Promise.all([
-      shopDb.collection("products").countDocuments({ isActive: true }),
-      shopDb.collection("customers").countDocuments({}),
-      shopDb.collection("sales").countDocuments({}),
-      shopDb.collection("purchases").countDocuments({}),
-      shopDb.collection("users").countDocuments({ isActive: true }),
+      shopDb.collection('products').countDocuments({ isActive: true }),
+      shopDb.collection('customers').countDocuments({}),
+      shopDb.collection('sales').countDocuments({}),
+      shopDb.collection('purchases').countDocuments({}),
+      shopDb.collection('users').countDocuments({ isActive: true }),
     ]);
 
     const systemInfo = {
-      version: "2.0.0",
+      version: '2.0.0',
       shopId: req.user.shopId,
       database: {
         products: productsCount,

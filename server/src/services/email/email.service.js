@@ -1,7 +1,7 @@
 // server/src/services/email/email.service.js
-const SendGridAdapter = require("./providers/sendgrid.adapter");
-const MailchimpAdapter = require("./providers/mailchimp.adapter");
-const { validateEmail } = require("./email.validator");
+const SendGridAdapter = require('./providers/sendgrid.adapter');
+const MailchimpAdapter = require('./providers/mailchimp.adapter');
+const { validateEmail } = require('./email.validator');
 
 class EmailService {
   constructor() {
@@ -16,7 +16,7 @@ class EmailService {
 
   get queue() {
     if (!this._queue) {
-      const EmailQueue = require("./email.queue");
+      const EmailQueue = require('./email.queue');
       this._queue = new EmailQueue();
     }
     return this._queue;
@@ -25,7 +25,7 @@ class EmailService {
   get template() {
     if (!this._template) {
       // Lazy require to avoid circular deps (task 2.5)
-      const EmailTemplate = require("./email.template");
+      const EmailTemplate = require('./email.template');
       this._template = new EmailTemplate();
     }
     return this._template;
@@ -39,7 +39,7 @@ class EmailService {
    */
   async sendTransactionalEmail(to, templateName, variables) {
     if (!this.validateEmail(to)) {
-      throw new Error("Invalid email address");
+      throw new Error('Invalid email address');
     }
 
     const tmpl = await this.template.get(templateName);
@@ -54,8 +54,8 @@ class EmailService {
       recipient: to,
       subject,
       templateName,
-      provider: "sendgrid",
-      type: "transactional",
+      provider: 'sendgrid',
+      type: 'transactional',
       status: result.status,
       messageId: result.messageId,
       shopId: variables.shopId,
@@ -72,7 +72,7 @@ class EmailService {
   async sendOrderConfirmation(order, customer) {
     return await this.sendTransactionalEmail(
       customer.email,
-      "order_confirmation",
+      'order_confirmation',
       {
         customerName: customer.name,
         orderNo: order.invoiceNo,
@@ -95,13 +95,13 @@ class EmailService {
    * @returns {Promise<{ invoiceUrl: string, emailSent: boolean, messageId?: string }>}
    */
   async sendInvoice(sale, customer, options = {}) {
-    const shopId = options.shopId || sale.shopId || "main_store";
+    const shopId = options.shopId || sale.shopId || 'main_store';
 
     // 1. Generate PDF buffer
     const pdfBuffer = await this.generateInvoicePDF(sale);
 
     // 2. Upload PDF to GCS / local storage
-    const { uploadInvoicePDF } = require("../file-upload.service");
+    const { uploadInvoicePDF } = require('../file-upload.service');
     const { url: invoiceUrl, storage } = await uploadInvoicePDF(
       pdfBuffer,
       shopId,
@@ -109,17 +109,17 @@ class EmailService {
     );
 
     // 3. Fetch shop details for branding
-    let shopName = "Health Care Surgical Mart";
-    let shopPhone = "";
-    let shopAddress = "";
+    let shopName = 'Health Care Surgical Mart';
+    let shopPhone = '';
+    let shopAddress = '';
     try {
-      const { getSystemDatabase } = require("../../config/database");
+      const { getSystemDatabase } = require('../../config/database');
       const systemDb = getSystemDatabase();
-      const shop = await systemDb.collection("shops").findOne({ shopId });
+      const shop = await systemDb.collection('shops').findOne({ shopId });
       if (shop) {
         shopName = shop.shopName || shop.name || shopName;
-        shopPhone = shop.phone || "";
-        shopAddress = shop.address || "";
+        shopPhone = shop.phone || '';
+        shopAddress = shop.address || '';
       }
     } catch (_) {
       // Non-fatal — use defaults
@@ -131,9 +131,9 @@ class EmailService {
 
     if (customer?.email) {
       const { subject, html } = this.template.render(
-        await this.template.get("invoice_email"),
+        await this.template.get('invoice_email'),
         {
-          customerName: customer.name || "Valued Customer",
+          customerName: customer.name || 'Valued Customer',
           invoiceNo: sale.invoiceNo,
           invoiceDate: new Date(sale.saleDate || Date.now()).toLocaleDateString(),
           totalAmount: `৳${(sale.grandTotal || 0).toFixed(2)}`,
@@ -151,9 +151,9 @@ class EmailService {
       await this.logEmail({
         recipient: customer.email,
         subject,
-        templateName: "invoice_email",
-        provider: "sendgrid",
-        type: "transactional",
+        templateName: 'invoice_email',
+        provider: 'sendgrid',
+        type: 'transactional',
         status: result.status,
         messageId: result.messageId,
         shopId,
@@ -161,7 +161,7 @@ class EmailService {
         storage,
       });
 
-      emailSent = result.status === "sent" || result.status === "queued";
+      emailSent = result.status === 'sent' || result.status === 'queued';
       messageId = result.messageId;
     }
 
@@ -203,13 +203,13 @@ class EmailService {
    * @param {string} shopId
    */
   async syncCustomersToMailchimp(shopId) {
-    const { getShopDatabase } = require("../../config/database");
+    const { getShopDatabase } = require('../../config/database');
     const db = getShopDatabase(shopId);
 
     const customers = await db
-      .collection("customers")
+      .collection('customers')
       .find({
-        email: { $exists: true, $ne: "" },
+        email: { $exists: true, $ne: '' },
         emailOptIn: true,
       })
       .toArray();
@@ -222,10 +222,10 @@ class EmailService {
    * @param {object} data
    */
   async logEmail(data) {
-    const { getShopDatabase } = require("../../config/database");
-    const db = getShopDatabase(data.shopId || "main_store");
+    const { getShopDatabase } = require('../../config/database');
+    const db = getShopDatabase(data.shopId || 'main_store');
 
-    await db.collection("email_logs").insertOne({
+    await db.collection('email_logs').insertOne({
       ...data,
       createdAt: new Date(),
     });
@@ -270,8 +270,8 @@ class EmailService {
 
       // ── Header ──────────────────────────────────────────────────────────
       doc.fontSize(18).font('Helvetica-Bold').text(shopName, { align: 'center' });
-      if (shop?.address) doc.fontSize(9).font('Helvetica').text(shop.address, { align: 'center' });
-      if (shop?.phone)   doc.fontSize(9).text(`Phone: ${shop.phone}`, { align: 'center' });
+      if (shop?.address) {doc.fontSize(9).font('Helvetica').text(shop.address, { align: 'center' });}
+      if (shop?.phone)   {doc.fontSize(9).text(`Phone: ${shop.phone}`, { align: 'center' });}
       doc.moveDown(0.5);
       doc.moveTo(40, doc.y).lineTo(555, doc.y).lineWidth(1.5).stroke();
       doc.moveDown(0.5);
@@ -284,8 +284,8 @@ class EmailService {
       const infoTop = doc.y;
       doc.fontSize(9).font('Helvetica-Bold').text('Bill To:', 40, infoTop);
       doc.font('Helvetica').text(sale.customerName || 'Cash Customer', 40, infoTop + 14);
-      if (sale.customerPhone) doc.text(`Phone: ${sale.customerPhone}`, 40, infoTop + 26);
-      if (sale.customerAddress) doc.text(sale.customerAddress, 40, infoTop + 38);
+      if (sale.customerPhone) {doc.text(`Phone: ${sale.customerPhone}`, 40, infoTop + 26);}
+      if (sale.customerAddress) {doc.text(sale.customerAddress, 40, infoTop + 38);}
 
       doc.font('Helvetica-Bold').text('Invoice No:', 380, infoTop);
       doc.font('Helvetica').text(sale.invoiceNo || 'N/A', 460, infoTop);
@@ -328,7 +328,7 @@ class EmailService {
         const total = item.total ?? (qty * rate);
         const name  = item.name || item.productName || 'Item';
 
-        if (i % 2 === 1) doc.rect(40, y, 515, rowH).fill('#f8fafc').stroke('#e2e8f0');
+        if (i % 2 === 1) {doc.rect(40, y, 515, rowH).fill('#f8fafc').stroke('#e2e8f0');}
         doc.fillColor('black');
         doc.text(String(i + 1),                col.sl,   y + 4, { width: 20 });
         doc.text(name,                          col.name, y + 4, { width: 270 });
@@ -355,9 +355,9 @@ class EmailService {
 
       addRow('Subtotal:',  `${currency}${Number(sale.subtotal || 0).toFixed(2)}`);
       if ((sale.discountAmount || 0) > 0)
-        addRow('Discount:', `-${currency}${Number(sale.discountAmount).toFixed(2)}`);
+        {addRow('Discount:', `-${currency}${Number(sale.discountAmount).toFixed(2)}`);}
       if ((sale.vatAmount || 0) > 0)
-        addRow(`VAT (${sale.vatPercent || 0}%):`, `${currency}${Number(sale.vatAmount).toFixed(2)}`);
+        {addRow(`VAT (${sale.vatPercent || 0}%):`, `${currency}${Number(sale.vatAmount).toFixed(2)}`);}
 
       doc.moveTo(totalsX, y).lineTo(555, y).lineWidth(0.5).stroke();
       y += 4;

@@ -6,11 +6,11 @@
  * Authentication: Twilio request signature validation
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const twilio = require("twilio");
-const { getShopDatabase } = require("../../config/database");
-const { logger } = require("../../config/logging");
+const twilio = require('twilio');
+const { getShopDatabase } = require('../../config/database');
+const { logger } = require('../../config/logging');
 
 /**
  * Validate Twilio webhook signature
@@ -20,18 +20,18 @@ const { logger } = require("../../config/logging");
 function validateTwilioSignature(req) {
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   if (!authToken) {
-    logger.warn("TWILIO_AUTH_TOKEN not configured");
+    logger.warn('TWILIO_AUTH_TOKEN not configured');
     return false;
   }
 
-  const twilioSignature = req.headers["x-twilio-signature"];
+  const twilioSignature = req.headers['x-twilio-signature'];
   if (!twilioSignature) {
     return false;
   }
 
   // Build the full URL that Twilio signed
-  const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
   const url = `${protocol}://${host}${req.originalUrl}`;
 
   return twilio.validateRequest(authToken, twilioSignature, url, req.body);
@@ -44,13 +44,13 @@ function validateTwilioSignature(req) {
  */
 function mapTwilioStatus(messageStatus) {
   const statusMap = {
-    delivered: "delivered",
-    failed: "failed",
-    undelivered: "failed",
-    sent: "sent",
-    queued: "queued",
-    sending: "sending",
-    canceled: "cancelled",
+    delivered: 'delivered',
+    failed: 'failed',
+    undelivered: 'failed',
+    sent: 'sent',
+    queued: 'queued',
+    sending: 'sending',
+    canceled: 'cancelled',
   };
   return statusMap[messageStatus] || messageStatus;
 }
@@ -60,13 +60,13 @@ function mapTwilioStatus(messageStatus) {
  * Receives Twilio status callback (application/x-www-form-urlencoded)
  */
 router.post(
-  "/",
+  '/',
   express.urlencoded({ extended: false }),
   async (req, res) => {
     // Validate Twilio signature
     if (!validateTwilioSignature(req)) {
-      logger.warn("Twilio webhook: invalid signature");
-      return res.status(403).send("Forbidden");
+      logger.warn('Twilio webhook: invalid signature');
+      return res.status(403).send('Forbidden');
     }
 
     const {
@@ -79,11 +79,11 @@ router.post(
     } = req.body;
 
     if (!MessageSid || !MessageStatus) {
-      return res.status(400).send("Missing required fields");
+      return res.status(400).send('Missing required fields');
     }
 
     try {
-      const db = getShopDatabase("main_store");
+      const db = getShopDatabase('main_store');
       const status = mapTwilioStatus(MessageStatus);
 
       const updateFields = {
@@ -91,7 +91,7 @@ router.post(
         updatedAt: new Date(),
       };
 
-      if (MessageStatus === "delivered") {
+      if (MessageStatus === 'delivered') {
         updateFields.deliveredAt = new Date();
       }
 
@@ -101,7 +101,7 @@ router.post(
       }
 
       await db
-        .collection("sms_logs")
+        .collection('sms_logs')
         .updateOne({ messageId: MessageSid }, { $set: updateFields });
 
       logger.info(
@@ -109,11 +109,11 @@ router.post(
       );
 
       // Twilio expects a 200 with empty TwiML or plain response
-      res.status(200).send("");
+      res.status(200).send('');
     } catch (err) {
-      logger.error("Twilio webhook: processing error", err.message);
+      logger.error('Twilio webhook: processing error', err.message);
       // Return 200 to avoid Twilio retrying on internal errors
-      res.status(200).send("");
+      res.status(200).send('');
     }
   },
 );

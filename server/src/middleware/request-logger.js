@@ -3,7 +3,7 @@
  * Logs all incoming requests with details
  */
 
-const { logger } = require("../config/logging");
+const { logger } = require('../config/logging');
 
 /**
  * Log incoming requests
@@ -12,26 +12,26 @@ const requestLogger = (req, res, next) => {
   const startTime = Date.now();
 
   // Log request
-  logger.info("Incoming request", {
+  logger.info('Incoming request', {
     method: req.method,
     path: req.path,
     query: req.query,
     ip: req.ip,
-    userAgent: req.get("user-agent"),
-    user: req.user?._id || "unauthenticated",
+    userAgent: req.get('user-agent'),
+    user: req.user?._id || 'unauthenticated',
   });
 
   // Log response when finished
-  res.on("finish", () => {
+  res.on('finish', () => {
     const duration = Date.now() - startTime;
-    const logLevel = res.statusCode >= 400 ? "warn" : "info";
+    const logLevel = res.statusCode >= 400 ? 'warn' : 'info';
 
-    logger[logLevel]("Request completed", {
+    logger[logLevel]('Request completed', {
       method: req.method,
       path: req.path,
       statusCode: res.statusCode,
       duration: `${duration}ms`,
-      user: req.user?._id || "unauthenticated",
+      user: req.user?._id || 'unauthenticated',
     });
   });
 
@@ -42,13 +42,13 @@ const requestLogger = (req, res, next) => {
  * Log only errors (lighter logging)
  */
 const errorOnlyLogger = (req, res, next) => {
-  res.on("finish", () => {
+  res.on('finish', () => {
     if (res.statusCode >= 400) {
-      logger.warn("Request failed", {
+      logger.warn('Request failed', {
         method: req.method,
         path: req.path,
         statusCode: res.statusCode,
-        user: req.user?._id || "unauthenticated",
+        user: req.user?._id || 'unauthenticated',
       });
     }
   });

@@ -1,18 +1,18 @@
 // server/src/services/sms/providers/msg91.adapter.js
-const axios = require("axios");
-const { logger } = require("../../../config/logging");
+const axios = require('axios');
+const { logger } = require('../../../config/logging');
 
 class MSG91Adapter {
   constructor() {
     this.apiKey = process.env.MSG91_API_KEY;
     this.senderId = process.env.MSG91_SENDER_ID;
-    this.baseURL = "https://api.msg91.com/api";
-    
+    this.baseURL = 'https://api.msg91.com/api';
+
     if (!this.apiKey || !this.senderId) {
-      logger.warn("MSG91 SMS provider not configured", {
-        file: "msg91.adapter.js",
-        function: "constructor",
-        message: "Please set MSG91_API_KEY and MSG91_SENDER_ID in .env",
+      logger.warn('MSG91 SMS provider not configured', {
+        file: 'msg91.adapter.js',
+        function: 'constructor',
+        message: 'Please set MSG91_API_KEY and MSG91_SENDER_ID in .env',
       });
     }
   }
@@ -21,8 +21,8 @@ class MSG91Adapter {
     if (!this.apiKey || !this.senderId) {
       return {
         success: false,
-        error: "MSG91 SMS provider is not configured. Please set MSG91_API_KEY and MSG91_SENDER_ID in your environment variables.",
-        provider: "msg91",
+        error: 'MSG91 SMS provider is not configured. Please set MSG91_API_KEY and MSG91_SENDER_ID in your environment variables.',
+        provider: 'msg91',
       };
     }
 
@@ -32,23 +32,23 @@ class MSG91Adapter {
         mobiles: to,
         message: message,
         sender: this.senderId,
-        route: options.route || "4", // Transactional
-        country: options.country || "91",
+        route: options.route || '4', // Transactional
+        country: options.country || '91',
         DLT_TE_ID: options.templateId, // DLT template ID (India)
       });
 
       return {
         success: true,
         messageId: response.data.message_id,
-        status: "queued",
-        provider: "msg91",
+        status: 'queued',
+        provider: 'msg91',
         cost: this.calculateCost(message),
       };
     } catch (error) {
       return {
         success: false,
         error: error.message,
-        provider: "msg91",
+        provider: 'msg91',
       };
     }
   }

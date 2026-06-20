@@ -20,9 +20,9 @@ class AppError extends Error {
  * 400 Bad Request
  */
 class BadRequestError extends AppError {
-  constructor(message = "Bad Request") {
+  constructor(message = 'Bad Request') {
     super(message, 400);
-    this.name = "BadRequestError";
+    this.name = 'BadRequestError';
   }
 }
 
@@ -30,9 +30,9 @@ class BadRequestError extends AppError {
  * 401 Unauthorized
  */
 class UnauthorizedError extends AppError {
-  constructor(message = "Unauthorized") {
+  constructor(message = 'Unauthorized') {
     super(message, 401);
-    this.name = "UnauthorizedError";
+    this.name = 'UnauthorizedError';
   }
 }
 
@@ -40,9 +40,9 @@ class UnauthorizedError extends AppError {
  * 403 Forbidden
  */
 class ForbiddenError extends AppError {
-  constructor(message = "Forbidden") {
+  constructor(message = 'Forbidden') {
     super(message, 403);
-    this.name = "ForbiddenError";
+    this.name = 'ForbiddenError';
   }
 }
 
@@ -50,9 +50,9 @@ class ForbiddenError extends AppError {
  * 404 Not Found
  */
 class NotFoundError extends AppError {
-  constructor(message = "Resource not found") {
+  constructor(message = 'Resource not found') {
     super(message, 404);
-    this.name = "NotFoundError";
+    this.name = 'NotFoundError';
   }
 }
 
@@ -60,9 +60,9 @@ class NotFoundError extends AppError {
  * 409 Conflict
  */
 class ConflictError extends AppError {
-  constructor(message = "Resource conflict") {
+  constructor(message = 'Resource conflict') {
     super(message, 409);
-    this.name = "ConflictError";
+    this.name = 'ConflictError';
   }
 }
 
@@ -70,9 +70,9 @@ class ConflictError extends AppError {
  * 422 Unprocessable Entity (Validation Error)
  */
 class ValidationError extends AppError {
-  constructor(message = "Validation failed", errors = []) {
+  constructor(message = 'Validation failed', errors = []) {
     super(message, 422);
-    this.name = "ValidationError";
+    this.name = 'ValidationError';
     this.errors = errors;
   }
 }
@@ -81,9 +81,9 @@ class ValidationError extends AppError {
  * 500 Internal Server Error
  */
 class InternalServerError extends AppError {
-  constructor(message = "Internal server error") {
+  constructor(message = 'Internal server error') {
     super(message, 500);
-    this.name = "InternalServerError";
+    this.name = 'InternalServerError';
   }
 }
 
@@ -91,9 +91,9 @@ class InternalServerError extends AppError {
  * 503 Service Unavailable
  */
 class ServiceUnavailableError extends AppError {
-  constructor(message = "Service temporarily unavailable") {
+  constructor(message = 'Service temporarily unavailable') {
     super(message, 503);
-    this.name = "ServiceUnavailableError";
+    this.name = 'ServiceUnavailableError';
   }
 }
 
@@ -101,9 +101,9 @@ class ServiceUnavailableError extends AppError {
  * Database Error
  */
 class DatabaseError extends AppError {
-  constructor(message = "Database operation failed") {
+  constructor(message = 'Database operation failed') {
     super(message, 500);
-    this.name = "DatabaseError";
+    this.name = 'DatabaseError';
   }
 }
 

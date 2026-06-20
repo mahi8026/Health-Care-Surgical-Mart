@@ -3,17 +3,17 @@
  * Handles product categories
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
 const { logger } = require('../config/logging');
-const { cacheResponse } = require("../middleware/cache.middleware");
-const { TTL } = require("../services/cache.service");
+const { cacheResponse } = require('../middleware/cache.middleware');
+const { TTL } = require('../services/cache.service');
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -56,7 +56,7 @@ router.use(checkShopStatus);
  * Get all categories
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_PRODUCTS),
   cacheResponse(TTL.CATEGORIES, (req) => `categories:${req.user.shopId}`),
   async (req, res) => {
@@ -64,21 +64,21 @@ router.get(
       // Return predefined categories for medical store
       const categories = [
         {
-          _id: "medical",
-          name: "Medical",
-          description: "Pharmaceutical medicines and drugs",
+          _id: 'medical',
+          name: 'Medical',
+          description: 'Pharmaceutical medicines and drugs',
           isActive: true,
         },
         {
-          _id: "lab",
-          name: "Lab",
-          description: "Laboratory equipment and diagnostic tools",
+          _id: 'lab',
+          name: 'Lab',
+          description: 'Laboratory equipment and diagnostic tools',
           isActive: true,
         },
         {
-          _id: "surgical",
-          name: "Surgical",
-          description: "Surgical instruments and supplies",
+          _id: 'surgical',
+          name: 'Surgical',
+          description: 'Surgical instruments and supplies',
           isActive: true,
         },
       ];
@@ -89,10 +89,10 @@ router.get(
         data: categories,
       });
     } catch (error) {
-      logger.error("Get categories error:", error);
+      logger.error('Get categories error:', error);
       res.status(500).json({
         success: false,
-        message: "Failed to fetch categories",
+        message: 'Failed to fetch categories',
       });
     }
   },

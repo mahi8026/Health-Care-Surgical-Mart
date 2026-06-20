@@ -1,12 +1,12 @@
 /**
  * Stock Command Service
- * 
+ *
  * Handles all stock mutations through event sourcing pattern
  * - Validates stock operations
  * - Records immutable events to ledger
  * - Updates materialized snapshots with optimistic locking
  * - Broadcasts real-time updates via SSE
- * 
+ *
  * IMPORTANT: All stock writes MUST go through this service
  */
 
@@ -49,7 +49,7 @@ class ConcurrencyConflictError extends Error {
 class StockCommandService {
   /**
    * Record a stock movement
-   * 
+   *
    * @param {Object} params
    * @param {string} params.shopId - Shop identifier
    * @param {ObjectId|string} params.productId - Product ID
@@ -93,13 +93,13 @@ class StockCommandService {
     }
 
     const shopDb = getShopDatabase(shopId);
-    
+
     // Note: MongoDB transactions require replica set
     // For local dev without replica set, operations run without transaction
     // For production MongoDB Atlas, transactions work automatically
-    
+
     let ledgerEntry, updatedSnapshot;
-    
+
     try {
       // 1. Get current snapshot with optimistic lock check
       const snapshot = await shopDb.collection('stock_snapshots').findOne({
@@ -232,7 +232,7 @@ class StockCommandService {
 
   /**
    * Allocate batches using FEFO (First Expiry First Out)
-   * 
+   *
    * @param {ObjectId|string} productId
    * @param {number} qtyNeeded
    * @param {string} shopId
@@ -255,8 +255,8 @@ class StockCommandService {
     let remaining = qtyNeeded;
 
     for (const batch of batches) {
-      if (remaining <= 0) break;
-      
+      if (remaining <= 0) {break;}
+
       const take = Math.min(batch.quantity, remaining);
       allocations.push({
         batchId: batch._id,
@@ -265,7 +265,7 @@ class StockCommandService {
         quantity: take,
         costPrice: batch.costPrice
       });
-      
+
       remaining -= take;
     }
 
@@ -282,7 +282,7 @@ class StockCommandService {
 
   /**
    * Emit stock update via SSE
-   * 
+   *
    * @param {string} shopId
    * @param {ObjectId|string} productId
    * @param {Object} snapshot
@@ -291,7 +291,7 @@ class StockCommandService {
     try {
       const sseManager = require('./sse-manager.service');
       sseManager.broadcastStockUpdate(shopId, productId, snapshot);
-      
+
       logger.debug('Stock update event broadcast', {
         shopId,
         productId: productId.toString(),
@@ -306,7 +306,7 @@ class StockCommandService {
 
   /**
    * Get current stock snapshot for a product
-   * 
+   *
    * @param {ObjectId|string} productId
    * @param {string} shopId
    * @returns {Promise<Object>} Stock snapshot
@@ -321,7 +321,7 @@ class StockCommandService {
 
   /**
    * Get movement history for a product
-   * 
+   *
    * @param {ObjectId|string} productId
    * @param {string} shopId
    * @param {Object} options - Query options (limit, startDate, endDate)
@@ -338,8 +338,8 @@ class StockCommandService {
 
     if (startDate || endDate) {
       query.timestamp = {};
-      if (startDate) query.timestamp.$gte = new Date(startDate);
-      if (endDate) query.timestamp.$lte = new Date(endDate);
+      if (startDate) {query.timestamp.$gte = new Date(startDate);}
+      if (endDate) {query.timestamp.$lte = new Date(endDate);}
     }
 
     return await shopDb.collection('stock_ledger')

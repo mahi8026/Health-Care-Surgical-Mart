@@ -3,28 +3,27 @@
  * CRUD operations for expense management
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
+const { ObjectId } = require('mongodb');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
 const {
   generateExpenseNumber,
-} = require("../services/expense-number-generator");
+} = require('../services/expense-number-generator');
 const {
   receiptUpload,
   processUploadedFiles,
   deleteUploadedFile,
   getFilePath,
-} = require("../services/file-upload.service");
-const { logger } = require('../config/logging');
-const { cacheService } = require("../services/cache.service");
+} = require('../services/file-upload.service');
+const { cacheService } = require('../services/cache.service');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -350,14 +349,14 @@ router.use(checkShopStatus);
  * Get all expenses for the shop with advanced filtering and pagination
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const {
       page = 1,
       limit = 50,
-      search = "",
+      search = '',
       startDate,
       endDate,
       categoryId,
@@ -367,18 +366,18 @@ router.get(
       vendor,
       tags,
       isRecurring,
-      sortBy = "expenseDate",
-      sortOrder = "desc",
+      sortBy = 'expenseDate',
+      sortOrder = 'desc',
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    let matchQuery = {};
+    const matchQuery = {};
 
     // Date range filter
     if (startDate || endDate) {
       matchQuery.expenseDate = {};
-      if (startDate) matchQuery.expenseDate.$gte = new Date(startDate);
-      if (endDate) matchQuery.expenseDate.$lte = new Date(endDate);
+      if (startDate) {matchQuery.expenseDate.$gte = new Date(startDate);}
+      if (endDate) {matchQuery.expenseDate.$lte = new Date(endDate);}
     }
 
     // Category filter - support multiple categories
@@ -404,57 +403,57 @@ router.get(
     // Amount range filter
     if (minAmount || maxAmount) {
       matchQuery.amount = {};
-      if (minAmount) matchQuery.amount.$gte = parseFloat(minAmount);
-      if (maxAmount) matchQuery.amount.$lte = parseFloat(maxAmount);
+      if (minAmount) {matchQuery.amount.$gte = parseFloat(minAmount);}
+      if (maxAmount) {matchQuery.amount.$lte = parseFloat(maxAmount);}
     }
 
     // Vendor filter
     if (vendor) {
-      matchQuery["vendor.name"] = { $regex: vendor, $options: "i" };
+      matchQuery['vendor.name'] = { $regex: vendor, $options: 'i' };
     }
 
     // Tags filter - support multiple tags
     if (tags) {
       const tagArray = Array.isArray(tags) ? tags : [tags];
-      matchQuery.tags = { $in: tagArray.map((tag) => new RegExp(tag, "i")) };
+      matchQuery.tags = { $in: tagArray.map((tag) => new RegExp(tag, 'i')) };
     }
 
     // Recurring filter
     if (isRecurring !== undefined) {
-      matchQuery.isRecurring = isRecurring === "true";
+      matchQuery.isRecurring = isRecurring === 'true';
     }
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expense_categories");
-    const usersCollectionName = shopDb.getCollectionName("users");
+      shopDb.getCollectionName('expense_categories');
+    const usersCollectionName = shopDb.getCollectionName('users');
 
     const pipeline = [
       { $match: matchQuery },
       {
         $lookup: {
           from: expenseCategoriesCollectionName,
-          localField: "categoryId",
-          foreignField: "_id",
-          as: "category",
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'category',
         },
       },
       {
         $unwind: {
-          path: "$category",
+          path: '$category',
           preserveNullAndEmptyArrays: true, // Don't exclude expenses without category
         },
       },
       {
         $lookup: {
           from: usersCollectionName,
-          localField: "createdBy",
-          foreignField: "_id",
-          as: "createdByUser",
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdByUser',
         },
       },
       {
         $unwind: {
-          path: "$createdByUser",
+          path: '$createdByUser',
           preserveNullAndEmptyArrays: true, // Don't exclude expenses without user
         },
       },
@@ -462,18 +461,18 @@ router.get(
 
     // Enhanced search filter
     if (search) {
-      const searchRegex = new RegExp(search, "i");
+      const searchRegex = new RegExp(search, 'i');
       const searchAmount = parseFloat(search);
 
       const searchConditions = [
-        { description: { $regex: search, $options: "i" } },
-        { "vendor.name": { $regex: search, $options: "i" } },
-        { "vendor.email": { $regex: search, $options: "i" } },
-        { expenseNumber: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: 'i' } },
+        { 'vendor.name': { $regex: search, $options: 'i' } },
+        { 'vendor.email': { $regex: search, $options: 'i' } },
+        { expenseNumber: { $regex: search, $options: 'i' } },
         { tags: { $in: [searchRegex] } },
-        { notes: { $regex: search, $options: "i" } },
-        { "category.name": { $regex: search, $options: "i" } },
-        { "createdByUser.name": { $regex: search, $options: "i" } },
+        { notes: { $regex: search, $options: 'i' } },
+        { 'category.name': { $regex: search, $options: 'i' } },
+        { 'createdByUser.name': { $regex: search, $options: 'i' } },
       ];
 
       // Add amount search if search term is a valid number
@@ -489,28 +488,28 @@ router.get(
     }
 
     // Enhanced sorting
-    const sortDirection = sortOrder === "desc" ? -1 : 1;
+    const sortDirection = sortOrder === 'desc' ? -1 : 1;
     let sortField;
 
     switch (sortBy) {
-      case "amount":
-        sortField = "amount";
+      case 'amount':
+        sortField = 'amount';
         break;
-      case "category":
-        sortField = "category.name";
+      case 'category':
+        sortField = 'category.name';
         break;
-      case "vendor":
-        sortField = "vendor.name";
+      case 'vendor':
+        sortField = 'vendor.name';
         break;
-      case "paymentMethod":
-        sortField = "paymentMethod";
+      case 'paymentMethod':
+        sortField = 'paymentMethod';
         break;
-      case "createdAt":
-        sortField = "createdAt";
+      case 'createdAt':
+        sortField = 'createdAt';
         break;
-      case "expenseDate":
+      case 'expenseDate':
       default:
-        sortField = "expenseDate";
+        sortField = 'expenseDate';
         break;
     }
 
@@ -518,10 +517,10 @@ router.get(
 
     // Get total count for pagination (before applying skip/limit)
     const countPipeline = [...pipeline];
-    countPipeline.push({ $count: "total" });
+    countPipeline.push({ $count: 'total' });
 
     const countResult = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate(countPipeline)
       .toArray();
 
@@ -531,7 +530,7 @@ router.get(
     pipeline.push({ $skip: skip }, { $limit: parseInt(limit) });
 
     const expenses = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate(pipeline)
       .toArray();
 
@@ -567,29 +566,29 @@ router.get(
  * Get available filter options for expenses
  */
 router.get(
-  "/filter-options",
+  '/filter-options',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     // Get available categories
     const categories = await shopDb
-      .collection("expense_categories")
+      .collection('expense_categories')
       .find({ isActive: true })
       .sort({ name: 1 })
       .toArray();
 
     // Get available payment methods from existing expenses
     const paymentMethods = await shopDb
-      .collection("expenses")
-      .distinct("paymentMethod");
+      .collection('expenses')
+      .distinct('paymentMethod');
 
     // Get available vendors from existing expenses
     const vendors = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
-        { $match: { "vendor.name": { $exists: true, $ne: null } } },
-        { $group: { _id: "$vendor.name" } },
+        { $match: { 'vendor.name': { $exists: true, $ne: null } } },
+        { $group: { _id: '$vendor.name' } },
         { $sort: { _id: 1 } },
         { $limit: 100 }, // Limit to prevent too many results
       ])
@@ -597,10 +596,10 @@ router.get(
 
     // Get available tags from existing expenses
     const tags = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
-        { $unwind: "$tags" },
-        { $group: { _id: "$tags" } },
+        { $unwind: '$tags' },
+        { $group: { _id: '$tags' } },
         { $sort: { _id: 1 } },
         { $limit: 100 }, // Limit to prevent too many results
       ])
@@ -608,13 +607,13 @@ router.get(
 
     // Get amount range from existing expenses
     const amountRange = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $group: {
             _id: null,
-            minAmount: { $min: "$amount" },
-            maxAmount: { $max: "$amount" },
+            minAmount: { $min: '$amount' },
+            maxAmount: { $max: '$amount' },
           },
         },
       ])
@@ -622,13 +621,13 @@ router.get(
 
     // Get date range from existing expenses
     const dateRange = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $group: {
             _id: null,
-            minDate: { $min: "$expenseDate" },
-            maxDate: { $max: "$expenseDate" },
+            minDate: { $min: '$expenseDate' },
+            maxDate: { $max: '$expenseDate' },
           },
         },
       ])
@@ -660,12 +659,12 @@ router.get(
               }
             : { min: null, max: null },
         sortOptions: [
-          { value: "expenseDate", label: "Date" },
-          { value: "amount", label: "Amount" },
-          { value: "category", label: "Category" },
-          { value: "vendor", label: "Vendor" },
-          { value: "paymentMethod", label: "Payment Method" },
-          { value: "createdAt", label: "Created Date" },
+          { value: 'expenseDate', label: 'Date' },
+          { value: 'amount', label: 'Amount' },
+          { value: 'category', label: 'Category' },
+          { value: 'vendor', label: 'Vendor' },
+          { value: 'paymentMethod', label: 'Payment Method' },
+          { value: 'createdAt', label: 'Created Date' },
         ],
       },
     });
@@ -673,47 +672,47 @@ router.get(
 );
 
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expense_categories");
-    const usersCollectionName = shopDb.getCollectionName("users");
+      shopDb.getCollectionName('expense_categories');
+    const usersCollectionName = shopDb.getCollectionName('users');
 
     const expense = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         { $match: { _id: new ObjectId(req.params.id) } },
         {
           $lookup: {
             from: expenseCategoriesCollectionName,
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "category",
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'category',
           },
         },
         {
           $unwind: {
-            path: "$category",
+            path: '$category',
             preserveNullAndEmptyArrays: true,
           },
         },
         {
           $lookup: {
             from: usersCollectionName,
-            localField: "createdBy",
-            foreignField: "_id",
-            as: "createdByUser",
+            localField: 'createdBy',
+            foreignField: '_id',
+            as: 'createdByUser',
           },
         },
-        { $unwind: "$createdByUser" },
+        { $unwind: '$createdByUser' },
       ])
       .toArray();
 
     if (expense.length === 0) {
-      throw createError.notFound("Expense not found");
+      throw createError.notFound('Expense not found');
     }
 
     res.json({
@@ -728,7 +727,7 @@ router.get(
  * Create new expense
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_EXPENSE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -737,7 +736,7 @@ router.post(
       amount,
       description,
       expenseDate = new Date(),
-      paymentMethod = "cash",
+      paymentMethod = 'cash',
       vendor,
       attachments = [],
       isRecurring = false,
@@ -749,24 +748,24 @@ router.post(
     // Validate required fields
     if (!categoryId || !amount || amount <= 0) {
       throw createError.badRequest(
-        "Category ID and positive amount are required",
+        'Category ID and positive amount are required',
       );
     }
 
     // Validate category exists and is active
     const category = await shopDb
-      .collection("expense_categories")
+      .collection('expense_categories')
       .findOne({ _id: new ObjectId(categoryId), isActive: true });
 
     if (!category) {
-      throw createError.notFound("Active expense category not found");
+      throw createError.notFound('Active expense category not found');
     }
 
     // Validate payment method
-    const validPaymentMethods = ["cash", "bank", "card"];
+    const validPaymentMethods = ['cash', 'bank', 'card'];
     if (!validPaymentMethods.includes(paymentMethod)) {
       throw createError.badRequest(
-        "Payment method must be one of: cash, bank, card",
+        'Payment method must be one of: cash, bank, card',
       );
     }
 
@@ -776,19 +775,19 @@ router.post(
     today.setHours(23, 59, 59, 999); // End of today
 
     if (!isRecurring && expenseDateObj > today) {
-      throw createError.badRequest("Expense date cannot be in the future");
+      throw createError.badRequest('Expense date cannot be in the future');
     }
 
     // Validate amount precision (max 2 decimal places)
     const amountNum = parseFloat(amount);
     if (Math.round(amountNum * 100) / 100 !== amountNum) {
-      throw createError.badRequest("Amount can have maximum 2 decimal places");
+      throw createError.badRequest('Amount can have maximum 2 decimal places');
     }
 
     // Validate description length
     if (description && description.length > 1000) {
       throw createError.badRequest(
-        "Description must be less than 1000 characters",
+        'Description must be less than 1000 characters',
       );
     }
 
@@ -796,33 +795,33 @@ router.post(
     if (vendor) {
       if (vendor.name && vendor.name.length > 200) {
         throw createError.badRequest(
-          "Vendor name must be less than 200 characters",
+          'Vendor name must be less than 200 characters',
         );
       }
       if (vendor.phone && vendor.phone.length > 20) {
         throw createError.badRequest(
-          "Vendor phone must be less than 20 characters",
+          'Vendor phone must be less than 20 characters',
         );
       }
       if (
         vendor.email &&
         !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(vendor.email)
       ) {
-        throw createError.badRequest("Invalid vendor email format");
+        throw createError.badRequest('Invalid vendor email format');
       }
     }
 
     // Validate recurring configuration if provided
     if (isRecurring && recurringConfig) {
-      const validFrequencies = ["daily", "weekly", "monthly", "yearly"];
+      const validFrequencies = ['daily', 'weekly', 'monthly', 'yearly'];
       if (!validFrequencies.includes(recurringConfig.frequency)) {
         throw createError.badRequest(
-          "Recurring frequency must be one of: daily, weekly, monthly, yearly",
+          'Recurring frequency must be one of: daily, weekly, monthly, yearly',
         );
       }
 
       if (recurringConfig.interval && recurringConfig.interval < 1) {
-        throw createError.badRequest("Recurring interval must be at least 1");
+        throw createError.badRequest('Recurring interval must be at least 1');
       }
 
       if (recurringConfig.endDate && recurringConfig.startDate) {
@@ -831,7 +830,7 @@ router.post(
           new Date(recurringConfig.startDate)
         ) {
           throw createError.badRequest(
-            "Recurring end date must be after start date",
+            'Recurring end date must be after start date',
           );
         }
       }
@@ -839,7 +838,7 @@ router.post(
 
     // Validate notes length
     if (notes && notes.length > 2000) {
-      throw createError.badRequest("Notes must be less than 2000 characters");
+      throw createError.badRequest('Notes must be less than 2000 characters');
     }
 
     // Generate expense number
@@ -880,7 +879,7 @@ router.post(
             }
           : null,
       tags: Array.isArray(tags)
-        ? tags.filter((tag) => typeof tag === "string" && tag.trim())
+        ? tags.filter((tag) => typeof tag === 'string' && tag.trim())
         : [],
       notes: notes?.trim() || null,
       createdBy: new ObjectId(req.user.id),
@@ -888,14 +887,14 @@ router.post(
       updatedAt: new Date(),
     };
 
-    const result = await shopDb.collection("expenses").insertOne(expenseData);
+    const result = await shopDb.collection('expenses').insertOne(expenseData);
 
     // Invalidate financial reports cache (expense affects P&L, cash-flow, daily-summary)
-    cacheService.invalidateShopCache(req.user.shopId, "reports");
+    cacheService.invalidateShopCache(req.user.shopId, 'reports');
 
     res.status(201).json({
       success: true,
-      message: "Expense created successfully",
+      message: 'Expense created successfully',
       data: { _id: result.insertedId, ...expenseData },
     });
   }),
@@ -906,7 +905,7 @@ router.post(
  * Update existing expense
  */
 router.put(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.EDIT_EXPENSE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -926,35 +925,35 @@ router.put(
 
     // Check if expense exists
     const existingExpense = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!existingExpense) {
-      throw createError.notFound("Expense not found");
+      throw createError.notFound('Expense not found');
     }
 
     // Validate required fields if provided
     if (amount !== undefined && amount <= 0) {
-      throw createError.badRequest("Amount must be positive");
+      throw createError.badRequest('Amount must be positive');
     }
 
     // Validate category if provided
     if (categoryId) {
       const category = await shopDb
-        .collection("expense_categories")
+        .collection('expense_categories')
         .findOne({ _id: new ObjectId(categoryId), isActive: true });
 
       if (!category) {
-        throw createError.notFound("Active expense category not found");
+        throw createError.notFound('Active expense category not found');
       }
     }
 
     // Validate payment method if provided
     if (paymentMethod) {
-      const validPaymentMethods = ["cash", "bank", "card"];
+      const validPaymentMethods = ['cash', 'bank', 'card'];
       if (!validPaymentMethods.includes(paymentMethod)) {
         throw createError.badRequest(
-          "Payment method must be one of: cash, bank, card",
+          'Payment method must be one of: cash, bank, card',
         );
       }
     }
@@ -966,7 +965,7 @@ router.put(
       today.setHours(23, 59, 59, 999);
 
       if (!existingExpense.isRecurring && expenseDateObj > today) {
-        throw createError.badRequest("Expense date cannot be in the future");
+        throw createError.badRequest('Expense date cannot be in the future');
       }
     }
 
@@ -975,7 +974,7 @@ router.put(
       const amountNum = parseFloat(amount);
       if (Math.round(amountNum * 100) / 100 !== amountNum) {
         throw createError.badRequest(
-          "Amount can have maximum 2 decimal places",
+          'Amount can have maximum 2 decimal places',
         );
       }
     }
@@ -987,18 +986,18 @@ router.put(
 
     if (categoryId) {
       const category = await shopDb
-        .collection("expense_categories")
+        .collection('expense_categories')
         .findOne({ _id: new ObjectId(categoryId) });
       updateData.categoryId = new ObjectId(categoryId);
       updateData.categoryName = category.name;
     }
 
-    if (amount !== undefined) updateData.amount = parseFloat(amount);
+    if (amount !== undefined) {updateData.amount = parseFloat(amount);}
     if (description !== undefined)
-      updateData.description = description?.trim() || null;
+      {updateData.description = description?.trim() || null;}
     if (expenseDate !== undefined)
-      updateData.expenseDate = new Date(expenseDate);
-    if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+      {updateData.expenseDate = new Date(expenseDate);}
+    if (paymentMethod !== undefined) {updateData.paymentMethod = paymentMethod;}
     if (vendor !== undefined) {
       updateData.vendor = vendor
         ? {
@@ -1008,8 +1007,8 @@ router.put(
           }
         : null;
     }
-    if (attachments !== undefined) updateData.attachments = attachments || [];
-    if (isRecurring !== undefined) updateData.isRecurring = isRecurring;
+    if (attachments !== undefined) {updateData.attachments = attachments || [];}
+    if (isRecurring !== undefined) {updateData.isRecurring = isRecurring;}
     if (recurringConfig !== undefined) {
       updateData.recurringConfig =
         isRecurring && recurringConfig
@@ -1030,21 +1029,21 @@ router.put(
     }
     if (tags !== undefined) {
       updateData.tags = Array.isArray(tags)
-        ? tags.filter((tag) => typeof tag === "string" && tag.trim())
+        ? tags.filter((tag) => typeof tag === 'string' && tag.trim())
         : [];
     }
-    if (notes !== undefined) updateData.notes = notes?.trim() || null;
+    if (notes !== undefined) {updateData.notes = notes?.trim() || null;}
 
     await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
     // Invalidate financial reports cache
-    cacheService.invalidateShopCache(req.user.shopId, "reports");
+    cacheService.invalidateShopCache(req.user.shopId, 'reports');
 
     res.json({
       success: true,
-      message: "Expense updated successfully",
+      message: 'Expense updated successfully',
     });
   }),
 );
@@ -1054,31 +1053,31 @@ router.put(
  * Delete expense
  */
 router.delete(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.DELETE_EXPENSE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     // Check if expense exists
     const expense = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!expense) {
-      throw createError.notFound("Expense not found");
+      throw createError.notFound('Expense not found');
     }
 
     // Delete the expense
     await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .deleteOne({ _id: new ObjectId(req.params.id) });
 
     // Invalidate financial reports cache
-    cacheService.invalidateShopCache(req.user.shopId, "reports");
+    cacheService.invalidateShopCache(req.user.shopId, 'reports');
 
     res.json({
       success: true,
-      message: "Expense deleted successfully",
+      message: 'Expense deleted successfully',
     });
   }),
 );
@@ -1088,14 +1087,14 @@ router.delete(
  * Delete multiple expenses
  */
 router.post(
-  "/bulk-delete",
+  '/bulk-delete',
   requirePermission(PERMISSIONS.DELETE_EXPENSE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { expenseIds } = req.body;
 
     if (!expenseIds || !Array.isArray(expenseIds) || expenseIds.length === 0) {
-      throw createError.badRequest("Expense IDs array is required");
+      throw createError.badRequest('Expense IDs array is required');
     }
 
     // Validate all IDs are valid ObjectIds
@@ -1108,16 +1107,16 @@ router.post(
 
     // Check how many expenses exist
     const existingCount = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .countDocuments({ _id: { $in: objectIds } });
 
     if (existingCount === 0) {
-      throw createError.notFound("No expenses found with provided IDs");
+      throw createError.notFound('No expenses found with provided IDs');
     }
 
     // Delete the expenses
     const result = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .deleteMany({ _id: { $in: objectIds } });
 
     res.json({
@@ -1133,16 +1132,16 @@ router.post(
  * Upload receipt files for an expense
  */
 router.post(
-  "/upload-receipt",
+  '/upload-receipt',
   requirePermission(PERMISSIONS.UPLOAD_RECEIPT),
-  receiptUpload.array("receipts", 5), // Allow up to 5 files
+  receiptUpload.array('receipts', 5), // Allow up to 5 files
   asyncHandler(async (req, res) => {
     if (!req.files || req.files.length === 0) {
-      throw createError.badRequest("No files uploaded");
+      throw createError.badRequest('No files uploaded');
     }
 
     // Process uploaded files (upload to GCS or local storage)
-    const fileInfo = await processUploadedFiles(req.files, req.user.shopId, "receipts");
+    const fileInfo = await processUploadedFiles(req.files, req.user.shopId, 'receipts');
 
     res.json({
       success: true,
@@ -1157,7 +1156,7 @@ router.post(
  * Serve receipt files (local storage only - GCS files use public URLs)
  */
 router.get(
-  "/receipts/:shopId/:filename",
+  '/receipts/:shopId/:filename',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const { shopId, filename } = req.params;
@@ -1167,14 +1166,14 @@ router.get(
       throw createError.forbidden("Access denied to this shop's files");
     }
 
-    const filePath = getFilePath(shopId, filename, "receipts");
+    const filePath = getFilePath(shopId, filename, 'receipts');
 
     if (!filePath) {
-      throw createError.notFound("File not found");
+      throw createError.notFound('File not found');
     }
 
     // Set appropriate headers
-    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
 
     // Send file
     res.sendFile(filePath);
@@ -1186,7 +1185,7 @@ router.get(
  * Delete a receipt file
  */
 router.delete(
-  "/receipts/:filename",
+  '/receipts/:filename',
   requirePermission(PERMISSIONS.DELETE_EXPENSE),
   asyncHandler(async (req, res) => {
     const { filename } = req.params;
@@ -1194,12 +1193,12 @@ router.delete(
     const success = await deleteUploadedFile(req.user.shopId, filename);
 
     if (!success) {
-      throw createError.notFound("File not found or could not be deleted");
+      throw createError.notFound('File not found or could not be deleted');
     }
 
     res.json({
       success: true,
-      message: "Receipt file deleted successfully",
+      message: 'Receipt file deleted successfully',
     });
   }),
 );
@@ -1209,7 +1208,7 @@ router.delete(
  * Update expense attachments
  */
 router.put(
-  "/:id/attachments",
+  '/:id/attachments',
   requirePermission(PERMISSIONS.EDIT_EXPENSE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -1217,20 +1216,20 @@ router.put(
 
     // Check if expense exists
     const expense = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!expense) {
-      throw createError.notFound("Expense not found");
+      throw createError.notFound('Expense not found');
     }
 
     // Validate attachments format
     if (attachments && !Array.isArray(attachments)) {
-      throw createError.badRequest("Attachments must be an array");
+      throw createError.badRequest('Attachments must be an array');
     }
 
     // Update expense attachments
-    await shopDb.collection("expenses").updateOne(
+    await shopDb.collection('expenses').updateOne(
       { _id: new ObjectId(req.params.id) },
       {
         $set: {
@@ -1242,7 +1241,7 @@ router.put(
 
     res.json({
       success: true,
-      message: "Expense attachments updated successfully",
+      message: 'Expense attachments updated successfully',
     });
   }),
 );

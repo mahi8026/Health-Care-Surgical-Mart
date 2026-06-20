@@ -1,6 +1,6 @@
 /**
  * User-Shop Index Service
- * 
+ *
  * Manages email-to-shopId mapping for fast user lookup during login
  * Eliminates N+1 query problem (looping through all shops)
  */
@@ -15,10 +15,10 @@ class UserShopIndexService {
   async findShopByEmail(email) {
     try {
       const systemDb = getSystemDatabase();
-      const mapping = await systemDb.collection('user_shop_index').findOne({ 
-        email: email.toLowerCase() 
+      const mapping = await systemDb.collection('user_shop_index').findOne({
+        email: email.toLowerCase()
       });
-      
+
       return mapping ? mapping.shopId : null;
     } catch (error) {
       logger.error('Failed to find shop by email:', { email, error: error.message });
@@ -32,7 +32,7 @@ class UserShopIndexService {
   async addUser(email, shopId, userId, role, isActive = true) {
     try {
       const systemDb = getSystemDatabase();
-      
+
       await systemDb.collection('user_shop_index').insertOne({
         email: email.toLowerCase(),
         shopId,
@@ -42,7 +42,7 @@ class UserShopIndexService {
         createdAt: new Date(),
         updatedAt: new Date()
       });
-      
+
       logger.info('User added to shop index', { email, shopId });
       return true;
     } catch (error) {
@@ -62,23 +62,23 @@ class UserShopIndexService {
   async updateUser(email, updates) {
     try {
       const systemDb = getSystemDatabase();
-      
+
       const result = await systemDb.collection('user_shop_index').findOneAndUpdate(
         { email: email.toLowerCase() },
-        { 
-          $set: { 
-            ...updates, 
-            updatedAt: new Date() 
-          } 
+        {
+          $set: {
+            ...updates,
+            updatedAt: new Date()
+          }
         },
         { returnDocument: 'after' }
       );
-      
+
       if (result) {
         logger.info('User updated in shop index', { email, updates });
         return true;
       }
-      
+
       logger.warn('User not found in shop index for update', { email });
       return false;
     } catch (error) {
@@ -93,16 +93,16 @@ class UserShopIndexService {
   async removeUser(email) {
     try {
       const systemDb = getSystemDatabase();
-      
-      const result = await systemDb.collection('user_shop_index').deleteOne({ 
-        email: email.toLowerCase() 
+
+      const result = await systemDb.collection('user_shop_index').deleteOne({
+        email: email.toLowerCase()
       });
-      
+
       if (result.deletedCount > 0) {
         logger.info('User removed from shop index', { email });
         return true;
       }
-      
+
       logger.warn('User not found in shop index for removal', { email });
       return false;
     } catch (error) {
@@ -117,8 +117,8 @@ class UserShopIndexService {
   async emailExists(email) {
     try {
       const systemDb = getSystemDatabase();
-      const count = await systemDb.collection('user_shop_index').countDocuments({ 
-        email: email.toLowerCase() 
+      const count = await systemDb.collection('user_shop_index').countDocuments({
+        email: email.toLowerCase()
       });
       return count > 0;
     } catch (error) {
@@ -146,7 +146,7 @@ class UserShopIndexService {
   async batchAddUsers(users) {
     try {
       const systemDb = getSystemDatabase();
-      
+
       const operations = users.map(user => ({
         insertOne: {
           document: {
@@ -160,17 +160,17 @@ class UserShopIndexService {
           }
         }
       }));
-      
+
       const result = await systemDb.collection('user_shop_index').bulkWrite(
         operations,
         { ordered: false } // Continue on duplicate key errors
       );
-      
+
       logger.info('Batch user index operation completed', {
         inserted: result.insertedCount,
         errors: result.writeErrors?.length || 0
       });
-      
+
       return {
         success: true,
         inserted: result.insertedCount,

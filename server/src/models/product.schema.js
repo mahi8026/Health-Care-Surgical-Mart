@@ -6,92 +6,92 @@
 const productSchema = {
   validator: {
     $jsonSchema: {
-      bsonType: "object",
+      bsonType: 'object',
       required: [
-        "name",
-        "category",
-        "sku",
-        "purchasePrice",
-        "sellingPrice",
-        "unit",
-        "minStockLevel",
+        'name',
+        'category',
+        'sku',
+        'purchasePrice',
+        'sellingPrice',
+        'unit',
+        'minStockLevel',
       ],
       properties: {
         _id: {
-          bsonType: "objectId",
+          bsonType: 'objectId',
         },
         name: {
-          bsonType: "string",
-          description: "Product name - required",
+          bsonType: 'string',
+          description: 'Product name - required',
         },
         category: {
-          enum: ["Medical", "Lab", "Surgical"],
-          description: "Product category - must be Medical, Lab, or Surgical",
+          enum: ['Medical', 'Lab', 'Surgical'],
+          description: 'Product category - must be Medical, Lab, or Surgical',
         },
         brand: {
-          bsonType: "string",
-          description: "Brand/manufacturer name",
+          bsonType: 'string',
+          description: 'Brand/manufacturer name',
         },
         sku: {
-          bsonType: "string",
-          description: "Stock Keeping Unit - unique identifier - required",
+          bsonType: 'string',
+          description: 'Stock Keeping Unit - unique identifier - required',
         },
         purchasePrice: {
-          bsonType: "double",
+          bsonType: 'double',
           minimum: 0,
-          description: "Purchase price from supplier - required",
+          description: 'Purchase price from supplier - required',
         },
         sellingPrice: {
-          bsonType: "double",
+          bsonType: 'double',
           minimum: 0,
-          description: "Selling price to customer - required",
+          description: 'Selling price to customer - required',
         },
         unit: {
-          enum: ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr"],
-          description: "Unit of measurement - required",
+          enum: ['pcs', 'box', 'pack', 'bottle', 'strip', 'vial', 'ml', 'kg', 'gm', 'ltr'],
+          description: 'Unit of measurement - required',
         },
         minStockLevel: {
-          bsonType: "int",
+          bsonType: 'int',
           minimum: 0,
-          description: "Minimum stock level for alerts - required",
+          description: 'Minimum stock level for alerts - required',
         },
         description: {
-          bsonType: "string",
-          description: "Product description",
+          bsonType: 'string',
+          description: 'Product description',
         },
         batchNo: {
-          bsonType: "string",
-          description: "Batch number for pharmaceutical tracking",
+          bsonType: 'string',
+          description: 'Batch number for pharmaceutical tracking',
         },
         lotNo: {
-          bsonType: "string",
-          description: "Lot number for pharmaceutical tracking",
+          bsonType: 'string',
+          description: 'Lot number for pharmaceutical tracking',
         },
         expiryDate: {
-          bsonType: "date",
-          description: "Product expiry date — null means no expiry",
+          bsonType: 'date',
+          description: 'Product expiry date — null means no expiry',
         },
         reorderPoint: {
-          bsonType: "int",
+          bsonType: 'int',
           minimum: 0,
-          description: "Stock level at which to reorder (default 10)",
+          description: 'Stock level at which to reorder (default 10)',
         },
         maxStock: {
-          bsonType: "int",
+          bsonType: 'int',
           minimum: 0,
-          description: "Maximum stock capacity (optional)",
+          description: 'Maximum stock capacity (optional)',
         },
         isActive: {
-          bsonType: "bool",
-          description: "Product active status",
+          bsonType: 'bool',
+          description: 'Product active status',
         },
         createdAt: {
-          bsonType: "date",
-          description: "Record creation timestamp",
+          bsonType: 'date',
+          description: 'Record creation timestamp',
         },
         updatedAt: {
-          bsonType: "date",
-          description: "Record update timestamp",
+          bsonType: 'date',
+          description: 'Record update timestamp',
         },
       },
     },
@@ -99,16 +99,16 @@ const productSchema = {
 };
 
 const productIndexes = [
-  { key: { sku: 1 }, unique: true, name: "sku_unique" },
-  { key: { name: 1 }, name: "name_index" },
-  { key: { category: 1 }, name: "category_index" },
-  { key: { brand: 1 }, name: "brand_index" },
-  { key: { isActive: 1 }, name: "active_status_index" },
-  { key: { name: "text", brand: "text" }, name: "text_search_index" },
+  { key: { sku: 1 }, unique: true, name: 'sku_unique' },
+  { key: { name: 1 }, name: 'name_index' },
+  { key: { category: 1 }, name: 'category_index' },
+  { key: { brand: 1 }, name: 'brand_index' },
+  { key: { isActive: 1 }, name: 'active_status_index' },
+  { key: { name: 'text', brand: 'text' }, name: 'text_search_index' },
   // Compound indexes for common query patterns
-  { key: { isActive: 1, category: 1 }, name: "active_category_compound" },
-  { key: { category: 1, brand: 1 }, name: "category_brand_compound" },
-  { key: { expiryDate: 1, isActive: 1 }, name: "expiry_active_compound" },
+  { key: { isActive: 1, category: 1 }, name: 'active_category_compound' },
+  { key: { category: 1, brand: 1 }, name: 'category_brand_compound' },
+  { key: { expiryDate: 1, isActive: 1 }, name: 'expiry_active_compound' },
 ];
 
 module.exports = { productSchema, productIndexes };

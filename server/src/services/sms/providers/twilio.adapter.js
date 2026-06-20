@@ -1,18 +1,18 @@
 // server/src/services/sms/providers/twilio.adapter.js
-const twilio = require("twilio");
-const { logger } = require("../../../config/logging");
+const twilio = require('twilio');
+const { logger } = require('../../../config/logging');
 
 class TwilioAdapter {
   constructor() {
     this.accountSid = process.env.TWILIO_ACCOUNT_SID;
     this.authToken = process.env.TWILIO_AUTH_TOKEN;
     this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
-    
+
     if (!this.accountSid || !this.authToken || !this.fromNumber) {
-      logger.warn("Twilio SMS provider not configured", {
-        file: "twilio.adapter.js",
-        function: "constructor",
-        message: "Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in .env",
+      logger.warn('Twilio SMS provider not configured', {
+        file: 'twilio.adapter.js',
+        function: 'constructor',
+        message: 'Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in .env',
       });
       this.client = null;
     } else {
@@ -24,8 +24,8 @@ class TwilioAdapter {
     if (!this.client) {
       return {
         success: false,
-        error: "Twilio SMS provider is not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in your environment variables.",
-        provider: "twilio",
+        error: 'Twilio SMS provider is not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in your environment variables.',
+        provider: 'twilio',
       };
     }
 
@@ -42,14 +42,14 @@ class TwilioAdapter {
         success: true,
         messageId: result.sid,
         status: result.status,
-        provider: "twilio",
+        provider: 'twilio',
         cost: this.calculateCost(result),
       };
     } catch (error) {
       return {
         success: false,
         error: error.message,
-        provider: "twilio",
+        provider: 'twilio',
       };
     }
   }

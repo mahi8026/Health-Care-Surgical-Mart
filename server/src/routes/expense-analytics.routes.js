@@ -3,18 +3,17 @@
  * Handles expense analytics, insights, and forecasting
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
+const { ObjectId } = require('mongodb');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
-const { logger } = require('../config/logging');
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -249,11 +248,11 @@ router.use(checkShopStatus);
  * Get expense trend analysis over time
  */
 router.get(
-  "/trends",
+  '/trends',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { startDate, endDate, period = "monthly", categoryId } = req.query;
+    const { startDate, endDate, period = 'monthly', categoryId } = req.query;
 
     // Set default date range (last 12 months)
     const today = new Date();
@@ -265,7 +264,7 @@ router.get(
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     // Build match query
-    let matchQuery = {
+    const matchQuery = {
       expenseDate: { $gte: defaultStartDate, $lte: defaultEndDate },
     };
 
@@ -276,50 +275,50 @@ router.get(
     // Define grouping based on period
     let groupBy;
     switch (period) {
-      case "daily":
+      case 'daily':
         groupBy = {
-          year: { $year: "$expenseDate" },
-          month: { $month: "$expenseDate" },
-          day: { $dayOfMonth: "$expenseDate" },
+          year: { $year: '$expenseDate' },
+          month: { $month: '$expenseDate' },
+          day: { $dayOfMonth: '$expenseDate' },
         };
         break;
-      case "weekly":
+      case 'weekly':
         groupBy = {
-          year: { $year: "$expenseDate" },
-          week: { $week: "$expenseDate" },
+          year: { $year: '$expenseDate' },
+          week: { $week: '$expenseDate' },
         };
         break;
-      case "yearly":
+      case 'yearly':
         groupBy = {
-          year: { $year: "$expenseDate" },
+          year: { $year: '$expenseDate' },
         };
         break;
-      case "monthly":
+      case 'monthly':
       default:
         groupBy = {
-          year: { $year: "$expenseDate" },
-          month: { $month: "$expenseDate" },
+          year: { $year: '$expenseDate' },
+          month: { $month: '$expenseDate' },
         };
         break;
     }
 
     // Expense trends aggregation
     const trends = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         { $match: matchQuery },
         {
           $group: {
             _id: groupBy,
-            totalAmount: { $sum: "$amount" },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
-            averageAmount: { $avg: "$amount" },
-            minAmount: { $min: "$amount" },
-            maxAmount: { $max: "$amount" },
+            averageAmount: { $avg: '$amount' },
+            minAmount: { $min: '$amount' },
+            maxAmount: { $max: '$amount' },
           },
         },
         {
-          $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1, "_id.week": 1 },
+          $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.week': 1 },
         },
       ])
       .toArray();
@@ -383,7 +382,7 @@ router.get(
  * Get category-wise expense distribution
  */
 router.get(
-  "/category-distribution",
+  '/category-distribution',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -399,11 +398,11 @@ router.get(
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName('expenseCategories');
 
     // Category distribution aggregation
     const distribution = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -413,22 +412,22 @@ router.get(
         {
           $lookup: {
             from: expenseCategoriesCollectionName,
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "category",
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'category',
           },
         },
-        { $unwind: "$category" },
+        { $unwind: '$category' },
         {
           $group: {
-            _id: "$categoryId",
-            categoryName: { $first: "$category.name" },
-            categoryType: { $first: "$category.type" },
-            totalAmount: { $sum: "$amount" },
+            _id: '$categoryId',
+            categoryName: { $first: '$category.name' },
+            categoryType: { $first: '$category.type' },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
-            averageAmount: { $avg: "$amount" },
-            minAmount: { $min: "$amount" },
-            maxAmount: { $max: "$amount" },
+            averageAmount: { $avg: '$amount' },
+            minAmount: { $min: '$amount' },
+            maxAmount: { $max: '$amount' },
           },
         },
         { $sort: { totalAmount: -1 } },
@@ -450,7 +449,7 @@ router.get(
 
     // Group by category type
     const byType = distributionWithPercentages.reduce((acc, item) => {
-      const type = item.categoryType || "Other";
+      const type = item.categoryType || 'Other';
       if (!acc[type]) {
         acc[type] = {
           totalAmount: 0,
@@ -496,7 +495,7 @@ router.get(
  * Get month-over-month expense comparison
  */
 router.get(
-  "/month-over-month",
+  '/month-over-month',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -511,7 +510,7 @@ router.get(
 
     // Monthly comparison aggregation
     const monthlyData = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -521,15 +520,15 @@ router.get(
         {
           $group: {
             _id: {
-              year: { $year: "$expenseDate" },
-              month: { $month: "$expenseDate" },
+              year: { $year: '$expenseDate' },
+              month: { $month: '$expenseDate' },
             },
-            totalAmount: { $sum: "$amount" },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
-            averageAmount: { $avg: "$amount" },
+            averageAmount: { $avg: '$amount' },
           },
         },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
       ])
       .toArray();
 
@@ -567,7 +566,7 @@ router.get(
         monthName: new Date(
           current._id.year,
           current._id.month - 1,
-        ).toLocaleString("default", { month: "long" }),
+        ).toLocaleString('default', { month: 'long' }),
         totalAmount: current.totalAmount,
         expenseCount: current.expenseCount,
         averageAmount: Math.round(current.averageAmount * 100) / 100,
@@ -627,7 +626,7 @@ router.get(
  * Get expense ratio analysis (% of revenue)
  */
 router.get(
-  "/expense-ratio",
+  '/expense-ratio',
   requirePermission(PERMISSIONS.VIEW_PROFIT_REPORT),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -644,7 +643,7 @@ router.get(
 
     // Get total expenses
     const expenseData = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -654,7 +653,7 @@ router.get(
         {
           $group: {
             _id: null,
-            totalExpenses: { $sum: "$amount" },
+            totalExpenses: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
           },
         },
@@ -663,18 +662,18 @@ router.get(
 
     // Get total revenue from sales
     const revenueData = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalRevenue: { $sum: "$grandTotal" },
+            totalRevenue: { $sum: '$grandTotal' },
             salesCount: { $sum: 1 },
           },
         },
@@ -682,11 +681,11 @@ router.get(
       .toArray();
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName('expenseCategories');
 
     // Get expense breakdown by category
     const expensesByCategory = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -696,18 +695,18 @@ router.get(
         {
           $lookup: {
             from: expenseCategoriesCollectionName,
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "category",
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'category',
           },
         },
-        { $unwind: "$category" },
+        { $unwind: '$category' },
         {
           $group: {
-            _id: "$categoryId",
-            categoryName: { $first: "$category.name" },
-            categoryType: { $first: "$category.type" },
-            totalAmount: { $sum: "$amount" },
+            _id: '$categoryId',
+            categoryName: { $first: '$category.name' },
+            categoryType: { $first: '$category.type' },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
           },
         },
@@ -731,7 +730,7 @@ router.get(
 
     // Monthly expense-to-revenue ratio trend
     const monthlyRatios = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -747,19 +746,19 @@ router.get(
         {
           $group: {
             _id: {
-              year: { $year: "$expenseDate" },
-              month: { $month: "$expenseDate" },
+              year: { $year: '$expenseDate' },
+              month: { $month: '$expenseDate' },
             },
-            totalExpenses: { $sum: "$amount" },
+            totalExpenses: { $sum: '$amount' },
           },
         },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
       ])
       .toArray();
 
     // Get corresponding revenue for each month
     const monthlyRevenue = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
@@ -770,19 +769,19 @@ router.get(
                 1,
               ),
             },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: {
-              year: { $year: "$saleDate" },
-              month: { $month: "$saleDate" },
+              year: { $year: '$saleDate' },
+              month: { $month: '$saleDate' },
             },
-            totalRevenue: { $sum: "$grandTotal" },
+            totalRevenue: { $sum: '$grandTotal' },
           },
         },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
       ])
       .toArray();
 
@@ -804,7 +803,7 @@ router.get(
         monthName: new Date(
           expenseMonth._id.year,
           expenseMonth._id.month - 1,
-        ).toLocaleString("default", { month: "long" }),
+        ).toLocaleString('default', { month: 'long' }),
         totalExpenses: expenses,
         totalRevenue: revenue,
         expenseRatio: Math.round(ratio * 100) / 100,
@@ -838,15 +837,15 @@ module.exports = router;
  * Get expense forecasting based on trends
  */
 router.get(
-  "/forecast",
+  '/forecast',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { months = 3, categoryId, method = "linear" } = req.query;
+    const { months = 3, categoryId, method = 'linear' } = req.query;
 
     const forecastMonths = parseInt(months);
     if (forecastMonths < 1 || forecastMonths > 12) {
-      throw createError.badRequest("Forecast months must be between 1 and 12");
+      throw createError.badRequest('Forecast months must be between 1 and 12');
     }
 
     // Get historical data (last 12 months for better accuracy)
@@ -862,7 +861,7 @@ router.get(
       0,
     );
 
-    let matchQuery = {
+    const matchQuery = {
       expenseDate: { $gte: historicalStartDate, $lte: historicalEndDate },
     };
 
@@ -872,34 +871,34 @@ router.get(
 
     // Get historical monthly data
     const historicalData = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         { $match: matchQuery },
         {
           $group: {
             _id: {
-              year: { $year: "$expenseDate" },
-              month: { $month: "$expenseDate" },
+              year: { $year: '$expenseDate' },
+              month: { $month: '$expenseDate' },
             },
-            totalAmount: { $sum: "$amount" },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
-            averageAmount: { $avg: "$amount" },
+            averageAmount: { $avg: '$amount' },
           },
         },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
       ])
       .toArray();
 
     if (historicalData.length < 3) {
       throw createError.badRequest(
-        "Insufficient historical data for forecasting (minimum 3 months required)",
+        'Insufficient historical data for forecasting (minimum 3 months required)',
       );
     }
 
     // Calculate forecast based on method
-    let forecast = [];
+    const forecast = [];
 
-    if (method === "linear") {
+    if (method === 'linear') {
       // Linear trend forecasting
       const amounts = historicalData.map((d) => d.totalAmount);
       const n = amounts.length;
@@ -928,13 +927,13 @@ router.get(
         forecast.push({
           year: forecastDate.getFullYear(),
           month: forecastDate.getMonth() + 1,
-          monthName: forecastDate.toLocaleString("default", { month: "long" }),
+          monthName: forecastDate.toLocaleString('default', { month: 'long' }),
           predictedAmount: Math.round(predictedAmount * 100) / 100,
           confidence: Math.max(0.5, 1 - i * 0.1), // Decreasing confidence over time
-          method: "linear",
+          method: 'linear',
         });
       }
-    } else if (method === "average") {
+    } else if (method === 'average') {
       // Simple moving average forecasting
       const recentMonths = Math.min(6, historicalData.length);
       const recentData = historicalData.slice(-recentMonths);
@@ -952,13 +951,13 @@ router.get(
         forecast.push({
           year: forecastDate.getFullYear(),
           month: forecastDate.getMonth() + 1,
-          monthName: forecastDate.toLocaleString("default", { month: "long" }),
+          monthName: forecastDate.toLocaleString('default', { month: 'long' }),
           predictedAmount: Math.round(averageAmount * 100) / 100,
           confidence: 0.8,
-          method: "average",
+          method: 'average',
         });
       }
-    } else if (method === "seasonal") {
+    } else if (method === 'seasonal') {
       // Seasonal forecasting (same month previous year)
       for (let i = 1; i <= forecastMonths; i++) {
         const forecastDate = new Date(
@@ -983,10 +982,10 @@ router.get(
         forecast.push({
           year: forecastDate.getFullYear(),
           month: forecastDate.getMonth() + 1,
-          monthName: forecastDate.toLocaleString("default", { month: "long" }),
+          monthName: forecastDate.toLocaleString('default', { month: 'long' }),
           predictedAmount: Math.round(predictedAmount * 100) / 100,
           confidence: sameMonthLastYear ? 0.7 : 0.5,
-          method: "seasonal",
+          method: 'seasonal',
         });
       }
     }
@@ -1014,8 +1013,8 @@ router.get(
           year: d._id.year,
           month: d._id.month,
           monthName: new Date(d._id.year, d._id.month - 1).toLocaleString(
-            "default",
-            { month: "long" },
+            'default',
+            { month: 'long' },
           ),
           totalAmount: d.totalAmount,
           expenseCount: d.expenseCount,
@@ -1040,7 +1039,7 @@ router.get(
  * Get top expense categories with insights
  */
 router.get(
-  "/top-categories",
+  '/top-categories',
   requirePermission(PERMISSIONS.VIEW_EXPENSES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -1056,11 +1055,11 @@ router.get(
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName('expenseCategories');
 
     // Get top categories with detailed analytics
     const topCategories = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -1070,27 +1069,27 @@ router.get(
         {
           $lookup: {
             from: expenseCategoriesCollectionName,
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "category",
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'category',
           },
         },
-        { $unwind: "$category" },
+        { $unwind: '$category' },
         {
           $group: {
-            _id: "$categoryId",
-            categoryName: { $first: "$category.name" },
-            categoryType: { $first: "$category.type" },
-            totalAmount: { $sum: "$amount" },
+            _id: '$categoryId',
+            categoryName: { $first: '$category.name' },
+            categoryType: { $first: '$category.type' },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
-            averageAmount: { $avg: "$amount" },
-            minAmount: { $min: "$amount" },
-            maxAmount: { $max: "$amount" },
+            averageAmount: { $avg: '$amount' },
+            minAmount: { $min: '$amount' },
+            maxAmount: { $max: '$amount' },
             expenses: {
               $push: {
-                amount: "$amount",
-                expenseDate: "$expenseDate",
-                description: "$description",
+                amount: '$amount',
+                expenseDate: '$expenseDate',
+                description: '$description',
               },
             },
           },
@@ -1099,7 +1098,7 @@ router.get(
           $addFields: {
             // Calculate standard deviation for amount variability
             amountVariability: {
-              $stdDevPop: "$expenses.amount",
+              $stdDevPop: '$expenses.amount',
             },
           },
         },
@@ -1147,13 +1146,13 @@ router.get(
           isHighVariability,
           isFrequentCategory,
           isHighValue,
-          pattern: isFrequentCategory ? "frequent" : "occasional",
+          pattern: isFrequentCategory ? 'frequent' : 'occasional',
           riskLevel:
             isHighVariability && isHighValue
-              ? "high"
+              ? 'high'
               : isHighVariability || isHighValue
-                ? "medium"
-                : "low",
+                ? 'medium'
+                : 'low',
         },
       };
     });
@@ -1183,7 +1182,7 @@ router.get(
           totalAmount,
           categoriesAnalyzed: categoriesWithPercentages.length,
           highRiskCategories: categoriesWithPercentages.filter(
-            (c) => c.insights.riskLevel === "high",
+            (c) => c.insights.riskLevel === 'high',
           ).length,
           frequentCategories: categoriesWithPercentages.filter(
             (c) => c.insights.isFrequentCategory,

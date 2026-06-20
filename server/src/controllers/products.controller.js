@@ -3,12 +3,12 @@
  * Handles business logic for product CRUD operations
  */
 
-const BaseController = require("./base.controller");
-const { ObjectId } = require("mongodb");
-const { logger } = require("../config/logging");
-const auditLog = require("../services/audit-log.service");
-const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
-const { cacheService } = require("../services/cache.service");
+const BaseController = require('./base.controller');
+const { ObjectId } = require('mongodb');
+const { logger } = require('../config/logging');
+const auditLog = require('../services/audit-log.service');
+const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
+const { cacheService } = require('../services/cache.service');
 
 class ProductsController extends BaseController {
   /**
@@ -21,10 +21,10 @@ class ProductsController extends BaseController {
       const matchStage = this._buildProductFilter({ category, search, isActive });
       const products = await this._fetchProductsWithStock(req.shopDb, matchStage);
 
-      this.sendSuccess(res, products, "Products fetched successfully");
+      this.sendSuccess(res, products, 'Products fetched successfully');
     } catch (error) {
-      logger.error("Get products error:", error);
-      this.sendError(res, "Failed to fetch products", 500, error);
+      logger.error('Get products error:', error);
+      this.sendError(res, 'Failed to fetch products', 500, error);
     }
   }
 
@@ -33,18 +33,18 @@ class ProductsController extends BaseController {
    */
   async getProductById(req, res) {
     try {
-      const product = await req.shopDb.collection("products").findOne({
+      const product = await req.shopDb.collection('products').findOne({
         _id: new ObjectId(req.params.id),
       });
 
       if (!product) {
-        return this.sendError(res, "Product not found", 404);
+        return this.sendError(res, 'Product not found', 404);
       }
 
-      this.sendSuccess(res, product, "Product fetched successfully");
+      this.sendSuccess(res, product, 'Product fetched successfully');
     } catch (error) {
-      logger.error("Get product error:", error);
-      this.sendError(res, "Failed to fetch product", 500, error);
+      logger.error('Get product error:', error);
+      this.sendError(res, 'Failed to fetch product', 500, error);
     }
   }
 
@@ -72,22 +72,22 @@ class ProductsController extends BaseController {
 
       // Validate required fields
       this.validateRequired(req.body, [
-        "name",
-        "category",
-        "sku",
-        "purchasePrice",
-        "sellingPrice",
-        "unit",
-        "minStockLevel",
+        'name',
+        'category',
+        'sku',
+        'purchasePrice',
+        'sellingPrice',
+        'unit',
+        'minStockLevel',
       ]);
 
       // Check if SKU already exists
       const existingProduct = await req.shopDb
-        .collection("products")
+        .collection('products')
         .findOne({ sku });
 
       if (existingProduct) {
-        return this.sendError(res, "SKU already exists", 400);
+        return this.sendError(res, 'SKU already exists', 400);
       }
 
       // Build product object
@@ -109,29 +109,29 @@ class ProductsController extends BaseController {
       });
 
       // Insert product
-      const result = await req.shopDb.collection("products").insertOne(product);
+      const result = await req.shopDb.collection('products').insertOne(product);
 
       // Create initial stock record (both old and new systems)
       await this._createInitialStock(req.shopDb, result.insertedId, name, sku, minStockLevel);
 
       // Audit: product created
-      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_CREATED, "product", result.insertedId.toString(),
+      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_CREATED, 'product', result.insertedId.toString(),
         `Created product "${name}" (SKU: ${sku})`,
         { after: { name, sku, category, sellingPrice, purchasePrice } }
       );
 
       // Invalidate products cache
-      cacheService.invalidateShopCache(req.user.shopId, "products");
+      cacheService.invalidateShopCache(req.user.shopId, 'products');
 
       this.sendSuccess(
         res,
         { _id: result.insertedId, ...product },
-        "Product created successfully",
+        'Product created successfully',
         201,
       );
     } catch (error) {
-      logger.error("Create product error:", error);
-      this.sendError(res, error.message || "Failed to create product", 500, error);
+      logger.error('Create product error:', error);
+      this.sendError(res, error.message || 'Failed to create product', 500, error);
     }
   }
 
@@ -159,23 +159,23 @@ class ProductsController extends BaseController {
       } = req.body;
 
       // Check if product exists
-      const existingProduct = await req.shopDb.collection("products").findOne({
+      const existingProduct = await req.shopDb.collection('products').findOne({
         _id: new ObjectId(req.params.id),
       });
 
       if (!existingProduct) {
-        return this.sendError(res, "Product not found", 404);
+        return this.sendError(res, 'Product not found', 404);
       }
 
       // Check if SKU is being changed and if new SKU already exists
       if (sku && sku !== existingProduct.sku) {
-        const skuExists = await req.shopDb.collection("products").findOne({
+        const skuExists = await req.shopDb.collection('products').findOne({
           sku,
           _id: { $ne: new ObjectId(req.params.id) },
         });
 
         if (skuExists) {
-          return this.sendError(res, "SKU already exists", 400);
+          return this.sendError(res, 'SKU already exists', 400);
         }
       }
 
@@ -200,14 +200,14 @@ class ProductsController extends BaseController {
 
       // Update product
       await req.shopDb
-        .collection("products")
+        .collection('products')
         .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
       // Update stock record if needed
       await this._updateStockRecord(req.shopDb, req.params.id, name, minStockLevel);
 
       // Audit: product updated
-      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_UPDATED, "product", req.params.id,
+      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_UPDATED, 'product', req.params.id,
         `Updated product "${existingProduct.name}"`,
         {
           before: { name: existingProduct.name, sku: existingProduct.sku, sellingPrice: existingProduct.sellingPrice, isActive: existingProduct.isActive },
@@ -216,12 +216,12 @@ class ProductsController extends BaseController {
       );
 
       // Invalidate products cache
-      cacheService.invalidateShopCache(req.user.shopId, "products");
+      cacheService.invalidateShopCache(req.user.shopId, 'products');
 
-      this.sendSuccess(res, null, "Product updated successfully");
+      this.sendSuccess(res, null, 'Product updated successfully');
     } catch (error) {
-      logger.error("Update product error:", error);
-      this.sendError(res, "Failed to update product", 500, error);
+      logger.error('Update product error:', error);
+      this.sendError(res, 'Failed to update product', 500, error);
     }
   }
 
@@ -230,7 +230,7 @@ class ProductsController extends BaseController {
    */
   async deleteProduct(req, res) {
     try {
-      const result = await req.shopDb.collection("products").updateOne(
+      const result = await req.shopDb.collection('products').updateOne(
         { _id: new ObjectId(req.params.id) },
         {
           $set: {
@@ -241,22 +241,22 @@ class ProductsController extends BaseController {
       );
 
       if (result.matchedCount === 0) {
-        return this.sendError(res, "Product not found", 404);
+        return this.sendError(res, 'Product not found', 404);
       }
 
       // Audit: product deleted (soft delete)
-      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_DELETED, "product", req.params.id,
+      auditLog.log(req, AUDIT_ACTIONS.PRODUCT_DELETED, 'product', req.params.id,
         `Deleted (deactivated) product ID ${req.params.id}`,
         { after: { isActive: false } }
       );
 
       // Invalidate products cache
-      cacheService.invalidateShopCache(req.user.shopId, "products");
+      cacheService.invalidateShopCache(req.user.shopId, 'products');
 
-      this.sendSuccess(res, null, "Product deleted successfully");
+      this.sendSuccess(res, null, 'Product deleted successfully');
     } catch (error) {
-      logger.error("Delete product error:", error);
-      this.sendError(res, "Failed to delete product", 500, error);
+      logger.error('Delete product error:', error);
+      this.sendError(res, 'Failed to delete product', 500, error);
     }
   }
 
@@ -268,13 +268,13 @@ class ProductsController extends BaseController {
   _buildProductFilter({ category, search, isActive }) {
     const matchStage = {};
 
-    if (category) matchStage.category = category;
-    if (isActive !== undefined) matchStage.isActive = isActive === "true";
+    if (category) {matchStage.category = category;}
+    if (isActive !== undefined) {matchStage.isActive = isActive === 'true';}
     if (search) {
       matchStage.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { sku: { $regex: search, $options: "i" } },
-        { brand: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -286,37 +286,37 @@ class ProductsController extends BaseController {
    */
   async _fetchProductsWithStock(shopDb, matchStage) {
     return await shopDb
-      .collection("products")
+      .collection('products')
       .aggregate([
         { $match: matchStage },
         {
           $lookup: {
-            from: "stock",
-            localField: "_id",
-            foreignField: "productId",
-            as: "stock",
+            from: 'stock',
+            localField: '_id',
+            foreignField: 'productId',
+            as: 'stock',
           },
         },
         {
           $addFields: {
             stockQuantity: {
-              $ifNull: [{ $arrayElemAt: ["$stock.currentQty", 0] }, 0],
+              $ifNull: [{ $arrayElemAt: ['$stock.currentQty', 0] }, 0],
             },
             isLowStock: {
               $cond: {
-                if: { $gt: [{ $size: "$stock" }, 0] },
+                if: { $gt: [{ $size: '$stock' }, 0] },
                 then: {
                   $lte: [
-                    { $arrayElemAt: ["$stock.currentQty", 0] },
-                    "$minStockLevel",
+                    { $arrayElemAt: ['$stock.currentQty', 0] },
+                    '$minStockLevel',
                   ],
                 },
                 else: true,
               },
             },
             category: {
-              _id: { $toLower: "$category" },
-              name: "$category",
+              _id: { $toLower: '$category' },
+              name: '$category',
             },
           },
         },
@@ -337,15 +337,15 @@ class ProductsController extends BaseController {
     return {
       name,
       category,
-      brand: brand || "",
+      brand: brand || '',
       sku,
       purchasePrice: parseFloat(purchasePrice),
       sellingPrice: parseFloat(sellingPrice),
       unit,
       minStockLevel: parseInt(minStockLevel),
-      description: description || "",
-      batchNo: batchNo || "",
-      lotNo: lotNo || "",
+      description: description || '',
+      batchNo: batchNo || '',
+      lotNo: lotNo || '',
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       reorderPoint: reorderPoint !== undefined ? parseInt(reorderPoint) : 10,
       maxStock: maxStock !== undefined ? parseInt(maxStock) : null,
@@ -364,21 +364,21 @@ class ProductsController extends BaseController {
     reorderPoint, maxStock, isActive,
   }) {
     const updateData = { updatedAt: new Date() };
-    if (name !== undefined) updateData.name = name;
-    if (category !== undefined) updateData.category = category;
-    if (brand !== undefined) updateData.brand = brand;
-    if (sku !== undefined) updateData.sku = sku;
-    if (purchasePrice !== undefined) updateData.purchasePrice = parseFloat(purchasePrice);
-    if (sellingPrice !== undefined) updateData.sellingPrice = parseFloat(sellingPrice);
-    if (unit !== undefined) updateData.unit = unit;
-    if (minStockLevel !== undefined) updateData.minStockLevel = parseInt(minStockLevel);
-    if (description !== undefined) updateData.description = description;
-    if (batchNo !== undefined) updateData.batchNo = batchNo;
-    if (lotNo !== undefined) updateData.lotNo = lotNo;
-    if (expiryDate !== undefined) updateData.expiryDate = expiryDate ? new Date(expiryDate) : null;
-    if (reorderPoint !== undefined) updateData.reorderPoint = parseInt(reorderPoint);
-    if (maxStock !== undefined) updateData.maxStock = maxStock ? parseInt(maxStock) : null;
-    if (isActive !== undefined) updateData.isActive = isActive;
+    if (name !== undefined) {updateData.name = name;}
+    if (category !== undefined) {updateData.category = category;}
+    if (brand !== undefined) {updateData.brand = brand;}
+    if (sku !== undefined) {updateData.sku = sku;}
+    if (purchasePrice !== undefined) {updateData.purchasePrice = parseFloat(purchasePrice);}
+    if (sellingPrice !== undefined) {updateData.sellingPrice = parseFloat(sellingPrice);}
+    if (unit !== undefined) {updateData.unit = unit;}
+    if (minStockLevel !== undefined) {updateData.minStockLevel = parseInt(minStockLevel);}
+    if (description !== undefined) {updateData.description = description;}
+    if (batchNo !== undefined) {updateData.batchNo = batchNo;}
+    if (lotNo !== undefined) {updateData.lotNo = lotNo;}
+    if (expiryDate !== undefined) {updateData.expiryDate = expiryDate ? new Date(expiryDate) : null;}
+    if (reorderPoint !== undefined) {updateData.reorderPoint = parseInt(reorderPoint);}
+    if (maxStock !== undefined) {updateData.maxStock = maxStock ? parseInt(maxStock) : null;}
+    if (isActive !== undefined) {updateData.isActive = isActive;}
     return updateData;
   }
 
@@ -387,7 +387,7 @@ class ProductsController extends BaseController {
    */
   async _createInitialStock(shopDb, productId, name, sku, minStockLevel) {
     // Create record in old stock collection (for backward compatibility)
-    await shopDb.collection("stock").insertOne({
+    await shopDb.collection('stock').insertOne({
       productId: productId,
       productName: name,
       currentQty: 0,
@@ -400,7 +400,7 @@ class ProductsController extends BaseController {
     });
 
     // Create initial snapshot in new event-sourced stock system
-    await shopDb.collection("stock_snapshots").insertOne({
+    await shopDb.collection('stock_snapshots').insertOne({
       productId: productId,
       productName: name,
       sku: sku || null,
@@ -439,7 +439,7 @@ class ProductsController extends BaseController {
       stockUpdate.minStockLevel = parseInt(minStockLevel);
 
       // Update isLowStock flag
-      const stock = await shopDb.collection("stock").findOne({
+      const stock = await shopDb.collection('stock').findOne({
         productId: new ObjectId(productId),
       });
 
@@ -449,7 +449,7 @@ class ProductsController extends BaseController {
     }
 
     await shopDb
-      .collection("stock")
+      .collection('stock')
       .updateOne({ productId: new ObjectId(productId) }, { $set: stockUpdate });
   }
 }

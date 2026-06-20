@@ -3,9 +3,9 @@
  * Scheduled job to process recurring expenses daily
  */
 
-const cron = require("node-cron");
-const { processAllRecurringExpenses } = require("./recurring-expense.service");
-const { logger } = require("../config/logging");
+const cron = require('node-cron');
+const { processAllRecurringExpenses } = require('./recurring-expense.service');
+const { logger } = require('../config/logging');
 
 /**
  * Start the recurring expense processing scheduler
@@ -14,14 +14,14 @@ const { logger } = require("../config/logging");
 function startRecurringExpenseScheduler() {
   // Schedule to run daily at 2:00 AM
   const task = cron.schedule(
-    "0 2 * * *",
+    '0 2 * * *',
     async () => {
-      logger.info("Starting scheduled recurring expense processing...");
+      logger.info('Starting scheduled recurring expense processing...');
 
       try {
         const results = await processAllRecurringExpenses();
 
-        logger.info("Scheduled recurring expense processing completed", {
+        logger.info('Scheduled recurring expense processing completed', {
           totalShopsProcessed: results.totalShopsProcessed,
           totalExpensesCreated: results.totalExpensesCreated,
           errors: results.errors.length,
@@ -30,17 +30,17 @@ function startRecurringExpenseScheduler() {
         // Log any errors
         if (results.errors.length > 0) {
           logger.error(
-            "Errors during recurring expense processing:",
+            'Errors during recurring expense processing:',
             results.errors,
           );
         }
       } catch (error) {
-        logger.error("Error in scheduled recurring expense processing:", error);
+        logger.error('Error in scheduled recurring expense processing:', error);
       }
     },
     {
       scheduled: false, // Don't start immediately
-      timezone: "UTC", // Use UTC timezone
+      timezone: 'UTC', // Use UTC timezone
     },
   );
 
@@ -48,7 +48,7 @@ function startRecurringExpenseScheduler() {
   task.start();
 
   logger.info(
-    "Recurring expense scheduler started - will run daily at 2:00 AM UTC",
+    'Recurring expense scheduler started - will run daily at 2:00 AM UTC',
   );
 
   return task;
@@ -61,7 +61,7 @@ function startRecurringExpenseScheduler() {
 function stopRecurringExpenseScheduler(task) {
   if (task) {
     task.stop();
-    logger.info("Recurring expense scheduler stopped");
+    logger.info('Recurring expense scheduler stopped');
   }
 }
 
@@ -69,12 +69,12 @@ function stopRecurringExpenseScheduler(task) {
  * Run recurring expense processing immediately (for testing/manual trigger)
  */
 async function runRecurringExpenseProcessingNow() {
-  logger.info("Running recurring expense processing manually...");
+  logger.info('Running recurring expense processing manually...');
 
   try {
     const results = await processAllRecurringExpenses();
 
-    logger.info("Manual recurring expense processing completed", {
+    logger.info('Manual recurring expense processing completed', {
       totalShopsProcessed: results.totalShopsProcessed,
       totalExpensesCreated: results.totalExpensesCreated,
       errors: results.errors.length,
@@ -82,7 +82,7 @@ async function runRecurringExpenseProcessingNow() {
 
     return results;
   } catch (error) {
-    logger.error("Error in manual recurring expense processing:", error);
+    logger.error('Error in manual recurring expense processing:', error);
     throw error;
   }
 }

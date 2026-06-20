@@ -3,12 +3,12 @@
  * Routes for system-wide shop management
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const rateLimit = require("express-rate-limit");
-const { authenticate } = require("../middleware/auth-multi-tenant");
-const { requireRole } = require("../utils/rbac");
-const { ROLES } = require("../utils/rbac");
+const rateLimit = require('express-rate-limit');
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { requireRole } = require('../utils/rbac');
+const { ROLES } = require('../utils/rbac');
 const {
   createShop,
   listShops,
@@ -16,11 +16,11 @@ const {
   updateShopStatus,
   deleteShop,
   getShopStats,
-} = require("../utils/shop-manager");
-const { listAllShops, getSystemDatabase, getShopDatabase } = require("../config/database");
+} = require('../utils/shop-manager');
+const { listAllShops, getSystemDatabase, getShopDatabase } = require('../config/database');
 const { logger } = require('../config/logging');
-const auditLog = require("../services/audit-log.service");
-const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+const auditLog = require('../services/audit-log.service');
+const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
 
 // Rate limiter for shop creation (prevent abuse)
 const shopCreationLimiter = rateLimit({
@@ -28,7 +28,7 @@ const shopCreationLimiter = rateLimit({
   max: 3, // 3 shops per hour per IP
   message: {
     success: false,
-    message: "Shop creation rate limit exceeded. Please try again in 1 hour.",
+    message: 'Shop creation rate limit exceeded. Please try again in 1 hour.',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -280,26 +280,26 @@ router.use(requireRole([ROLES.SUPER_ADMIN]));
  * GET /api/super-admin/dashboard
  * Get platform-level dashboard statistics
  */
-router.get("/dashboard", async (req, res) => {
+router.get('/dashboard', async (req, res) => {
   try {
     const systemDb = getSystemDatabase();
 
     // Get all shops
-    const allShops = await systemDb.collection("shops").find({}).toArray();
-    const activeShops = allShops.filter((s) => s.status === "Active").length;
+    const allShops = await systemDb.collection('shops').find({}).toArray();
+    const activeShops = allShops.filter((s) => s.status === 'Active').length;
 
     // Get all users from system_users collection
-    const systemUsers = await systemDb.collection("system_users").find({}).toArray();
+    const systemUsers = await systemDb.collection('system_users').find({}).toArray();
     const activeSystemUsers = systemUsers.filter((u) => u.isActive).length;
 
     // Get shop users count (aggregate from all shop databases)
     let totalShopUsers = 0;
     let activeShopUsers = 0;
-    
+
     for (const shop of allShops) {
       try {
         const shopDb = getShopDatabase(shop.shopId);
-        const users = await shopDb.collection("users").find({}).toArray();
+        const users = await shopDb.collection('users').find({}).toArray();
         totalShopUsers += users.length;
         activeShopUsers += users.filter((u) => u.isActive).length;
       } catch (error) {
@@ -313,14 +313,14 @@ router.get("/dashboard", async (req, res) => {
     const stats = {
       totalShops: allShops.length,
       activeShops,
-      suspendedShops: allShops.filter((s) => s.status === "Suspended").length,
-      inactiveShops: allShops.filter((s) => s.status === "Inactive").length,
+      suspendedShops: allShops.filter((s) => s.status === 'Suspended').length,
+      inactiveShops: allShops.filter((s) => s.status === 'Inactive').length,
       totalUsers: systemUsers.length + totalShopUsers,
       activeUsers: activeSystemUsers + activeShopUsers,
       systemUsers: systemUsers.length,
       shopUsers: totalShopUsers,
-      systemHealth: "Good",
-      databaseStatus: "Connected",
+      systemHealth: 'Good',
+      databaseStatus: 'Connected',
       totalCollections: collections.length,
       lastUpdated: new Date().toISOString(),
     };
@@ -330,10 +330,10 @@ router.get("/dashboard", async (req, res) => {
       data: stats,
     });
   } catch (error) {
-    logger.error("Get platform dashboard error:", error);
+    logger.error('Get platform dashboard error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to get platform statistics",
+      message: 'Failed to get platform statistics',
     });
   }
 });
@@ -342,14 +342,14 @@ router.get("/dashboard", async (req, res) => {
  * POST /api/super-admin/shops
  * Create a new shop
  */
-router.post("/shops", shopCreationLimiter, async (req, res) => {
+router.post('/shops', shopCreationLimiter, async (req, res) => {
   try {
     const { shopData, adminData } = req.body;
 
     if (!shopData || !adminData) {
       return res.status(400).json({
         success: false,
-        message: "Shop data and admin data are required",
+        message: 'Shop data and admin data are required',
       });
     }
 
@@ -360,21 +360,21 @@ router.post("/shops", shopCreationLimiter, async (req, res) => {
     );
 
     // Audit: shop created
-    auditLog.log(req, AUDIT_ACTIONS.USER_CREATED, "shop", result.shopId,
+    auditLog.log(req, AUDIT_ACTIONS.USER_CREATED, 'shop', result.shopId,
       `SUPER_ADMIN created shop "${shopData.name}" (${result.shopId})`,
       { after: { shopId: result.shopId, name: shopData.name, ownerEmail: shopData.ownerEmail } }
     );
 
     res.status(201).json({
       success: true,
-      message: "Shop created successfully",
+      message: 'Shop created successfully',
       data: result,
     });
   } catch (error) {
-    logger.error("Create shop error:", error);
+    logger.error('Create shop error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to create shop",
+      message: error.message || 'Failed to create shop',
     });
   }
 });
@@ -383,13 +383,13 @@ router.post("/shops", shopCreationLimiter, async (req, res) => {
  * GET /api/super-admin/shops
  * List all shops
  */
-router.get("/shops", async (req, res) => {
+router.get('/shops', async (req, res) => {
   try {
     const { status, subscriptionPlan } = req.query;
 
     const filter = {};
-    if (status) filter.status = status;
-    if (subscriptionPlan) filter.subscriptionPlan = subscriptionPlan;
+    if (status) {filter.status = status;}
+    if (subscriptionPlan) {filter.subscriptionPlan = subscriptionPlan;}
 
     const shops = await listShops(filter);
 
@@ -399,10 +399,10 @@ router.get("/shops", async (req, res) => {
       data: shops,
     });
   } catch (error) {
-    logger.error("List shops error:", error);
+    logger.error('List shops error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to list shops",
+      message: 'Failed to list shops',
     });
   }
 });
@@ -411,14 +411,14 @@ router.get("/shops", async (req, res) => {
  * GET /api/super-admin/shops/:shopId
  * Get shop details
  */
-router.get("/shops/:shopId", async (req, res) => {
+router.get('/shops/:shopId', async (req, res) => {
   try {
     const shop = await getShop(req.params.shopId);
 
     if (!shop) {
       return res.status(404).json({
         success: false,
-        message: "Shop not found",
+        message: 'Shop not found',
       });
     }
 
@@ -427,10 +427,10 @@ router.get("/shops/:shopId", async (req, res) => {
       data: shop,
     });
   } catch (error) {
-    logger.error("Get shop error:", error);
+    logger.error('Get shop error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to get shop details",
+      message: 'Failed to get shop details',
     });
   }
 });
@@ -439,14 +439,14 @@ router.get("/shops/:shopId", async (req, res) => {
  * PATCH /api/super-admin/shops/:shopId/status
  * Update shop status
  */
-router.patch("/shops/:shopId/status", async (req, res) => {
+router.patch('/shops/:shopId/status', async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!["Active", "Suspended", "Inactive"].includes(status)) {
+    if (!['Active', 'Suspended', 'Inactive'].includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid status. Must be Active, Suspended, or Inactive",
+        message: 'Invalid status. Must be Active, Suspended, or Inactive',
       });
     }
 
@@ -455,12 +455,12 @@ router.patch("/shops/:shopId/status", async (req, res) => {
     if (result.matchedCount === 0) {
       return res.status(404).json({
         success: false,
-        message: "Shop not found",
+        message: 'Shop not found',
       });
     }
 
     // Audit: shop status changed
-    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, "shop", req.params.shopId,
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, 'shop', req.params.shopId,
       `SUPER_ADMIN changed shop ${req.params.shopId} status to ${status}`,
       { after: { shopId: req.params.shopId, status } }
     );
@@ -470,10 +470,10 @@ router.patch("/shops/:shopId/status", async (req, res) => {
       message: `Shop status updated to ${status}`,
     });
   } catch (error) {
-    logger.error("Update shop status error:", error);
+    logger.error('Update shop status error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to update shop status",
+      message: 'Failed to update shop status',
     });
   }
 });
@@ -482,12 +482,12 @@ router.patch("/shops/:shopId/status", async (req, res) => {
  * DELETE /api/super-admin/shops/:shopId
  * Delete shop and its database
  */
-router.delete("/shops/:shopId", async (req, res) => {
+router.delete('/shops/:shopId', async (req, res) => {
   try {
     const result = await deleteShop(req.params.shopId);
 
     // Audit: shop deleted
-    auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, "shop", req.params.shopId,
+    auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, 'shop', req.params.shopId,
       `SUPER_ADMIN deleted shop ${req.params.shopId}`,
       { before: { shopId: req.params.shopId } }
     );
@@ -497,10 +497,10 @@ router.delete("/shops/:shopId", async (req, res) => {
       message: result.message,
     });
   } catch (error) {
-    logger.error("Delete shop error:", error);
+    logger.error('Delete shop error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to delete shop",
+      message: 'Failed to delete shop',
     });
   }
 });
@@ -509,7 +509,7 @@ router.delete("/shops/:shopId", async (req, res) => {
  * GET /api/super-admin/shops/:shopId/stats
  * Get shop statistics
  */
-router.get("/shops/:shopId/stats", async (req, res) => {
+router.get('/shops/:shopId/stats', async (req, res) => {
   try {
     const stats = await getShopStats(req.params.shopId);
 
@@ -518,10 +518,10 @@ router.get("/shops/:shopId/stats", async (req, res) => {
       data: stats,
     });
   } catch (error) {
-    logger.error("Get shop stats error:", error);
+    logger.error('Get shop stats error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to get shop statistics",
+      message: 'Failed to get shop statistics',
     });
   }
 });
@@ -530,7 +530,7 @@ router.get("/shops/:shopId/stats", async (req, res) => {
  * GET /api/super-admin/database-list
  * List all shop databases
  */
-router.get("/database-list", async (req, res) => {
+router.get('/database-list', async (req, res) => {
   try {
     const databases = await listAllShops();
 
@@ -540,10 +540,10 @@ router.get("/database-list", async (req, res) => {
       data: databases,
     });
   } catch (error) {
-    logger.error("List databases error:", error);
+    logger.error('List databases error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to list databases",
+      message: 'Failed to list databases',
     });
   }
 });

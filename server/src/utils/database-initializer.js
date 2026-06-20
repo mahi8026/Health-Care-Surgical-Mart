@@ -1,29 +1,30 @@
 /**
  * Database Initializer
-const { logger } = require('../config/logging');
  * Creates collections with schemas and indexes for a shop database
  */
 
-const { productSchema, productIndexes } = require("../models/product.schema");
+const { logger } = require('../config/logging');
+
+const { productSchema, productIndexes } = require('../models/product.schema');
 const {
   customerSchema,
   customerIndexes,
-} = require("../models/customer.schema");
-const { saleSchema, saleIndexes } = require("../models/sale.schema");
+} = require('../models/customer.schema');
+const { saleSchema, saleIndexes } = require('../models/sale.schema');
 const {
   purchaseSchema,
   purchaseIndexes,
-} = require("../models/purchase.schema");
-const { stockSchema, stockIndexes } = require("../models/stock.schema");
-const { userSchema, userIndexes } = require("../models/user.schema");
+} = require('../models/purchase.schema');
+const { stockSchema, stockIndexes } = require('../models/stock.schema');
+const { userSchema, userIndexes } = require('../models/user.schema');
 const {
   expenseCategorySchema,
   expenseCategoryIndexes,
-} = require("../models/expense-category.schema");
-const { expenseSchema, expenseIndexes } = require("../models/expense.schema");
+} = require('../models/expense-category.schema');
+const { expenseSchema, expenseIndexes } = require('../models/expense.schema');
 const {
   seedDefaultExpenseCategories,
-} = require("../services/expense-category-seeder");
+} = require('../services/expense-category-seeder');
 
 /**
  * Initialize a shop database with all collections, schemas, and indexes
@@ -40,18 +41,18 @@ async function initializeShopDatabase(db) {
   try {
     // Collection configurations
     const collections = [
-      { name: "products", schema: productSchema, indexes: productIndexes },
-      { name: "customers", schema: customerSchema, indexes: customerIndexes },
-      { name: "sales", schema: saleSchema, indexes: saleIndexes },
-      { name: "purchases", schema: purchaseSchema, indexes: purchaseIndexes },
-      { name: "stock", schema: stockSchema, indexes: stockIndexes },
-      { name: "users", schema: userSchema, indexes: userIndexes },
+      { name: 'products', schema: productSchema, indexes: productIndexes },
+      { name: 'customers', schema: customerSchema, indexes: customerIndexes },
+      { name: 'sales', schema: saleSchema, indexes: saleIndexes },
+      { name: 'purchases', schema: purchaseSchema, indexes: purchaseIndexes },
+      { name: 'stock', schema: stockSchema, indexes: stockIndexes },
+      { name: 'users', schema: userSchema, indexes: userIndexes },
       {
-        name: "expense_categories",
+        name: 'expense_categories',
         schema: expenseCategorySchema,
         indexes: expenseCategoryIndexes,
       },
-      { name: "expenses", schema: expenseSchema, indexes: expenseIndexes },
+      { name: 'expenses', schema: expenseSchema, indexes: expenseIndexes },
     ];
 
     // Create collections with validation
@@ -117,7 +118,7 @@ async function initializeShopDatabase(db) {
 
     return results;
   } catch (error) {
-    logger.error("Database initialization error:", error);
+    logger.error('Database initialization error:', error);
     throw error;
   }
 }
@@ -128,7 +129,7 @@ async function initializeShopDatabase(db) {
  * @returns {Promise<Object>} Result of initialization
  */
 async function initializeSystemDatabase(systemDb) {
-  const { shopSchema, shopIndexes } = require("../models/shop.schema");
+  const { shopSchema, shopIndexes } = require('../models/shop.schema');
 
   const results = {
     collections: [],
@@ -139,22 +140,22 @@ async function initializeSystemDatabase(systemDb) {
   try {
     // Check if shops collection exists
     const existingCollections = await systemDb
-      .listCollections({ name: "shops" })
+      .listCollections({ name: 'shops' })
       .toArray();
 
     if (existingCollections.length === 0) {
-      await systemDb.createCollection("shops", shopSchema);
-      results.collections.push("✅ Created collection: shops");
+      await systemDb.createCollection('shops', shopSchema);
+      results.collections.push('✅ Created collection: shops');
     } else {
       await systemDb.command({
-        collMod: "shops",
+        collMod: 'shops',
         validator: shopSchema.validator,
       });
-      results.collections.push("✅ Updated validation for: shops");
+      results.collections.push('✅ Updated validation for: shops');
     }
 
     // Create indexes
-    const shopsCollection = systemDb.collection("shops");
+    const shopsCollection = systemDb.collection('shops');
     for (const index of shopIndexes) {
       try {
         await shopsCollection.createIndex(index.key, {
@@ -176,23 +177,23 @@ async function initializeSystemDatabase(systemDb) {
 
     // Create system users collection
     const systemUserExists = await systemDb
-      .listCollections({ name: "system_users" })
+      .listCollections({ name: 'system_users' })
       .toArray();
     if (systemUserExists.length === 0) {
-      await systemDb.createCollection("system_users", userSchema);
-      results.collections.push("✅ Created collection: system_users");
+      await systemDb.createCollection('system_users', userSchema);
+      results.collections.push('✅ Created collection: system_users');
 
-      const systemUsersCollection = systemDb.collection("system_users");
+      const systemUsersCollection = systemDb.collection('system_users');
       await systemUsersCollection.createIndex(
         { email: 1 },
-        { unique: true, name: "email_unique" },
+        { unique: true, name: 'email_unique' },
       );
-      results.indexes.push("✅ Created index email_unique on system_users");
+      results.indexes.push('✅ Created index email_unique on system_users');
     }
 
     return results;
   } catch (error) {
-    logger.error("System database initialization error:", error);
+    logger.error('System database initialization error:', error);
     throw error;
   }
 }

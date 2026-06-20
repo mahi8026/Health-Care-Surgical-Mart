@@ -3,17 +3,17 @@
  * Handles sale returns and refunds for medical stores
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
+const { ObjectId } = require('mongodb');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
 const { logger } = require('../config/logging');
 
 // Apply authentication to all routes
@@ -351,11 +351,11 @@ router.use(checkShopStatus);
  * Get all returns for the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_RETURNS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { page = 1, limit = 20, search = "", status = "" } = req.query;
+    const { page = 1, limit = 20, search = '', status = '' } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const searchQuery = {};
@@ -363,9 +363,9 @@ router.get(
     // Add search filter
     if (search) {
       searchQuery.$or = [
-        { returnNumber: { $regex: search, $options: "i" } },
-        { originalInvoiceNumber: { $regex: search, $options: "i" } },
-        { "customer.name": { $regex: search, $options: "i" } },
+        { returnNumber: { $regex: search, $options: 'i' } },
+        { originalInvoiceNumber: { $regex: search, $options: 'i' } },
+        { 'customer.name': { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -375,7 +375,7 @@ router.get(
     }
 
     const returns = await shopDb
-      .collection("returns")
+      .collection('returns')
       .find(searchQuery)
       .sort({ returnDate: -1 })
       .skip(skip)
@@ -383,7 +383,7 @@ router.get(
       .toArray();
 
     const total = await shopDb
-      .collection("returns")
+      .collection('returns')
       .countDocuments(searchQuery);
 
     res.json({
@@ -404,17 +404,17 @@ router.get(
  * Get return by ID
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_RETURNS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     const returnRecord = await shopDb
-      .collection("returns")
+      .collection('returns')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!returnRecord) {
-      throw createError.notFound("Return record not found");
+      throw createError.notFound('Return record not found');
     }
 
     res.json({
@@ -429,29 +429,29 @@ router.get(
  * Get original sale details for return processing
  */
 router.get(
-  "/sale/:saleId",
+  '/sale/:saleId',
   requirePermission(PERMISSIONS.VIEW_RETURNS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
     const sale = await shopDb
-      .collection("sales")
+      .collection('sales')
       .findOne({ _id: new ObjectId(req.params.saleId) });
 
     if (!sale) {
-      throw createError.notFound("Original sale not found");
+      throw createError.notFound('Original sale not found');
     }
 
     // Check if any returns already exist for this sale
     const existingReturns = await shopDb
-      .collection("returns")
+      .collection('returns')
       .find({ originalSaleId: req.params.saleId })
       .toArray();
 
     // Calculate returned quantities for each item
     const returnedQuantities = {};
     existingReturns.forEach((returnRecord) => {
-      if (returnRecord.status !== "cancelled") {
+      if (returnRecord.status !== 'cancelled') {
         returnRecord.items.forEach((item) => {
           const key = item.productId.toString();
           returnedQuantities[key] =
@@ -484,7 +484,7 @@ router.get(
  * Create new return
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_RETURN),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -502,21 +502,21 @@ router.post(
     // Validate required fields
     if (!originalSaleId || !items || items.length === 0) {
       throw createError.badRequest(
-        "Original sale ID and return items are required",
+        'Original sale ID and return items are required',
       );
     }
 
     if (!returnReason) {
-      throw createError.badRequest("Return reason is required");
+      throw createError.badRequest('Return reason is required');
     }
 
     // Verify original sale exists
     const originalSale = await shopDb
-      .collection("sales")
+      .collection('sales')
       .findOne({ _id: new ObjectId(originalSaleId) });
 
     if (!originalSale) {
-      throw createError.notFound("Original sale not found");
+      throw createError.notFound('Original sale not found');
     }
 
     // Validate return items and quantities
@@ -531,7 +531,7 @@ router.post(
       } = returnItem;
 
       if (!productId || !returnQuantity || returnQuantity <= 0) {
-        throw createError.badRequest("Invalid return item data");
+        throw createError.badRequest('Invalid return item data');
       }
 
       // Find the original sale item
@@ -547,11 +547,11 @@ router.post(
 
       // Check if return quantity is valid
       const existingReturns = await shopDb
-        .collection("returns")
+        .collection('returns')
         .find({
           originalSaleId: originalSaleId,
-          "items.productId": new ObjectId(productId),
-          status: { $ne: "cancelled" },
+          'items.productId': new ObjectId(productId),
+          status: { $ne: 'cancelled' },
         })
         .toArray();
 
@@ -574,7 +574,7 @@ router.post(
 
       // Get current product details for stock restoration
       const product = await shopDb
-        .collection("products")
+        .collection('products')
         .findOne({ _id: new ObjectId(productId) });
 
       if (!product) {
@@ -600,8 +600,8 @@ router.post(
 
     // Generate return number
     const returnCount =
-      (await shopDb.collection("returns").countDocuments({})) + 1;
-    const returnNumber = `RET-${Date.now()}-${returnCount.toString().padStart(4, "0")}`;
+      (await shopDb.collection('returns').countDocuments({})) + 1;
+    const returnNumber = `RET-${Date.now()}-${returnCount.toString().padStart(4, '0')}`;
 
     // Calculate refund amounts based on original sale proportions
     const originalSubtotal = originalSale.subtotal || originalSale.grandTotal;
@@ -621,14 +621,14 @@ router.post(
       items: returnItems,
       returnReason,
       returnType,
-      refundMethod: refundMethod || "cash",
+      refundMethod: refundMethod || 'cash',
       subtotal: totalReturnAmount,
       discount: refundDiscount,
       vatAmount: refundVAT,
       totalRefund: totalRefundAmount,
-      status: "completed", // 'pending', 'completed', 'cancelled'
+      status: 'completed', // 'pending', 'completed', 'cancelled'
       returnDate: new Date(),
-      notes: notes || "",
+      notes: notes || '',
       createdBy: req.user.id,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -637,11 +637,11 @@ router.post(
     // Start transaction-like operations
     try {
       // Insert return record
-      const result = await shopDb.collection("returns").insertOne(returnData);
+      const result = await shopDb.collection('returns').insertOne(returnData);
 
       // Phase 6: Update stock using event-sourced system
       const stockCommand = require('../services/stock-command.service');
-      
+
       for (const item of returnItems) {
         // Record stock movement via event-sourced system
         await stockCommand.recordMovement({
@@ -661,14 +661,14 @@ router.post(
         });
 
         // Log stock movement (legacy - for backward compatibility)
-        await shopDb.collection("stock_movements").insertOne({
+        await shopDb.collection('stock_movements').insertOne({
           productId: item.productId,
           productName: item.name,
-          movementType: "return",
+          movementType: 'return',
           quantity: item.returnQuantity,
           previousQty: 0, // Will be updated by stock service
           newQty: 0, // Will be updated by stock service
-          referenceType: "return",
+          referenceType: 'return',
           referenceId: result.insertedId.toString(),
           referenceNumber: returnNumber,
           notes: `Return from sale ${originalInvoiceNumber}`,
@@ -678,7 +678,7 @@ router.post(
       }
 
       // Update original sale with return reference
-      await shopDb.collection("sales").updateOne(
+      await shopDb.collection('sales').updateOne(
         { _id: new ObjectId(originalSaleId) },
         {
           $push: {
@@ -695,7 +695,7 @@ router.post(
 
       res.status(201).json({
         success: true,
-        message: "Return processed successfully",
+        message: 'Return processed successfully',
         data: {
           _id: result.insertedId,
           ...returnData,
@@ -704,8 +704,8 @@ router.post(
     } catch (error) {
       // If any operation fails, we should ideally rollback
       // For now, log the error and throw
-      logger.error("Return processing error:", error);
-      throw createError.internalServerError("Failed to process return");
+      logger.error('Return processing error:', error);
+      throw createError.internalServerError('Failed to process return');
     }
   }),
 );
@@ -715,29 +715,29 @@ router.post(
  * Update return status (cancel, approve, etc.)
  */
 router.put(
-  "/:id/status",
+  '/:id/status',
   requirePermission(PERMISSIONS.EDIT_RETURN),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { status, notes } = req.body;
 
-    if (!["pending", "completed", "cancelled"].includes(status)) {
-      throw createError.badRequest("Invalid status");
+    if (!['pending', 'completed', 'cancelled'].includes(status)) {
+      throw createError.badRequest('Invalid status');
     }
 
     const returnRecord = await shopDb
-      .collection("returns")
+      .collection('returns')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!returnRecord) {
-      throw createError.notFound("Return record not found");
+      throw createError.notFound('Return record not found');
     }
 
     // If cancelling a completed return, restore stock (remove returned items)
     // Phase 6: Use event-sourced system
-    if (status === "cancelled" && returnRecord.status === "completed") {
+    if (status === 'cancelled' && returnRecord.status === 'completed') {
       const stockCommand = require('../services/stock-command.service');
-      
+
       for (const item of returnRecord.items) {
         await stockCommand.recordMovement({
           shopId: req.user.shopId,
@@ -757,9 +757,9 @@ router.put(
     }
 
     // If completing a pending return, update stock (add returned items)
-    if (status === "completed" && returnRecord.status === "pending") {
+    if (status === 'completed' && returnRecord.status === 'pending') {
       const stockCommand = require('../services/stock-command.service');
-      
+
       for (const item of returnRecord.items) {
         await stockCommand.recordMovement({
           shopId: req.user.shopId,
@@ -778,7 +778,7 @@ router.put(
       }
     }
 
-    await shopDb.collection("returns").updateOne(
+    await shopDb.collection('returns').updateOne(
       { _id: new ObjectId(req.params.id) },
       {
         $set: {
@@ -792,7 +792,7 @@ router.put(
 
     res.json({
       success: true,
-      message: "Return status updated successfully",
+      message: 'Return status updated successfully',
     });
   }),
 );
@@ -802,7 +802,7 @@ router.put(
  * Get return statistics
  */
 router.get(
-  "/stats/summary",
+  '/stats/summary',
   requirePermission(PERMISSIONS.VIEW_RETURNS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -820,19 +820,19 @@ router.get(
       await Promise.all([
         // Today's returns
         shopDb
-          .collection("returns")
+          .collection('returns')
           .aggregate([
             {
               $match: {
                 returnDate: { $gte: startOfDay },
-                status: "completed",
+                status: 'completed',
               },
             },
             {
               $group: {
                 _id: null,
                 totalReturns: { $sum: 1 },
-                totalAmount: { $sum: "$totalRefund" },
+                totalAmount: { $sum: '$totalRefund' },
               },
             },
           ])
@@ -840,39 +840,39 @@ router.get(
 
         // Monthly returns
         shopDb
-          .collection("returns")
+          .collection('returns')
           .aggregate([
             {
               $match: {
                 returnDate: { $gte: startOfMonth },
-                status: "completed",
+                status: 'completed',
               },
             },
             {
               $group: {
                 _id: null,
                 totalReturns: { $sum: 1 },
-                totalAmount: { $sum: "$totalRefund" },
+                totalAmount: { $sum: '$totalRefund' },
               },
             },
           ])
           .toArray(),
 
         // Total returns
-        shopDb.collection("returns").countDocuments({ status: "completed" }),
+        shopDb.collection('returns').countDocuments({ status: 'completed' }),
 
         // Returns by reason
         shopDb
-          .collection("returns")
+          .collection('returns')
           .aggregate([
             {
-              $match: { status: "completed" },
+              $match: { status: 'completed' },
             },
             {
               $group: {
-                _id: "$returnReason",
+                _id: '$returnReason',
                 count: { $sum: 1 },
-                totalAmount: { $sum: "$totalRefund" },
+                totalAmount: { $sum: '$totalRefund' },
               },
             },
             {

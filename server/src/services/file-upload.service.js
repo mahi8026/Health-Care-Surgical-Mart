@@ -2,15 +2,15 @@
  * File Upload Service with Google Cloud Storage Support
  * Handles file uploads for receipts, invoices, imports, and product images
  * Falls back to local storage if GCS is not configured
- * 
+ *
  * @version 2.0.0
  */
 
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const { logger } = require("../config/logging");
-const { createError } = require("../config/error-handling");
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { logger } = require('../config/logging');
+const { createError } = require('../config/error-handling');
 
 // ============================================
 // Cloudinary Configuration (Free tier: 25GB storage, 25GB bandwidth)
@@ -33,13 +33,13 @@ function initializeGCS() {
 
     if (!cloudName || !apiKey || !apiSecret) {
       logger.warn(
-        "Cloudinary not configured — using local storage fallback. " +
-        "Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to enable persistent cloud storage."
+        'Cloudinary not configured — using local storage fallback. ' +
+        'Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to enable persistent cloud storage.'
       );
       return false;
     }
 
-    const { v2: cloudinary } = require("cloudinary");
+    const { v2: cloudinary } = require('cloudinary');
     cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
     cloudinaryInstance = cloudinary;
 
@@ -60,11 +60,11 @@ useGCS = initializeGCS();
 // ============================================
 
 // Ensure uploads directory exists for local fallback
-const uploadsDir = path.join(__dirname, "../../uploads");
-const receiptsDir = path.join(uploadsDir, "receipts");
-const invoicesDir = path.join(uploadsDir, "invoices");
-const importsDir = path.join(uploadsDir, "imports");
-const productsDir = path.join(uploadsDir, "products");
+const uploadsDir = path.join(__dirname, '../../uploads');
+const receiptsDir = path.join(uploadsDir, 'receipts');
+const invoicesDir = path.join(uploadsDir, 'invoices');
+const importsDir = path.join(uploadsDir, 'imports');
+const productsDir = path.join(uploadsDir, 'products');
 
 // Create directories if they don't exist
 [uploadsDir, receiptsDir, invoicesDir, importsDir, productsDir].forEach((dir) => {
@@ -84,7 +84,7 @@ const productsDir = path.join(uploadsDir, "products");
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     // Use temp directory for GCS uploads, or final directory for local storage
-    const tempDir = path.join(uploadsDir, "temp");
+    const tempDir = path.join(uploadsDir, 'temp');
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -95,7 +95,7 @@ const storage = multer.diskStorage({
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
     const ext = path.extname(file.originalname);
-    const name = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, "-");
+    const name = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '-');
     const filename = `${timestamp}-${random}-${name}${ext}`;
     cb(null, filename);
   },
@@ -106,12 +106,12 @@ const storage = multer.diskStorage({
  */
 const receiptFileFilter = (req, file, cb) => {
   const allowedTypes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/gif",
-    "application/pdf",
-    "image/webp",
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'application/pdf',
+    'image/webp',
   ];
 
   if (allowedTypes.includes(file.mimetype)) {
@@ -119,7 +119,7 @@ const receiptFileFilter = (req, file, cb) => {
   } else {
     cb(
       createError.badRequest(
-        "Invalid file type. Only JPEG, PNG, GIF, WebP, and PDF files are allowed."
+        'Invalid file type. Only JPEG, PNG, GIF, WebP, and PDF files are allowed.'
       ),
       false
     );
@@ -131,17 +131,17 @@ const receiptFileFilter = (req, file, cb) => {
  */
 const importFileFilter = (req, file, cb) => {
   const allowedTypes = [
-    "text/csv",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    'text/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ];
 
-  if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith(".csv")) {
+  if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith('.csv')) {
     cb(null, true);
   } else {
     cb(
       createError.badRequest(
-        "Invalid file type. Only CSV and Excel files are allowed."
+        'Invalid file type. Only CSV and Excel files are allowed.'
       ),
       false
     );
@@ -153,11 +153,11 @@ const importFileFilter = (req, file, cb) => {
  */
 const productImageFilter = (req, file, cb) => {
   const allowedTypes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/gif",
-    "image/webp",
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
   ];
 
   if (allowedTypes.includes(file.mimetype)) {
@@ -165,7 +165,7 @@ const productImageFilter = (req, file, cb) => {
   } else {
     cb(
       createError.badRequest(
-        "Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed."
+        'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'
       ),
       false
     );
@@ -214,23 +214,23 @@ const productImageUpload = multer({
  */
 async function uploadBufferToGCS(buffer, gcsFolder, shopId, filename) {
   if (!useGCS || !cloudinaryInstance) {
-    throw new Error("Cloudinary is not initialized");
+    throw new Error('Cloudinary is not initialized');
   }
 
   return new Promise((resolve, reject) => {
     const folder = `health-care-surgical-mart/${shopId}/${gcsFolder}`;
-    const publicId = filename.replace(/\.[^.]+$/, ""); // strip extension
-    const isPdf = filename.toLowerCase().endsWith(".pdf");
+    const publicId = filename.replace(/\.[^.]+$/, ''); // strip extension
+    const isPdf = filename.toLowerCase().endsWith('.pdf');
 
     const uploadStream = cloudinaryInstance.uploader.upload_stream(
       {
         folder,
         public_id: publicId,
         // PDFs must use "raw" — "auto" wrongly classifies them as images
-        resource_type: isPdf ? "raw" : "auto",
+        resource_type: isPdf ? 'raw' : 'auto',
       },
       (error, result) => {
-        if (error) return reject(error);
+        if (error) {return reject(error);}
         logger.info(`Buffer uploaded to Cloudinary: ${result.public_id}`);
         resolve(result.secure_url);
       }
@@ -283,8 +283,8 @@ async function uploadInvoicePDF(pdfBuffer, shopId, saleId) {
 
   if (useGCS) {
     try {
-      const url = await uploadBufferToGCS(pdfBuffer, "invoices", shopId, filename);
-      return { url, storage: "gcs", filename };
+      const url = await uploadBufferToGCS(pdfBuffer, 'invoices', shopId, filename);
+      return { url, storage: 'gcs', filename };
     } catch (error) {
       logger.error(`GCS upload failed for invoice, falling back to local: ${error.message}`);
       // Fall through to local storage
@@ -292,9 +292,9 @@ async function uploadInvoicePDF(pdfBuffer, shopId, saleId) {
   }
 
   // Local storage fallback
-  const url = saveBufferToLocalStorage(pdfBuffer, "invoices", shopId, filename);
-  logger.warn("Invoice PDF saved to local storage (GCS not configured or failed)");
-  return { url, storage: "local", filename };
+  const url = saveBufferToLocalStorage(pdfBuffer, 'invoices', shopId, filename);
+  logger.warn('Invoice PDF saved to local storage (GCS not configured or failed)');
+  return { url, storage: 'local', filename };
 }
 
 /**
@@ -307,16 +307,16 @@ async function uploadInvoicePDF(pdfBuffer, shopId, saleId) {
  */
 async function uploadToGCS(localFilePath, gcsFolder, shopId, filename) {
   if (!useGCS || !cloudinaryInstance) {
-    throw new Error("Cloudinary is not initialized");
+    throw new Error('Cloudinary is not initialized');
   }
 
   try {
     const folder = `health-care-surgical-mart/${shopId}/${gcsFolder}`;
-    const publicId = filename.replace(/\.[^.]+$/, "");
+    const publicId = filename.replace(/\.[^.]+$/, '');
     const result = await cloudinaryInstance.uploader.upload(localFilePath, {
       folder,
       public_id: publicId,
-      resource_type: "auto",
+      resource_type: 'auto',
     });
     logger.info(`File uploaded to Cloudinary: ${result.public_id}`);
     return result.secure_url;
@@ -339,8 +339,8 @@ async function deleteFromGCS(gcsFolder, shopId, filename) {
   }
 
   try {
-    const publicId = `health-care-surgical-mart/${shopId}/${gcsFolder}/${filename.replace(/\.[^.]+$/, "")}`;
-    await cloudinaryInstance.uploader.destroy(publicId, { resource_type: "auto" });
+    const publicId = `health-care-surgical-mart/${shopId}/${gcsFolder}/${filename.replace(/\.[^.]+$/, '')}`;
+    await cloudinaryInstance.uploader.destroy(publicId, { resource_type: 'auto' });
     logger.info(`File deleted from Cloudinary: ${publicId}`);
     return true;
   } catch (error) {
@@ -432,7 +432,7 @@ function deleteFromLocalStorage(folder, shopId, filename) {
  * @param {string} folder - Folder type (receipts, invoices, imports, products)
  * @returns {Promise<Array>} Array of file information objects
  */
-async function processUploadedFiles(files, shopId, folder = "receipts") {
+async function processUploadedFiles(files, shopId, folder = 'receipts') {
   if (!files || files.length === 0) {
     return [];
   }
@@ -450,7 +450,7 @@ async function processUploadedFiles(files, shopId, folder = "receipts") {
         // Delete temp file after successful GCS upload
         try {
           fs.unlinkSync(file.path);
-        } catch (error) {
+        } catch (_error) {
           logger.warn(`Failed to delete temp file: ${file.path}`);
         }
       } else {
@@ -465,7 +465,7 @@ async function processUploadedFiles(files, shopId, folder = "receipts") {
         size: file.size,
         mimetype: file.mimetype,
         storedFilename: file.filename,
-        storage: useGCS ? "gcs" : "local",
+        storage: useGCS ? 'gcs' : 'local',
       });
     } catch (error) {
       logger.error(`Failed to process file ${file.originalname}: ${error.message}`);
@@ -475,7 +475,7 @@ async function processUploadedFiles(files, shopId, folder = "receipts") {
         if (fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
-      } catch (cleanupError) {
+      } catch (_cleanupError) {
         logger.warn(`Failed to clean up temp file: ${file.path}`);
       }
 
@@ -493,7 +493,7 @@ async function processUploadedFiles(files, shopId, folder = "receipts") {
  * @param {string} folder - Folder type (receipts, invoices, imports, products)
  * @returns {Promise<boolean>} Success status
  */
-async function deleteUploadedFile(shopId, filename, folder = "receipts") {
+async function deleteUploadedFile(shopId, filename, folder = 'receipts') {
   try {
     if (useGCS) {
       return await deleteFromGCS(folder, shopId, filename);
@@ -513,7 +513,7 @@ async function deleteUploadedFile(shopId, filename, folder = "receipts") {
  * @param {string} folder - Folder type
  * @returns {string|null} File path or null if not found
  */
-function getFilePath(shopId, filename, folder = "receipts") {
+function getFilePath(shopId, filename, folder = 'receipts') {
   if (useGCS) {
     // GCS files are served via public URL, not local path
     return null;
@@ -542,7 +542,7 @@ function getFilePath(shopId, filename, folder = "receipts") {
  * @param {string} type - File type (receipt, import, product)
  * @returns {Object} Validation result
  */
-function validateFile(file, type = "receipt") {
+function validateFile(file, type = 'receipt') {
   const maxSizes = {
     receipt: 10 * 1024 * 1024, // 10MB
     import: 10 * 1024 * 1024, // 10MB
@@ -551,19 +551,19 @@ function validateFile(file, type = "receipt") {
 
   const allowedTypes = {
     receipt: [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "application/pdf",
-      "image/webp",
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'image/webp',
     ],
     import: [
-      "text/csv",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ],
-    product: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"],
+    product: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
   };
 
   const maxSize = maxSizes[type] || maxSizes.receipt;
@@ -579,7 +579,7 @@ function validateFile(file, type = "receipt") {
   if (!allowed.includes(file.mimetype)) {
     return {
       valid: false,
-      error: `Invalid file type. Allowed types: ${allowed.join(", ")}`,
+      error: `Invalid file type. Allowed types: ${allowed.join(', ')}`,
     };
   }
 
@@ -597,53 +597,41 @@ async function cleanupOldFiles(daysOld = 365, folder = null) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-    if (useGCS && gcsBucket) {
-      // Clean up GCS files
-      const folders = folder ? [folder] : ["receipts", "invoices", "imports", "products"];
+    // Note: GCS/Cloudinary cleanup not implemented - would require API pagination
+    // For now, only local file cleanup is supported
+    if (useGCS) {
+      logger.warn('Cloud storage cleanup not yet implemented');
+      return { message: 'Cloud storage cleanup not yet implemented' };
+    }
 
-      for (const folderName of folders) {
-        const [files] = await gcsBucket.getFiles({ prefix: `${folderName}/` });
+    // Clean up local files
+    const folders = folder
+      ? [{ name: folder, dir: path.join(uploadsDir, folder) }]
+      : [
+          { name: 'receipts', dir: receiptsDir },
+          { name: 'invoices', dir: invoicesDir },
+          { name: 'imports', dir: importsDir },
+          { name: 'products', dir: productsDir },
+        ];
 
-        for (const file of files) {
-          const [metadata] = await file.getMetadata();
-          const fileDate = new Date(metadata.timeCreated);
+    for (const { name: _name, dir } of folders) {
+      if (!fs.existsSync(dir)) {continue;}
 
-          if (fileDate < cutoffDate) {
-            await file.delete();
-            logger.info(`Cleaned up old GCS file: ${file.name}`);
-          }
-        }
-      }
-    } else {
-      // Clean up local files
-      const folders = folder
-        ? [{ name: folder, dir: path.join(uploadsDir, folder) }]
-        : [
-            { name: "receipts", dir: receiptsDir },
-            { name: "invoices", dir: invoicesDir },
-            { name: "imports", dir: importsDir },
-            { name: "products", dir: productsDir },
-          ];
+      const shopDirs = fs.readdirSync(dir);
 
-      for (const { name, dir } of folders) {
-        if (!fs.existsSync(dir)) continue;
+      for (const shopDir of shopDirs) {
+        const shopPath = path.join(dir, shopDir);
 
-        const shopDirs = fs.readdirSync(dir);
+        if (fs.statSync(shopPath).isDirectory()) {
+          const files = fs.readdirSync(shopPath);
 
-        for (const shopDir of shopDirs) {
-          const shopPath = path.join(dir, shopDir);
+          for (const file of files) {
+            const filePath = path.join(shopPath, file);
+            const stats = fs.statSync(filePath);
 
-          if (fs.statSync(shopPath).isDirectory()) {
-            const files = fs.readdirSync(shopPath);
-
-            for (const file of files) {
-              const filePath = path.join(shopPath, file);
-              const stats = fs.statSync(filePath);
-
-              if (stats.mtime < cutoffDate) {
-                fs.unlinkSync(filePath);
-                logger.info(`Cleaned up old local file: ${filePath}`);
-              }
+            if (stats.mtime < cutoffDate) {
+              fs.unlinkSync(filePath);
+              logger.info(`Cleaned up old local file: ${filePath}`);
             }
           }
         }

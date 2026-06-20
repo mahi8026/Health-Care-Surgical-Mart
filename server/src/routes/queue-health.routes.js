@@ -3,9 +3,9 @@
  * Provides monitoring endpoints for Bull queues (Email & SMS)
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { logger } = require("../config/logging");
+const { logger } = require('../config/logging');
 
 /**
  * @swagger
@@ -100,15 +100,15 @@ let emailQueue, smsQueue;
 function getQueues() {
   if (!emailQueue || !smsQueue) {
     try {
-      const EmailQueue = require("../services/email/email.queue");
-      const SMSQueue = require("../services/sms/sms.queue");
-      
+      const EmailQueue = require('../services/email/email.queue');
+      const SMSQueue = require('../services/sms/sms.queue');
+
       // Get singleton instances (assuming they're exported as instances)
       // If they're classes, you'll need to adjust this
       emailQueue = new EmailQueue();
       smsQueue = new SMSQueue();
     } catch (error) {
-      logger.error("Failed to load queue instances:", error.message);
+      logger.error('Failed to load queue instances:', error.message);
     }
   }
   return { emailQueue, smsQueue };
@@ -118,17 +118,17 @@ function getQueues() {
  * GET /api/queues/health
  * Get health status of all queues
  */
-router.get("/health", async (req, res) => {
+router.get('/health', async (req, res) => {
   try {
     const { emailQueue, smsQueue } = getQueues();
 
     const health = {
       timestamp: new Date().toISOString(),
       queues: {
-        email: emailQueue ? emailQueue.getStatus() : { enabled: false, error: "Queue not initialized" },
-        sms: smsQueue ? smsQueue.getStatus() : { enabled: false, error: "Queue not initialized" },
+        email: emailQueue ? emailQueue.getStatus() : { enabled: false, error: 'Queue not initialized' },
+        sms: smsQueue ? smsQueue.getStatus() : { enabled: false, error: 'Queue not initialized' },
       },
-      overall: "unknown",
+      overall: 'unknown',
     };
 
     // Determine overall health
@@ -136,26 +136,26 @@ router.get("/health", async (req, res) => {
     const smsHealthy = smsQueue && smsQueue.isHealthy();
 
     if (emailHealthy && smsHealthy) {
-      health.overall = "healthy";
+      health.overall = 'healthy';
     } else if (!emailQueue?.isQueueEnabled && !smsQueue?.isQueueEnabled) {
-      health.overall = "disabled";
+      health.overall = 'disabled';
     } else if (emailHealthy || smsHealthy) {
-      health.overall = "degraded";
+      health.overall = 'degraded';
     } else {
-      health.overall = "unhealthy";
+      health.overall = 'unhealthy';
     }
 
-    const statusCode = health.overall === "healthy" || health.overall === "disabled" ? 200 : 503;
+    const statusCode = health.overall === 'healthy' || health.overall === 'disabled' ? 200 : 503;
 
     res.status(statusCode).json({
       success: true,
       data: health,
     });
   } catch (error) {
-    logger.error("Queue health check failed:", error);
+    logger.error('Queue health check failed:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to check queue health",
+      message: 'Failed to check queue health',
       error: error.message,
     });
   }
@@ -165,14 +165,14 @@ router.get("/health", async (req, res) => {
  * GET /api/queues/stats
  * Get detailed statistics for all queues
  */
-router.get("/stats", async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const { emailQueue, smsQueue } = getQueues();
 
     const stats = {
       timestamp: new Date().toISOString(),
-      email: emailQueue ? await emailQueue.getJobCounts() : { error: "Queue not initialized" },
-      sms: smsQueue ? await smsQueue.getStats() : { error: "Queue not initialized" },
+      email: emailQueue ? await emailQueue.getJobCounts() : { error: 'Queue not initialized' },
+      sms: smsQueue ? await smsQueue.getStats() : { error: 'Queue not initialized' },
     };
 
     res.json({
@@ -180,10 +180,10 @@ router.get("/stats", async (req, res) => {
       data: stats,
     });
   } catch (error) {
-    logger.error("Failed to get queue stats:", error);
+    logger.error('Failed to get queue stats:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to get queue statistics",
+      message: 'Failed to get queue statistics',
       error: error.message,
     });
   }
@@ -193,14 +193,14 @@ router.get("/stats", async (req, res) => {
  * GET /api/queues/email/stats
  * Get email queue statistics
  */
-router.get("/email/stats", async (req, res) => {
+router.get('/email/stats', async (req, res) => {
   try {
     const { emailQueue } = getQueues();
 
     if (!emailQueue) {
       return res.status(503).json({
         success: false,
-        message: "Email queue not initialized",
+        message: 'Email queue not initialized',
       });
     }
 
@@ -210,16 +210,16 @@ router.get("/email/stats", async (req, res) => {
       success: true,
       data: {
         timestamp: new Date().toISOString(),
-        queue: "email",
+        queue: 'email',
         status: emailQueue.getStatus(),
         stats,
       },
     });
   } catch (error) {
-    logger.error("Failed to get email queue stats:", error);
+    logger.error('Failed to get email queue stats:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to get email queue statistics",
+      message: 'Failed to get email queue statistics',
       error: error.message,
     });
   }
@@ -229,14 +229,14 @@ router.get("/email/stats", async (req, res) => {
  * GET /api/queues/sms/stats
  * Get SMS queue statistics
  */
-router.get("/sms/stats", async (req, res) => {
+router.get('/sms/stats', async (req, res) => {
   try {
     const { smsQueue } = getQueues();
 
     if (!smsQueue) {
       return res.status(503).json({
         success: false,
-        message: "SMS queue not initialized",
+        message: 'SMS queue not initialized',
       });
     }
 
@@ -246,16 +246,16 @@ router.get("/sms/stats", async (req, res) => {
       success: true,
       data: {
         timestamp: new Date().toISOString(),
-        queue: "sms",
+        queue: 'sms',
         status: smsQueue.getStatus(),
         stats,
       },
     });
   } catch (error) {
-    logger.error("Failed to get SMS queue stats:", error);
+    logger.error('Failed to get SMS queue stats:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to get SMS queue statistics",
+      message: 'Failed to get SMS queue statistics',
       error: error.message,
     });
   }

@@ -48,7 +48,7 @@ async function comprehensiveHealthCheck() {
     let replicaSetStatus = null;
     try {
       replicaSetStatus = await admin.command({ replSetGetStatus: 1 });
-    } catch (err) {
+    } catch (_err) {
       // Not a replica set or not authorized
       replicaSetStatus = { error: 'Not a replica set or not authorized' };
     }
@@ -143,24 +143,24 @@ function calculateHealthScore(metrics) {
   let score = 100;
 
   // Deduct points for slow ping
-  if (metrics.pingTime > 500) score -= 20;
-  else if (metrics.pingTime > 200) score -= 10;
-  else if (metrics.pingTime > 100) score -= 5;
+  if (metrics.pingTime > 500) {score -= 20;}
+  else if (metrics.pingTime > 200) {score -= 10;}
+  else if (metrics.pingTime > 100) {score -= 5;}
 
   // Deduct points for connection pool issues
-  const connectionUtilization = metrics.connectionStatus.current / 
+  const connectionUtilization = metrics.connectionStatus.current /
     (metrics.connectionStatus.current + metrics.connectionStatus.available);
-  
-  if (connectionUtilization > 0.9) score -= 20;
-  else if (connectionUtilization > 0.7) score -= 10;
+
+  if (connectionUtilization > 0.9) {score -= 20;}
+  else if (connectionUtilization > 0.7) {score -= 10;}
 
   // Deduct points for high memory usage
-  if (metrics.memory.resident > 2000) score -= 15; // > 2GB
-  else if (metrics.memory.resident > 1000) score -= 5; // > 1GB
+  if (metrics.memory.resident > 2000) {score -= 15;} // > 2GB
+  else if (metrics.memory.resident > 1000) {score -= 5;} // > 1GB
 
   // Deduct points for large database size without indexes
   const indexRatio = metrics.dbStats.indexSize / metrics.dbStats.dataSize;
-  if (indexRatio < 0.05 && metrics.dbStats.dataSize > 1000000) score -= 10;
+  if (indexRatio < 0.05 && metrics.dbStats.dataSize > 1000000) {score -= 10;}
 
   return Math.max(0, Math.min(100, score));
 }
@@ -175,9 +175,9 @@ function generateHealthWarnings(metrics) {
     warnings.push('High database latency detected (>500ms)');
   }
 
-  const connectionUtilization = metrics.connectionStatus.current / 
+  const connectionUtilization = metrics.connectionStatus.current /
     (metrics.connectionStatus.current + metrics.connectionStatus.available);
-  
+
   if (connectionUtilization > 0.9) {
     warnings.push('Connection pool nearly exhausted (>90% utilization)');
   }
@@ -205,7 +205,7 @@ function generateHealthWarnings(metrics) {
  */
 async function getSlowQueries(thresholdMs = 100) {
   const mongoClient = getMongoClient();
-  
+
   if (!mongoClient) {
     throw new Error('Database not connected');
   }
@@ -280,13 +280,13 @@ async function optimizeDatabase(shopId) {
   for (const collectionName of collections) {
     try {
       const collection = shopDb.collection(collectionName);
-      
+
       // Reindex collection
       await collection.reIndex();
-      
+
       // Get collection stats
       const stats = await collection.stats();
-      
+
       results[collectionName] = {
         success: true,
         documentsCount: stats.count,
@@ -357,7 +357,7 @@ async function checkMissingIndexes(shopId) {
  */
 async function getDatabaseSizeBreakdown() {
   const database = getDatabase();
-  
+
   if (!database) {
     throw new Error('Database not connected');
   }
@@ -402,7 +402,7 @@ async function getDatabaseSizeBreakdown() {
  */
 async function monitorConnectionPool() {
   const mongoClient = getMongoClient();
-  
+
   if (!mongoClient) {
     throw new Error('Database not connected');
   }
@@ -421,7 +421,7 @@ async function monitorConnectionPool() {
       active: connections.active || 0,
       utilization: Math.round(utilization * 100),
       status: utilization > 0.9 ? 'critical' : utilization > 0.7 ? 'warning' : 'healthy',
-      recommendation: utilization > 0.9 
+      recommendation: utilization > 0.9
         ? 'Consider increasing DB_MAX_POOL_SIZE in environment variables'
         : utilization > 0.7
         ? 'Monitor connection pool usage closely'

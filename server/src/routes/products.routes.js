@@ -3,17 +3,17 @@
  * Handles product CRUD operations for shops
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const productsController = require("../controllers/products.controller");
-const { cacheResponse, queryHash } = require("../middleware/cache.middleware");
-const { cacheService, TTL } = require("../services/cache.service");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const productsController = require('../controllers/products.controller');
+const { cacheResponse, queryHash } = require('../middleware/cache.middleware');
+const { cacheService, TTL } = require('../services/cache.service');
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -301,7 +301,7 @@ router.use(checkShopStatus);
  * Get all products for the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_PRODUCTS),
   cacheResponse(TTL.PRODUCTS, (req) => `products:${req.user.shopId}:${queryHash(req.query)}`),
   productsController.getProducts.bind(productsController),
@@ -312,7 +312,7 @@ router.get(
  * Get single product by ID
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_PRODUCTS),
   productsController.getProductById.bind(productsController),
 );
@@ -322,7 +322,7 @@ router.get(
  * Create new product
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_PRODUCT),
   productsController.createProduct.bind(productsController),
 );
@@ -332,7 +332,7 @@ router.post(
  * Update product
  */
 router.put(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.EDIT_PRODUCT),
   productsController.updateProduct.bind(productsController),
 );
@@ -342,7 +342,7 @@ router.put(
  * Delete product (soft delete)
  */
 router.delete(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.DELETE_PRODUCT),
   productsController.deleteProduct.bind(productsController),
 );

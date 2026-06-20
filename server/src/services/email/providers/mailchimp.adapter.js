@@ -1,6 +1,6 @@
 // server/src/services/email/providers/mailchimp.adapter.js
-const mailchimp = require("@mailchimp/mailchimp_marketing");
-const BaseEmailAdapter = require("./base.adapter");
+const mailchimp = require('@mailchimp/mailchimp_marketing');
+const BaseEmailAdapter = require('./base.adapter');
 
 class MailchimpAdapter extends BaseEmailAdapter {
   constructor() {
@@ -21,8 +21,8 @@ class MailchimpAdapter extends BaseEmailAdapter {
     if (!this.validateEmail(to)) {
       return {
         success: false,
-        error: "Invalid email address",
-        provider: "mailchimp",
+        error: 'Invalid email address',
+        provider: 'mailchimp',
       };
     }
 
@@ -30,16 +30,16 @@ class MailchimpAdapter extends BaseEmailAdapter {
       // Add recipient to list first
       await mailchimp.lists.addListMember(this.listId, {
         email_address: to,
-        status: "subscribed",
+        status: 'subscribed',
       });
 
       // Create a single-recipient campaign
       const campaign = await mailchimp.campaigns.create({
-        type: "regular",
+        type: 'regular',
         recipients: { list_id: this.listId },
         settings: {
           subject_line: subject,
-          from_name: options.fromName || "Healthcare Plus",
+          from_name: options.fromName || 'Healthcare Plus',
           reply_to: options.replyTo || this.fromEmail,
           title: options.title || subject,
         },
@@ -51,14 +51,14 @@ class MailchimpAdapter extends BaseEmailAdapter {
       return {
         success: true,
         messageId: campaign.id,
-        provider: "mailchimp",
-        status: "sent",
+        provider: 'mailchimp',
+        status: 'sent',
       };
     } catch (error) {
       return {
         success: false,
         error: error.message,
-        provider: "mailchimp",
+        provider: 'mailchimp',
       };
     }
   }
@@ -67,10 +67,10 @@ class MailchimpAdapter extends BaseEmailAdapter {
     try {
       const members = customers.map((customer) => ({
         email_address: customer.email,
-        status: "subscribed",
+        status: 'subscribed',
         merge_fields: {
-          FNAME: customer.name.split(" ")[0],
-          LNAME: customer.name.split(" ").slice(1).join(" "),
+          FNAME: customer.name.split(' ')[0],
+          LNAME: customer.name.split(' ').slice(1).join(' '),
           PHONE: customer.phone,
         },
         tags: customer.tags || [],
@@ -98,14 +98,14 @@ class MailchimpAdapter extends BaseEmailAdapter {
   async createCampaign(campaignData) {
     try {
       const campaign = await mailchimp.campaigns.create({
-        type: "regular",
+        type: 'regular',
         recipients: {
           list_id: this.listId,
           segment_opts: campaignData.segmentOptions,
         },
         settings: {
           subject_line: campaignData.subject,
-          from_name: campaignData.fromName || "Healthcare Plus",
+          from_name: campaignData.fromName || 'Healthcare Plus',
           reply_to: campaignData.replyTo || this.fromEmail,
           title: campaignData.title,
         },

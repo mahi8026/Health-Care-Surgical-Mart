@@ -3,13 +3,13 @@
  * Provides common functionality for all controllers
  */
 
-const { logger } = require("../config/logging");
+const { logger } = require('../config/logging');
 
 class BaseController {
   /**
    * Send success response
    */
-  sendSuccess(res, data, message = "Success", statusCode = 200) {
+  sendSuccess(res, data, message = 'Success', statusCode = 200) {
     return res.status(statusCode).json({
       success: true,
       message,
@@ -20,14 +20,14 @@ class BaseController {
   /**
    * Send error response
    */
-  sendError(res, message = "An error occurred", statusCode = 500, error = null) {
+  sendError(res, message = 'An error occurred', statusCode = 500, error = null) {
     const response = {
       success: false,
       message,
     };
 
     // Include error details in development
-    if (process.env.NODE_ENV === "development" && error) {
+    if (process.env.NODE_ENV === 'development' && error) {
       response.error = error.message;
       response.stack = error.stack;
     }
@@ -64,7 +64,7 @@ class BaseController {
     }
 
     if (missing.length > 0) {
-      throw new Error(`Missing required fields: ${missing.join(", ")}`);
+      throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }
   }
 

@@ -3,7 +3,7 @@
  * Common validation functions
  */
 
-const { ValidationError } = require("./errors");
+const { ValidationError } = require('./errors');
 
 /**
  * Validate required fields
@@ -12,15 +12,15 @@ const validateRequired = (data, requiredFields) => {
   const missing = [];
 
   for (const field of requiredFields) {
-    if (data[field] === undefined || data[field] === null || data[field] === "") {
+    if (data[field] === undefined || data[field] === null || data[field] === '') {
       missing.push(field);
     }
   }
 
   if (missing.length > 0) {
     throw new ValidationError(
-      `Missing required fields: ${missing.join(", ")}`,
-      missing.map((field) => ({ field, message: "This field is required" })),
+      `Missing required fields: ${missing.join(', ')}`,
+      missing.map((field) => ({ field, message: 'This field is required' })),
     );
   }
 };
@@ -31,7 +31,7 @@ const validateRequired = (data, requiredFields) => {
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    throw new ValidationError("Invalid email format");
+    throw new ValidationError('Invalid email format');
   }
 };
 
@@ -41,9 +41,9 @@ const validateEmail = (email) => {
 const validatePhone = (phone) => {
   // Bangladesh phone: 11 digits starting with 01
   const phoneRegex = /^01[0-9]{9}$/;
-  if (!phoneRegex.test(phone.replace(/[\s-]/g, ""))) {
+  if (!phoneRegex.test(phone.replace(/[\s-]/g, ''))) {
     throw new ValidationError(
-      "Invalid phone number. Must be 11 digits starting with 01",
+      'Invalid phone number. Must be 11 digits starting with 01',
     );
   }
 };
@@ -51,7 +51,7 @@ const validatePhone = (phone) => {
 /**
  * Validate positive number
  */
-const validatePositiveNumber = (value, fieldName = "Value") => {
+const validatePositiveNumber = (value, fieldName = 'Value') => {
   const num = parseFloat(value);
   if (isNaN(num) || num <= 0) {
     throw new ValidationError(`${fieldName} must be a positive number`);
@@ -62,7 +62,7 @@ const validatePositiveNumber = (value, fieldName = "Value") => {
 /**
  * Validate non-negative number
  */
-const validateNonNegativeNumber = (value, fieldName = "Value") => {
+const validateNonNegativeNumber = (value, fieldName = 'Value') => {
   const num = parseFloat(value);
   if (isNaN(num) || num < 0) {
     throw new ValidationError(`${fieldName} must be a non-negative number`);
@@ -73,7 +73,7 @@ const validateNonNegativeNumber = (value, fieldName = "Value") => {
 /**
  * Validate integer
  */
-const validateInteger = (value, fieldName = "Value") => {
+const validateInteger = (value, fieldName = 'Value') => {
   const num = parseInt(value);
   if (isNaN(num) || !Number.isInteger(num)) {
     throw new ValidationError(`${fieldName} must be an integer`);
@@ -84,7 +84,7 @@ const validateInteger = (value, fieldName = "Value") => {
 /**
  * Validate date
  */
-const validateDate = (date, fieldName = "Date") => {
+const validateDate = (date, fieldName = 'Date') => {
   const parsedDate = new Date(date);
   if (isNaN(parsedDate.getTime())) {
     throw new ValidationError(`${fieldName} must be a valid date`);
@@ -95,8 +95,8 @@ const validateDate = (date, fieldName = "Date") => {
 /**
  * Validate string length
  */
-const validateStringLength = (value, min, max, fieldName = "Value") => {
-  if (typeof value !== "string") {
+const validateStringLength = (value, min, max, fieldName = 'Value') => {
+  if (typeof value !== 'string') {
     throw new ValidationError(`${fieldName} must be a string`);
   }
 
@@ -118,10 +118,10 @@ const validateStringLength = (value, min, max, fieldName = "Value") => {
 /**
  * Validate enum value
  */
-const validateEnum = (value, allowedValues, fieldName = "Value") => {
+const validateEnum = (value, allowedValues, fieldName = 'Value') => {
   if (!allowedValues.includes(value)) {
     throw new ValidationError(
-      `${fieldName} must be one of: ${allowedValues.join(", ")}`,
+      `${fieldName} must be one of: ${allowedValues.join(', ')}`,
     );
   }
   return value;
@@ -130,8 +130,8 @@ const validateEnum = (value, allowedValues, fieldName = "Value") => {
 /**
  * Validate MongoDB ObjectId
  */
-const validateObjectId = (id, fieldName = "ID") => {
-  const ObjectId = require("mongodb").ObjectId;
+const validateObjectId = (id, fieldName = 'ID') => {
+  const ObjectId = require('mongodb').ObjectId;
   if (!ObjectId.isValid(id)) {
     throw new ValidationError(`${fieldName} is not a valid ID`);
   }
@@ -141,7 +141,7 @@ const validateObjectId = (id, fieldName = "ID") => {
 /**
  * Validate array
  */
-const validateArray = (value, minLength = 0, fieldName = "Array") => {
+const validateArray = (value, minLength = 0, fieldName = 'Array') => {
   if (!Array.isArray(value)) {
     throw new ValidationError(`${fieldName} must be an array`);
   }
@@ -159,8 +159,8 @@ const validateArray = (value, minLength = 0, fieldName = "Array") => {
  * Sanitize string (trim and remove extra spaces)
  */
 const sanitizeString = (value) => {
-  if (typeof value !== "string") return value;
-  return value.trim().replace(/\s+/g, " ");
+  if (typeof value !== 'string') {return value;}
+  return value.trim().replace(/\s+/g, ' ');
 };
 
 /**
@@ -169,9 +169,9 @@ const sanitizeString = (value) => {
 const sanitizeObject = (obj) => {
   const sanitized = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === "string") {
+    if (typeof value === 'string') {
       sanitized[key] = sanitizeString(value);
-    } else if (typeof value === "object" && value !== null) {
+    } else if (typeof value === 'object' && value !== null) {
       sanitized[key] = sanitizeObject(value);
     } else {
       sanitized[key] = value;

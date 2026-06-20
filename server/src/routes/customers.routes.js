@@ -3,15 +3,16 @@
  * CRUD operations for customer management
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
+const { logger } = require('../config/logging');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const customersController = require("../controllers/customers.controller");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const customersController = require('../controllers/customers.controller');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -272,7 +273,7 @@ router.use(checkShopStatus);
  * Get all customers for the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_CUSTOMERS),
   customersController.getCustomers.bind(customersController),
 );
@@ -282,7 +283,7 @@ router.get(
  * Create new customer
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_CUSTOMER),
   customersController.createCustomer.bind(customersController),
 );
@@ -293,27 +294,27 @@ router.post(
  * Must be defined BEFORE /:id routes to avoid being matched as an ID.
  */
 router.post(
-  "/recalculate-due",
+  '/recalculate-due',
   requirePermission(PERMISSIONS.EDIT_CUSTOMER),
   async (req, res) => {
     try {
-      const { getShopDatabase } = require("../config/database");
+      const { getShopDatabase } = require('../config/database');
       const shopDb = getShopDatabase(req.user.shopId);
 
-      const customers = await shopDb.collection("customers").find({}).toArray();
+      const customers = await shopDb.collection('customers').find({}).toArray();
       const results = [];
 
       for (const customer of customers) {
-        const agg = await shopDb.collection("sales").aggregate([
+        const agg = await shopDb.collection('sales').aggregate([
           { $match: { customerId: customer._id } },
-          { $group: { _id: null, totalDue: { $sum: "$dueAmount" } } },
+          { $group: { _id: null, totalDue: { $sum: '$dueAmount' } } },
         ]).toArray();
 
         const calculatedDue = agg[0]?.totalDue || 0;
         const previousDue = customer.currentDue || 0;
 
         if (Math.abs(calculatedDue - previousDue) > 0.01) {
-          await shopDb.collection("customers").updateOne(
+          await shopDb.collection('customers').updateOne(
             { _id: customer._id },
             { $set: { currentDue: calculatedDue, updatedAt: new Date() } }
           );
@@ -330,9 +331,9 @@ router.post(
         data: results,
       });
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Recalculate due error:", error);
-      return res.status(500).json({ success: false, message: "Failed to recalculate due balances" });
+
+      logger.error('Recalculate due error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to recalculate due balances' });
     }
   }
 );
@@ -342,7 +343,7 @@ router.post(
  * Get customer by ID
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_CUSTOMERS),
   customersController.getCustomerById.bind(customersController),
 );
@@ -352,7 +353,7 @@ router.get(
  * Update customer
  */
 router.put(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.EDIT_CUSTOMER),
   customersController.updateCustomer.bind(customersController),
 );
@@ -362,7 +363,7 @@ router.put(
  * Delete customer
  */
 router.delete(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.DELETE_CUSTOMER),
   customersController.deleteCustomer.bind(customersController),
 );
@@ -472,13 +473,13 @@ router.delete(
  * Get paginated purchase history for a customer
  */
 router.get(
-  "/:id/purchase-history",
+  '/:id/purchase-history',
   requirePermission(PERMISSIONS.VIEW_CUSTOMERS),
   async (req, res) => {
     try {
-      const { ObjectId } = require("mongodb");
-      const { getShopDatabase } = require("../config/database");
-      const { logger } = require("../config/logging");
+      const { ObjectId } = require('mongodb');
+      const { getShopDatabase } = require('../config/database');
+
 
       const shopDb = getShopDatabase(req.user.shopId);
 
@@ -489,16 +490,16 @@ router.get(
       } catch {
         return res.status(400).json({
           success: false,
-          message: "Invalid customer ID format",
+          message: 'Invalid customer ID format',
         });
       }
 
       // Fetch the customer
-      const customer = await shopDb.collection("customers").findOne({ _id: customerId });
+      const customer = await shopDb.collection('customers').findOne({ _id: customerId });
       if (!customer) {
         return res.status(404).json({
           success: false,
-          message: "Customer not found",
+          message: 'Customer not found',
         });
       }
 
@@ -525,13 +526,13 @@ router.get(
 
       // Total count for pagination and lifetime stats
       const [total, lifetimeStats] = await Promise.all([
-        shopDb.collection("sales").countDocuments(query),
-        shopDb.collection("sales").aggregate([
+        shopDb.collection('sales').countDocuments(query),
+        shopDb.collection('sales').aggregate([
           { $match: { customerId } },
           {
             $group: {
               _id: null,
-              totalSpent: { $sum: "$grandTotal" },
+              totalSpent: { $sum: '$grandTotal' },
               totalOrders: { $sum: 1 },
             },
           },
@@ -540,7 +541,7 @@ router.get(
 
       // Fetch paginated sales
       const sales = await shopDb
-        .collection("sales")
+        .collection('sales')
         .find(query)
         .sort({ saleDate: -1 })
         .skip(skip)
@@ -553,15 +554,15 @@ router.get(
         invoiceNo: sale.invoiceNo || sale.invoiceNumber || `INV-${sale._id}`,
         date: sale.saleDate,
         items: (sale.items || []).map((item) => ({
-          productName: item.name || item.productName || "Unknown Product",
+          productName: item.name || item.productName || 'Unknown Product',
           qty: item.qty || item.quantity || 0,
           price: item.rate || item.price || item.sellingPrice || 0,
         })),
         total: sale.grandTotal || 0,
         paymentMethod: sale.paymentMethod || (sale.cashPaid > 0 && sale.bankPaid > 0
-          ? "Cash + Bank"
-          : sale.bankPaid > 0 ? "Bank" : "Cash"),
-        status: sale.paymentStatus || "Paid",
+          ? 'Cash + Bank'
+          : sale.bankPaid > 0 ? 'Bank' : 'Cash'),
+        status: sale.paymentStatus || 'Paid',
       }));
 
       const stats = lifetimeStats[0] || { totalSpent: 0, totalOrders: 0 };
@@ -584,15 +585,15 @@ router.get(
         },
       });
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Purchase history error:", {
+
+      logger.error('Purchase history error:', {
         error: error.message,
         customerId: req.params.id,
         shopId: req.user?.shopId,
       });
       return res.status(500).json({
         success: false,
-        message: "Failed to fetch purchase history",
+        message: 'Failed to fetch purchase history',
       });
     }
   }
@@ -623,23 +624,23 @@ router.get(
  *         $ref: '#/components/responses/NotFoundError'
  */
 router.get(
-  "/:id/due-summary",
+  '/:id/due-summary',
   requirePermission(PERMISSIONS.VIEW_CUSTOMERS),
   async (req, res) => {
     try {
-      const { ObjectId } = require("mongodb");
-      const { getShopDatabase } = require("../config/database");
+      const { ObjectId } = require('mongodb');
+      const { getShopDatabase } = require('../config/database');
       const shopDb = getShopDatabase(req.user.shopId);
 
       let customerId;
       try { customerId = new ObjectId(req.params.id); }
-      catch { return res.status(400).json({ success: false, message: "Invalid customer ID" }); }
+      catch { return res.status(400).json({ success: false, message: 'Invalid customer ID' }); }
 
-      const customer = await shopDb.collection("customers").findOne({ _id: customerId });
-      if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
+      const customer = await shopDb.collection('customers').findOne({ _id: customerId });
+      if (!customer) {return res.status(404).json({ success: false, message: 'Customer not found' });}
 
       const paymentHistory = await shopDb
-        .collection("customer_payments")
+        .collection('customer_payments')
         .find({ customerId })
         .sort({ paidAt: -1 })
         .limit(20)
@@ -661,9 +662,9 @@ router.get(
         },
       });
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Due summary error:", error);
-      return res.status(500).json({ success: false, message: "Failed to fetch due summary" });
+
+      logger.error('Due summary error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to fetch due summary' });
     }
   }
 );
@@ -715,33 +716,33 @@ router.get(
  *         $ref: '#/components/responses/NotFoundError'
  */
 router.post(
-  "/:id/payment",
+  '/:id/payment',
   requirePermission(PERMISSIONS.CREATE_SALE),
   async (req, res) => {
     try {
-      const { ObjectId } = require("mongodb");
-      const { getShopDatabase } = require("../config/database");
-      const { logger } = require("../config/logging");
+      const { ObjectId } = require('mongodb');
+      const { getShopDatabase } = require('../config/database');
+
       const shopDb = getShopDatabase(req.user.shopId);
 
       let customerId;
       try { customerId = new ObjectId(req.params.id); }
-      catch { return res.status(400).json({ success: false, message: "Invalid customer ID" }); }
+      catch { return res.status(400).json({ success: false, message: 'Invalid customer ID' }); }
 
       const { amount, paymentMethod, note } = req.body;
       const payAmount = parseFloat(amount);
 
       if (!payAmount || payAmount <= 0) {
-        return res.status(400).json({ success: false, message: "Amount must be greater than 0" });
+        return res.status(400).json({ success: false, message: 'Amount must be greater than 0' });
       }
 
-      const validMethods = ["cash", "bank", "card"];
+      const validMethods = ['cash', 'bank', 'card'];
       if (!paymentMethod || !validMethods.includes(paymentMethod)) {
-        return res.status(400).json({ success: false, message: "paymentMethod must be cash, bank, or card" });
+        return res.status(400).json({ success: false, message: 'paymentMethod must be cash, bank, or card' });
       }
 
-      const customer = await shopDb.collection("customers").findOne({ _id: customerId });
-      if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
+      const customer = await shopDb.collection('customers').findOne({ _id: customerId });
+      if (!customer) {return res.status(404).json({ success: false, message: 'Customer not found' });}
 
       const currentDue = customer.currentDue || 0;
       if (payAmount > currentDue) {
@@ -758,7 +759,7 @@ router.post(
         customerId,
         amount: payAmount,
         paymentMethod,
-        note: note || "",
+        note: note || '',
         previousDue: currentDue,
         newDue,
         recordedBy: req.user._id,
@@ -767,19 +768,19 @@ router.post(
         createdAt: new Date(),
       };
 
-      await shopDb.collection("customer_payments").insertOne(paymentRecord);
+      await shopDb.collection('customer_payments').insertOne(paymentRecord);
 
       // Update customer due
-      await shopDb.collection("customers").updateOne(
+      await shopDb.collection('customers').updateOne(
         { _id: customerId },
         { $set: { currentDue: newDue, updatedAt: new Date() } }
       );
 
       // Audit log
       try {
-        const auditLog = require("../services/audit-log.service");
-        const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
-        auditLog.log(req, AUDIT_ACTIONS.CUSTOMER_UPDATED, "customer", req.params.id,
+        const auditLog = require('../services/audit-log.service');
+        const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
+        auditLog.log(req, AUDIT_ACTIONS.CUSTOMER_UPDATED, 'customer', req.params.id,
           `Payment of ৳${payAmount} recorded for ${customer.name}. Due: ৳${currentDue} → ৳${newDue}`,
           { before: { currentDue }, after: { currentDue: newDue, payment: payAmount } }
         );
@@ -802,9 +803,9 @@ router.post(
         },
       });
     } catch (error) {
-      const { logger } = require("../config/logging");
-      logger.error("Record payment error:", error);
-      return res.status(500).json({ success: false, message: "Failed to record payment" });
+
+      logger.error('Record payment error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to record payment' });
     }
   }
 );

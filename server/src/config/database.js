@@ -3,13 +3,13 @@
  * Modified to use one database with shop-prefixed collections
  */
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
-const { logger } = require("./logging");
+const { MongoClient, ServerApiVersion } = require('mongodb');
+const { logger } = require('./logging');
 
 // Connection configuration
 const config = {
-  uri: process.env.MONGODB_URI || "mongodb://localhost:27017",
-  dbName: process.env.DB_NAME || "Health_Care_DB",
+  uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
+  dbName: process.env.DB_NAME || 'Health_Care_DB',
   options: {
     serverApi: {
       version: ServerApiVersion.v1,
@@ -37,8 +37,8 @@ const config = {
     tlsAllowInvalidHostnames: true,
 
     // Monitoring
-    monitorCommands: process.env.NODE_ENV === "development",
-    
+    monitorCommands: process.env.NODE_ENV === 'development',
+
     // Compression (reduces network bandwidth)
     compressors: ['zlib'],
   },
@@ -62,16 +62,16 @@ async function connectToDatabase() {
     client = new MongoClient(config.uri, config.options);
 
     // Connection event listeners
-    client.on("connectionPoolCreated", () => {
-      logger.info("MongoDB connection pool created");
+    client.on('connectionPoolCreated', () => {
+      logger.info('MongoDB connection pool created');
     });
 
-    client.on("connectionPoolClosed", () => {
-      logger.info("MongoDB connection pool closed");
+    client.on('connectionPoolClosed', () => {
+      logger.info('MongoDB connection pool closed');
     });
 
-    client.on("error", (error) => {
-      logger.error("MongoDB client error:", error);
+    client.on('error', (error) => {
+      logger.error('MongoDB client error:', error);
     });
 
     // Connect to the server
@@ -96,7 +96,7 @@ async function connectToDatabase() {
 
     return client;
   } catch (error) {
-    logger.error("❌ MongoDB connection failed:", error.message);
+    logger.error('❌ MongoDB connection failed:', error.message);
     throw error;
   }
 }
@@ -109,11 +109,11 @@ async function connectToDatabase() {
  */
 function getShopDatabase(shopId) {
   if (!isConnected || !database) {
-    throw new Error("Database not connected. Call connectToDatabase() first.");
+    throw new Error('Database not connected. Call connectToDatabase() first.');
   }
 
-  if (!shopId || typeof shopId !== "string") {
-    throw new Error("Invalid shopId provided");
+  if (!shopId || typeof shopId !== 'string') {
+    throw new Error('Invalid shopId provided');
   }
 
   // Return a wrapper that prefixes collection names with shopId
@@ -142,7 +142,7 @@ function getShopDatabase(shopId) {
  */
 function getSystemDatabase() {
   if (!isConnected || !database) {
-    throw new Error("Database not connected. Call connectToDatabase() first.");
+    throw new Error('Database not connected. Call connectToDatabase() first.');
   }
 
   // Return the database directly for system collections
@@ -163,9 +163,9 @@ async function closeDatabaseConnection() {
     isConnected = false;
     database = null;
     client = null;
-    logger.info("Database connection closed gracefully");
+    logger.info('Database connection closed gracefully');
   } catch (error) {
-    logger.error("Error closing database connection:", error);
+    logger.error('Error closing database connection:', error);
     throw error;
   }
 }
@@ -197,7 +197,7 @@ async function getDatabaseStats() {
       indexSize: dbStats.indexSize,
     };
   } catch (error) {
-    logger.error("Error getting database stats:", error);
+    logger.error('Error getting database stats:', error);
     return { connected: false, error: error.message };
   }
 }
@@ -208,12 +208,12 @@ async function getDatabaseStats() {
  */
 async function listAllShops() {
   if (!isConnected || !database) {
-    throw new Error("Database not connected");
+    throw new Error('Database not connected');
   }
 
   try {
     // Get list of shops from system collection
-    const shops = await database.collection("shops").find({}).toArray();
+    const shops = await database.collection('shops').find({}).toArray();
 
     // Get all collections to count shop-specific collections
     const collections = await database.listCollections().toArray();
@@ -235,7 +235,7 @@ async function listAllShops() {
       })
       .sort((a, b) => a.shopId.localeCompare(b.shopId));
   } catch (error) {
-    logger.error("Error listing shops:", error);
+    logger.error('Error listing shops:', error);
     throw error;
   }
 }
@@ -249,48 +249,48 @@ async function createShopIndexes(shopId) {
     const shopDb = getShopDatabase(shopId);
 
     // Product indexes
-    await shopDb.collection("products").createIndexes([
-      { key: { sku: 1 }, unique: true, name: "sku_unique" },
-      { key: { name: 1 }, name: "name_index" },
-      { key: { category: 1 }, name: "category_index" },
-      { key: { isActive: 1 }, name: "active_status_index" },
-      { key: { name: "text", brand: "text" }, name: "text_search_index" },
+    await shopDb.collection('products').createIndexes([
+      { key: { sku: 1 }, unique: true, name: 'sku_unique' },
+      { key: { name: 1 }, name: 'name_index' },
+      { key: { category: 1 }, name: 'category_index' },
+      { key: { isActive: 1 }, name: 'active_status_index' },
+      { key: { name: 'text', brand: 'text' }, name: 'text_search_index' },
     ]);
 
     // Sales indexes
-    await shopDb.collection("sales").createIndexes([
-      { key: { invoiceNo: 1 }, unique: true, name: "invoice_unique" },
-      { key: { saleDate: -1 }, name: "sale_date_desc" },
-      { key: { customerId: 1 }, name: "customer_index" },
-      { key: { createdBy: 1 }, name: "created_by_index" },
+    await shopDb.collection('sales').createIndexes([
+      { key: { invoiceNo: 1 }, unique: true, name: 'invoice_unique' },
+      { key: { saleDate: -1 }, name: 'sale_date_desc' },
+      { key: { customerId: 1 }, name: 'customer_index' },
+      { key: { createdBy: 1 }, name: 'created_by_index' },
     ]);
 
     // Stock indexes
-    await shopDb.collection("stock").createIndexes([
-      { key: { productId: 1 }, unique: true, name: "product_unique" },
-      { key: { isLowStock: 1 }, name: "low_stock_index" },
-      { key: { lastUpdated: -1 }, name: "last_updated_desc" },
+    await shopDb.collection('stock').createIndexes([
+      { key: { productId: 1 }, unique: true, name: 'product_unique' },
+      { key: { isLowStock: 1 }, name: 'low_stock_index' },
+      { key: { lastUpdated: -1 }, name: 'last_updated_desc' },
     ]);
 
     // Customer indexes
-    await shopDb.collection("customers").createIndexes([
-      { key: { phone: 1 }, name: "phone_index" },
-      { key: { email: 1 }, sparse: true, name: "email_index" },
-      { key: { type: 1 }, name: "customer_type_index" },
+    await shopDb.collection('customers').createIndexes([
+      { key: { phone: 1 }, name: 'phone_index' },
+      { key: { email: 1 }, sparse: true, name: 'email_index' },
+      { key: { type: 1 }, name: 'customer_type_index' },
     ]);
 
     // User indexes
-    await shopDb.collection("users").createIndexes([
-      { key: { email: 1 }, unique: true, name: "email_unique" },
-      { key: { role: 1 }, name: "role_index" },
-      { key: { isActive: 1 }, name: "active_status_index" },
+    await shopDb.collection('users').createIndexes([
+      { key: { email: 1 }, unique: true, name: 'email_unique' },
+      { key: { role: 1 }, name: 'role_index' },
+      { key: { isActive: 1 }, name: 'active_status_index' },
     ]);
 
     // Expense indexes
-    await shopDb.collection("expenses").createIndexes([
-      { key: { expenseDate: -1 }, name: "expense_date_desc" },
-      { key: { categoryId: 1 }, name: "category_index" },
-      { key: { createdBy: 1 }, name: "created_by_index" },
+    await shopDb.collection('expenses').createIndexes([
+      { key: { expenseDate: -1 }, name: 'expense_date_desc' },
+      { key: { categoryId: 1 }, name: 'category_index' },
+      { key: { createdBy: 1 }, name: 'created_by_index' },
     ]);
 
     logger.info(`Database indexes created for shop: ${shopId}`);
@@ -308,15 +308,15 @@ async function createSystemIndexes() {
     const systemDb = getSystemDatabase();
 
     // Shops collection indexes
-    await systemDb.collection("shops").createIndexes([
-      { key: { shopId: 1 }, unique: true, name: "shopId_unique" },
-      { key: { email: 1 }, unique: true, name: "email_unique" },
-      { key: { status: 1 }, name: "status_index" },
+    await systemDb.collection('shops').createIndexes([
+      { key: { shopId: 1 }, unique: true, name: 'shopId_unique' },
+      { key: { email: 1 }, unique: true, name: 'email_unique' },
+      { key: { status: 1 }, name: 'status_index' },
     ]);
 
-    logger.info("System database indexes created");
+    logger.info('System database indexes created');
   } catch (error) {
-    logger.error("Error creating system indexes:", error);
+    logger.error('Error creating system indexes:', error);
     throw error;
   }
 }
@@ -334,7 +334,7 @@ async function healthCheck() {
     await database.command({ ping: 1 });
     return true;
   } catch (error) {
-    logger.error("Database health check failed:", error);
+    logger.error('Database health check failed:', error);
     return false;
   }
 }
@@ -344,7 +344,7 @@ async function healthCheck() {
  * This is a utility function for one-time migration
  */
 async function migrateToSingleDatabase() {
-  logger.info("Starting migration to single database...");
+  logger.info('Starting migration to single database...');
 
   try {
     const admin = client.db().admin();
@@ -354,11 +354,11 @@ async function migrateToSingleDatabase() {
     const shopDatabases = databases.filter(
       (db) =>
         ![
-          "admin",
-          "local",
-          "config",
-          "Health_Care_DB",
-          "medical_store_system",
+          'admin',
+          'local',
+          'config',
+          'Health_Care_DB',
+          'medical_store_system',
         ].includes(db.name),
     );
 
@@ -392,10 +392,10 @@ async function migrateToSingleDatabase() {
       }
     }
 
-    logger.info("✅ Migration completed successfully!");
+    logger.info('✅ Migration completed successfully!');
     return { success: true, migratedDatabases: shopDatabases.length };
   } catch (error) {
-    logger.error("❌ Migration failed:", error);
+    logger.error('❌ Migration failed:', error);
     throw error;
   }
 }

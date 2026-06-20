@@ -3,19 +3,19 @@
  * Purchase order management and inventory receiving
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
+const { ObjectId } = require('mongodb');
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
 const { logger } = require('../config/logging');
-const { cacheService } = require("../services/cache.service");
+const { cacheService } = require('../services/cache.service');
 
 /**
  * @swagger
@@ -221,14 +221,14 @@ const { cacheService } = require("../services/cache.service");
 
 // Helper function to handle ObjectId conversion for both MongoDB and mock database
 function toObjectId(id) {
-  if (!id) return null;
+  if (!id) {return null;}
 
   // If it's already an ObjectId, return as is
-  if (id instanceof ObjectId) return id;
+  if (id instanceof ObjectId) {return id;}
 
   // If it's a string that looks like a MongoDB ObjectId (24 hex chars), convert it
   if (
-    typeof id === "string" &&
+    typeof id === 'string' &&
     id.length === 24 &&
     /^[0-9a-fA-F]{24}$/.test(id)
   ) {
@@ -248,27 +248,27 @@ router.use(checkShopStatus);
  * Get all purchases for the shop
  */
 router.get(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.VIEW_PURCHASES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const {
       page = 1,
       limit = 50,
-      search = "",
+      search = '',
       startDate,
       endDate,
       supplierId,
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    let matchQuery = {};
+    const matchQuery = {};
 
     // Date range filter
     if (startDate || endDate) {
       matchQuery.purchaseDate = {};
-      if (startDate) matchQuery.purchaseDate.$gte = new Date(startDate);
-      if (endDate) matchQuery.purchaseDate.$lte = new Date(endDate);
+      if (startDate) {matchQuery.purchaseDate.$gte = new Date(startDate);}
+      if (endDate) {matchQuery.purchaseDate.$lte = new Date(endDate);}
     }
 
     // Supplier filter
@@ -276,19 +276,19 @@ router.get(
       matchQuery.supplierId = toObjectId(supplierId);
     }
 
-    const suppliersCollectionName = shopDb.getCollectionName("suppliers");
+    const suppliersCollectionName = shopDb.getCollectionName('suppliers');
 
     const pipeline = [
       { $match: matchQuery },
       {
         $lookup: {
           from: suppliersCollectionName,
-          localField: "supplierId",
-          foreignField: "_id",
-          as: "supplier",
+          localField: 'supplierId',
+          foreignField: '_id',
+          as: 'supplier',
         },
       },
-      { $unwind: "$supplier" },
+      { $unwind: '$supplier' },
     ];
 
     // Add search filter
@@ -296,9 +296,9 @@ router.get(
       pipeline.push({
         $match: {
           $or: [
-            { invoiceNo: { $regex: search, $options: "i" } },
-            { "supplier.name": { $regex: search, $options: "i" } },
-            { "supplier.company": { $regex: search, $options: "i" } },
+            { invoiceNo: { $regex: search, $options: 'i' } },
+            { 'supplier.name': { $regex: search, $options: 'i' } },
+            { 'supplier.company': { $regex: search, $options: 'i' } },
           ],
         },
       });
@@ -312,7 +312,7 @@ router.get(
     );
 
     const purchases = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .aggregate(pipeline)
       .toArray();
 
@@ -321,10 +321,10 @@ router.get(
     countPipeline.pop(); // Remove limit
     countPipeline.pop(); // Remove skip
     countPipeline.pop(); // Remove sort
-    countPipeline.push({ $count: "total" });
+    countPipeline.push({ $count: 'total' });
 
     const countResult = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .aggregate(countPipeline)
       .toArray();
 
@@ -348,48 +348,48 @@ router.get(
  * Get purchase by ID with full details
  */
 router.get(
-  "/:id",
+  '/:id',
   requirePermission(PERMISSIONS.VIEW_PURCHASES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const suppliersCollectionName = shopDb.getCollectionName("suppliers");
-    const usersCollectionName = shopDb.getCollectionName("users");
+    const suppliersCollectionName = shopDb.getCollectionName('suppliers');
+    const usersCollectionName = shopDb.getCollectionName('users');
 
     const purchase = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .aggregate([
         { $match: { _id: toObjectId(req.params.id) } },
         {
           $lookup: {
             from: suppliersCollectionName,
-            localField: "supplierId",
-            foreignField: "_id",
-            as: "supplier",
+            localField: 'supplierId',
+            foreignField: '_id',
+            as: 'supplier',
           },
         },
-        { $unwind: "$supplier" },
+        { $unwind: '$supplier' },
         {
           $lookup: {
             from: usersCollectionName,
-            localField: "createdBy",
-            foreignField: "_id",
-            as: "createdByUser",
+            localField: 'createdBy',
+            foreignField: '_id',
+            as: 'createdByUser',
           },
         },
-        { $unwind: "$createdByUser" },
+        { $unwind: '$createdByUser' },
       ])
       .toArray();
 
     if (purchase.length === 0) {
-      throw createError.notFound("Purchase not found");
+      throw createError.notFound('Purchase not found');
     }
 
     // Get product details for each item
     const purchaseData = purchase[0];
-    for (let item of purchaseData.items) {
+    for (const item of purchaseData.items) {
       const product = await shopDb
-        .collection("products")
+        .collection('products')
         .findOne({ _id: toObjectId(item.productId) });
       item.product = product;
     }
@@ -406,7 +406,7 @@ router.get(
  * Create new purchase order
  */
 router.post(
-  "/",
+  '/',
   requirePermission(PERMISSIONS.CREATE_PURCHASE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -420,34 +420,34 @@ router.post(
 
     // Validate required fields
     if (!supplierId || !items || !Array.isArray(items) || items.length === 0) {
-      throw createError.badRequest("Supplier ID and items array are required");
+      throw createError.badRequest('Supplier ID and items array are required');
     }
 
     // Validate supplier exists
     const supplier = await shopDb
-      .collection("suppliers")
+      .collection('suppliers')
       .findOne({ _id: toObjectId(supplierId) });
 
     if (!supplier) {
-      throw createError.notFound("Supplier not found");
+      throw createError.notFound('Supplier not found');
     }
 
     // Validate and calculate totals
     let grandTotal = 0;
     const validatedItems = [];
 
-    for (let item of items) {
+    for (const item of items) {
       const { productId, qty, unitCost } = item;
 
       if (!productId || !qty || qty <= 0 || !unitCost || unitCost <= 0) {
         throw createError.badRequest(
-          "Each item must have valid productId, qty, and unitCost",
+          'Each item must have valid productId, qty, and unitCost',
         );
       }
 
       // Validate product exists
       const product = await shopDb
-        .collection("products")
+        .collection('products')
         .findOne({ _id: toObjectId(productId) });
 
       if (!product) {
@@ -474,11 +474,11 @@ router.post(
     // Check if invoice number already exists
     if (invoiceNo) {
       const existingPurchase = await shopDb
-        .collection("purchases")
+        .collection('purchases')
         .findOne({ invoiceNo });
 
       if (existingPurchase) {
-        throw createError.conflict("Invoice number already exists");
+        throw createError.conflict('Invoice number already exists');
       }
     }
 
@@ -488,29 +488,29 @@ router.post(
     const purchaseData = {
       purchaseNo: finalInvoiceNo, // Use purchaseNo instead of invoiceNo
       supplierName: supplierName, // Required by schema
-      supplierPhone: supplier.phone || "", // Optional
-      supplierAddress: supplier.address || "", // Optional
+      supplierPhone: supplier.phone || '', // Optional
+      supplierAddress: supplier.address || '', // Optional
       items: validatedItems,
       totalAmount: Number(parseFloat(grandTotal.toFixed(2))), // Required by schema
       paidAmount: 0, // Default to 0
       dueAmount: Number(parseFloat(grandTotal.toFixed(2))), // Same as totalAmount initially
-      paymentStatus: "Pending", // Default status
+      paymentStatus: 'Pending', // Default status
       purchaseDate: new Date(purchaseDate), // Required by schema
       createdBy: toObjectId(req.user._id), // Required by schema
       createdByName: req.user.name, // Optional but useful
-      notes: notes?.trim() || "", // Optional
+      notes: notes?.trim() || '', // Optional
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const result = await shopDb.collection("purchases").insertOne(purchaseData);
+    const result = await shopDb.collection('purchases').insertOne(purchaseData);
 
     // Invalidate financial reports cache (purchase affects cash-flow, P&L)
-    cacheService.invalidateShopCache(req.user.shopId, "reports");
+    cacheService.invalidateShopCache(req.user.shopId, 'reports');
 
     res.status(201).json({
       success: true,
-      message: "Purchase order created successfully",
+      message: 'Purchase order created successfully',
       data: { _id: result.insertedId, ...purchaseData },
     });
   }),
@@ -522,7 +522,7 @@ router.post(
  * Phase 3B: Now creates batches for batch tracking
  */
 router.put(
-  "/:id/receive",
+  '/:id/receive',
   requirePermission(PERMISSIONS.EDIT_PURCHASE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -531,33 +531,33 @@ router.put(
 
     // Get purchase order
     const purchase = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .findOne({ _id: toObjectId(req.params.id) });
 
     if (!purchase) {
-      throw createError.notFound("Purchase order not found");
+      throw createError.notFound('Purchase order not found');
     }
 
-    if (purchase.status === "received") {
-      throw createError.badRequest("Purchase order already received");
+    if (purchase.status === 'received') {
+      throw createError.badRequest('Purchase order already received');
     }
 
-    if (purchase.status === "cancelled") {
-      throw createError.badRequest("Cannot receive cancelled purchase order");
+    if (purchase.status === 'cancelled') {
+      throw createError.badRequest('Cannot receive cancelled purchase order');
     }
 
     // If no receivedItems provided, receive all items as ordered
     const itemsToReceive = receivedItems || purchase.items;
 
     // Process each received item
-    for (let item of itemsToReceive) {
+    for (const item of itemsToReceive) {
       const productId = toObjectId(item.productId || item.productId);
       const receivedQty = item.receivedQty || item.qty;
       const unitCost = item.unitCost || item.rate;
 
       // Get product details
       const product = await shopDb
-        .collection("products")
+        .collection('products')
         .findOne({ _id: productId });
 
       if (!product) {
@@ -655,7 +655,7 @@ router.put(
 
       // Update product's purchase price if provided
       if (unitCost) {
-        await shopDb.collection("products").updateOne(
+        await shopDb.collection('products').updateOne(
           { _id: productId },
           {
             $set: {
@@ -668,11 +668,11 @@ router.put(
     }
 
     // Update purchase status
-    await shopDb.collection("purchases").updateOne(
+    await shopDb.collection('purchases').updateOne(
       { _id: toObjectId(req.params.id) },
       {
         $set: {
-          status: "received",
+          status: 'received',
           receivedAt: new Date(),
           receivedBy: toObjectId(req.user._id),
           receivedItems: itemsToReceive,
@@ -683,12 +683,12 @@ router.put(
     );
 
     // Invalidate caches
-    cacheService.invalidateShopCache(req.user.shopId, "reports");
-    cacheService.invalidateShopCache(req.user.shopId, "products");
+    cacheService.invalidateShopCache(req.user.shopId, 'reports');
+    cacheService.invalidateShopCache(req.user.shopId, 'products');
 
     res.json({
       success: true,
-      message: "Purchase order received, stock updated, and batches created successfully",
+      message: 'Purchase order received, stock updated, and batches created successfully',
     });
   }),
 );
@@ -698,7 +698,7 @@ router.put(
  * Cancel purchase order
  */
 router.put(
-  "/:id/cancel",
+  '/:id/cancel',
   requirePermission(PERMISSIONS.EDIT_PURCHASE),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
@@ -706,27 +706,27 @@ router.put(
 
     // Get purchase order
     const purchase = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!purchase) {
-      throw createError.notFound("Purchase order not found");
+      throw createError.notFound('Purchase order not found');
     }
 
-    if (purchase.status === "received") {
-      throw createError.badRequest("Cannot cancel received purchase order");
+    if (purchase.status === 'received') {
+      throw createError.badRequest('Cannot cancel received purchase order');
     }
 
-    if (purchase.status === "cancelled") {
-      throw createError.badRequest("Purchase order already cancelled");
+    if (purchase.status === 'cancelled') {
+      throw createError.badRequest('Purchase order already cancelled');
     }
 
     // Update purchase status
-    await shopDb.collection("purchases").updateOne(
+    await shopDb.collection('purchases').updateOne(
       { _id: new ObjectId(req.params.id) },
       {
         $set: {
-          status: "cancelled",
+          status: 'cancelled',
           cancelledAt: new Date(),
           cancelledBy: new ObjectId(req.user._id),
           cancellationReason: reason?.trim() || null,
@@ -736,11 +736,11 @@ router.put(
     );
 
     // Invalidate financial reports cache
-    cacheService.invalidateShopCache(req.user.shopId, "reports");
+    cacheService.invalidateShopCache(req.user.shopId, 'reports');
 
     res.json({
       success: true,
-      message: "Purchase order cancelled successfully",
+      message: 'Purchase order cancelled successfully',
     });
   }),
 );

@@ -40,9 +40,9 @@ function advancedSecurityHeaders(req, res, next) {
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "upgrade-insecure-requests"
+    'upgrade-insecure-requests'
   ];
-  
+
   res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
 
   // X-Content-Type-Options
@@ -185,11 +185,11 @@ function constantTimeCompare(a, b) {
 
   const aLen = Buffer.byteLength(a);
   const bLen = Buffer.byteLength(b);
-  
+
   // Use crypto.timingSafeEqual for constant-time comparison
   const bufA = Buffer.alloc(Math.max(aLen, bLen), 0, 'utf8');
   bufA.write(a);
-  
+
   const bufB = Buffer.alloc(Math.max(aLen, bLen), 0, 'utf8');
   bufB.write(b);
 
@@ -219,18 +219,18 @@ const ACCOUNT_LOCKOUT_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 function bruteForceProtection(req, res, next) {
   const identifier = req.body.email || req.ip;
   const now = Date.now();
-  
+
   if (!loginAttempts.has(identifier)) {
     loginAttempts.set(identifier, { count: 0, lastAttempt: now, lockedUntil: null });
     return next();
   }
 
   const attempts = loginAttempts.get(identifier);
-  
+
   // Check if account is locked
   if (attempts.lockedUntil && now < attempts.lockedUntil) {
     const remainingTime = Math.ceil((attempts.lockedUntil - now) / 1000 / 60); // minutes
-    
+
     securityLogger.warn('Account lockout - login attempt during lockout period', {
       ip: req.ip,
       identifier,
@@ -245,22 +245,22 @@ function bruteForceProtection(req, res, next) {
       lockedUntil: new Date(attempts.lockedUntil).toISOString()
     });
   }
-  
+
   // If lockout period expired, reset attempts
   if (attempts.lockedUntil && now >= attempts.lockedUntil) {
     loginAttempts.set(identifier, { count: 0, lastAttempt: now, lockedUntil: null });
     return next();
   }
-  
+
   const timeSinceLastAttempt = now - attempts.lastAttempt;
-  
+
   // Exponential backoff: 2^(attempts-5) seconds after 5 failed attempts (before lockout)
   if (attempts.count >= 5 && attempts.count < ACCOUNT_LOCKOUT_THRESHOLD) {
     const backoffTime = Math.pow(2, attempts.count - 5) * 1000; // milliseconds
-    
+
     if (timeSinceLastAttempt < backoffTime) {
       const waitTime = Math.ceil((backoffTime - timeSinceLastAttempt) / 1000);
-      
+
       securityLogger.warn('Brute force attempt detected', {
         ip: req.ip,
         identifier,
@@ -283,11 +283,11 @@ function bruteForceProtection(req, res, next) {
   // Attach function to increment attempts on auth failure
   req.incrementLoginAttempts = () => {
     attempts.count++;
-    
+
     // Lock account after threshold reached
     if (attempts.count >= ACCOUNT_LOCKOUT_THRESHOLD) {
       attempts.lockedUntil = now + ACCOUNT_LOCKOUT_DURATION;
-      
+
       securityLogger.error('Account locked due to excessive failed login attempts', {
         ip: req.ip,
         identifier,
@@ -296,7 +296,7 @@ function bruteForceProtection(req, res, next) {
         lockedUntil: new Date(attempts.lockedUntil).toISOString()
       });
     }
-    
+
     loginAttempts.set(identifier, attempts);
   };
 
@@ -325,7 +325,7 @@ function validateApiKey(req, res, next) {
   }
 
   const apiKey = req.headers['x-api-key'];
-  
+
   if (!apiKey) {
     return res.status(401).json({
       success: false,
@@ -349,7 +349,7 @@ function validateApiKey(req, res, next) {
   // TODO: Validate against database of API keys
   // For now, just check if it matches environment variable
   const validApiKey = process.env.EXTERNAL_API_KEY;
-  
+
   if (!validApiKey || !constantTimeCompare(apiKey, validApiKey)) {
     securityLogger.warn('Invalid API key attempt', {
       ip: req.ip,

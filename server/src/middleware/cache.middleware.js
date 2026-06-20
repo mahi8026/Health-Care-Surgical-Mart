@@ -11,8 +11,8 @@
  *   X-Cache: SKIP — Redis unavailable, request passed through normally
  */
 
-const crypto = require("crypto");
-const { cacheService } = require("../services/cache.service");
+const crypto = require('crypto');
+const { cacheService } = require('../services/cache.service');
 
 /**
  * Create a short deterministic hash of an object (for query params).
@@ -20,14 +20,14 @@ const { cacheService } = require("../services/cache.service");
  * @returns {string} 16-char hex hash (increased from 8 to reduce collision risk)
  */
 function queryHash(obj) {
-  if (!obj || Object.keys(obj).length === 0) return "default";
+  if (!obj || Object.keys(obj).length === 0) {return 'default';}
   const sorted = Object.keys(obj)
     .sort()
     .reduce((acc, k) => { acc[k] = obj[k]; return acc; }, {});
   return crypto
-    .createHash("md5")
+    .createHash('md5')
     .update(JSON.stringify(sorted))
-    .digest("hex")
+    .digest('hex')
     .slice(0, 16);
 }
 
@@ -43,11 +43,11 @@ function queryHash(obj) {
 function cacheResponse(ttlSeconds, keyFn) {
   return async (req, res, next) => {
     // Only cache GET requests
-    if (req.method !== "GET") return next();
+    if (req.method !== 'GET') {return next();}
 
     // Skip if Redis unavailable — transparent fallback
     if (!cacheService.isAvailable()) {
-      res.setHeader("X-Cache", "SKIP");
+      res.setHeader('X-Cache', 'SKIP');
       return next();
     }
 
@@ -58,18 +58,18 @@ function cacheResponse(ttlSeconds, keyFn) {
 
       if (cached !== null) {
         // Cache HIT — return cached response immediately
-        res.setHeader("X-Cache", "HIT");
-        res.setHeader("Content-Type", "application/json");
+        res.setHeader('X-Cache', 'HIT');
+        res.setHeader('Content-Type', 'application/json');
         return res.status(200).json(cached);
       }
     } catch (_) {
       // Cache read error — fall through to normal handler
-      res.setHeader("X-Cache", "SKIP");
+      res.setHeader('X-Cache', 'SKIP');
       return next();
     }
 
     // Cache MISS — intercept the response to cache it
-    res.setHeader("X-Cache", "MISS");
+    res.setHeader('X-Cache', 'MISS');
 
     // Monkey-patch res.json to capture the response body
     const originalJson = res.json.bind(res);

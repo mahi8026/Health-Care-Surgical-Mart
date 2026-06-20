@@ -1,14 +1,14 @@
 /**
  * Sentry Configuration for Backend Error Tracking
  * Captures and reports errors to Sentry for monitoring and debugging
- * 
+ *
  * @version 1.0.0
  */
 
-const Sentry = require("@sentry/node");
+const Sentry = require('@sentry/node');
 // Profiling disabled due to C++ binding compatibility issues
 // const { ProfilingIntegration } = require("@sentry/profiling-node");
-const { logger } = require("./logging");
+const { logger } = require('./logging');
 
 /**
  * Initialize Sentry for error tracking
@@ -17,96 +17,96 @@ const { logger } = require("./logging");
 const initializeSentry = (app) => {
   // Only initialize if DSN is provided
   if (!process.env.SENTRY_DSN) {
-    logger.warn("Sentry DSN not configured - error tracking disabled");
+    logger.warn('Sentry DSN not configured - error tracking disabled');
     return;
   }
 
   try {
     Sentry.init({
       dsn: process.env.SENTRY_DSN,
-      
+
       // Environment configuration
-      environment: process.env.NODE_ENV || "development",
-      
+      environment: process.env.NODE_ENV || 'development',
+
       // Release tracking (use git commit hash or version)
-      release: process.env.SENTRY_RELEASE || `medical-store-pos@${process.env.npm_package_version || "2.0.0"}`,
-      
+      release: process.env.SENTRY_RELEASE || `medical-store-pos@${process.env.npm_package_version || '2.0.0'}`,
+
       // Performance monitoring
-      tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0, // 10% in production, 100% in dev
-      
+      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0, // 10% in production, 100% in dev
+
       // Profiling disabled due to compatibility issues
       // profilesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-      
+
       // Integrations - use only available ones
       integrations: [],
-      
+
       // Filter out sensitive data
-      beforeSend(event, hint) {
+      beforeSend(event, _hint) {
         // Remove sensitive headers
         if (event.request?.headers) {
           delete event.request.headers.authorization;
           delete event.request.headers.cookie;
         }
-        
+
         // Remove sensitive query parameters
         if (event.request?.query_string) {
-          const sensitiveParams = ["token", "password", "secret", "api_key"];
+          const sensitiveParams = ['token', 'password', 'secret', 'api_key'];
           sensitiveParams.forEach(param => {
             if (event.request.query_string.includes(param)) {
               event.request.query_string = event.request.query_string.replace(
-                new RegExp(`${param}=[^&]*`, "gi"),
+                new RegExp(`${param}=[^&]*`, 'gi'),
                 `${param}=[REDACTED]`
               );
             }
           });
         }
-        
+
         // Remove sensitive data from request body
         if (event.request?.data) {
-          const data = typeof event.request.data === "string" 
-            ? JSON.parse(event.request.data) 
+          const data = typeof event.request.data === 'string'
+            ? JSON.parse(event.request.data)
             : event.request.data;
-          
+
           const sensitiveFields = [
-            "password",
-            "token",
-            "secret",
-            "apiKey",
-            "api_key",
-            "creditCard",
-            "ssn",
-            "firebaseServiceAccount",
+            'password',
+            'token',
+            'secret',
+            'apiKey',
+            'api_key',
+            'creditCard',
+            'ssn',
+            'firebaseServiceAccount',
           ];
-          
+
           sensitiveFields.forEach(field => {
             if (data && data[field]) {
-              data[field] = "[REDACTED]";
+              data[field] = '[REDACTED]';
             }
           });
-          
+
           event.request.data = JSON.stringify(data);
         }
-        
+
         return event;
       },
-      
+
       // Ignore specific errors
       ignoreErrors: [
         // Browser/network errors
-        "Network request failed",
-        "NetworkError",
-        "Failed to fetch",
-        
+        'Network request failed',
+        'NetworkError',
+        'Failed to fetch',
+
         // Expected validation errors
-        "ValidationError",
-        
+        'ValidationError',
+
         // Rate limiting (expected behavior)
-        "Too many requests",
-        
+        'Too many requests',
+
         // CORS (handled separately)
-        "CORS",
+        'CORS',
       ],
-      
+
       // Don't report errors from these URLs
       denyUrls: [
         // Browser extensions
@@ -116,12 +116,12 @@ const initializeSentry = (app) => {
       ],
     });
 
-    logger.info("Sentry initialized successfully", {
+    logger.info('Sentry initialized successfully', {
       environment: process.env.NODE_ENV,
-      release: process.env.SENTRY_RELEASE || `medical-store-pos@${process.env.npm_package_version || "2.0.0"}`,
+      release: process.env.SENTRY_RELEASE || `medical-store-pos@${process.env.npm_package_version || '2.0.0'}`,
     });
   } catch (error) {
-    logger.error("Failed to initialize Sentry:", error);
+    logger.error('Failed to initialize Sentry:', error);
   }
 };
 
@@ -166,9 +166,9 @@ const captureException = (error, context = {}) => {
       extra: context,
     });
   }
-  
+
   // Always log to Winston as well
-  logger.error("Exception captured:", {
+  logger.error('Exception captured:', {
     error: error.message,
     stack: error.stack,
     ...context,
@@ -181,14 +181,14 @@ const captureException = (error, context = {}) => {
  * @param {string} level - Severity level (info, warning, error)
  * @param {Object} context - Additional context
  */
-const captureMessage = (message, level = "info", context = {}) => {
+const captureMessage = (message, level = 'info', context = {}) => {
   if (process.env.SENTRY_DSN) {
     Sentry.captureMessage(message, {
       level,
       extra: context,
     });
   }
-  
+
   logger[level](message, context);
 };
 
@@ -235,9 +235,9 @@ const flush = async (timeout = 2000) => {
   if (process.env.SENTRY_DSN) {
     try {
       await Sentry.close(timeout);
-      logger.info("Sentry events flushed");
+      logger.info('Sentry events flushed');
     } catch (error) {
-      logger.error("Failed to flush Sentry events:", error);
+      logger.error('Failed to flush Sentry events:', error);
     }
   }
 };

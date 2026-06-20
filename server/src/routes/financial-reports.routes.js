@@ -3,20 +3,18 @@
  * Handles P&L, financial analytics, and business intelligence
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { ObjectId } = require("mongodb");
 const {
   authenticate,
   checkShopStatus,
-} = require("../middleware/auth-multi-tenant");
-const { requirePermission } = require("../utils/rbac");
-const { PERMISSIONS } = require("../utils/rbac");
-const { getShopDatabase } = require("../config/database");
-const { asyncHandler, createError } = require("../config/error-handling");
-const { logger } = require('../config/logging');
-const { cacheResponse, queryHash } = require("../middleware/cache.middleware");
-const { TTL } = require("../services/cache.service");
+} = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
+const { getShopDatabase } = require('../config/database');
+const { asyncHandler, createError } = require('../config/error-handling');
+const { cacheResponse, queryHash } = require('../middleware/cache.middleware');
+const { TTL } = require('../services/cache.service');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -220,12 +218,12 @@ router.use(checkShopStatus);
  * Get Profit & Loss statement
  */
 router.get(
-  "/profit-loss",
+  '/profit-loss',
   requirePermission(PERMISSIONS.VIEW_PROFIT_REPORT),
   cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:profit-loss:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { startDate, endDate, period = "daily" } = req.query;
+    const { startDate, endDate, period = 'daily' } = req.query;
 
     // Set default date range if not provided
     const today = new Date();
@@ -238,22 +236,22 @@ router.get(
 
     // Sales Revenue
     const salesRevenue = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalRevenue: { $sum: "$grandTotal" },
+            totalRevenue: { $sum: '$grandTotal' },
             totalSales: { $sum: 1 },
-            totalDiscount: { $sum: "$discount" },
-            totalVAT: { $sum: "$vatAmount" },
-            netRevenue: { $sum: { $subtract: ["$grandTotal", "$vatAmount"] } },
+            totalDiscount: { $sum: '$discount' },
+            totalVAT: { $sum: '$vatAmount' },
+            netRevenue: { $sum: { $subtract: ['$grandTotal', '$vatAmount'] } },
           },
         },
       ])
@@ -261,52 +259,52 @@ router.get(
 
     // Returns Impact
     const returnsImpact = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            status: "completed",
+            status: 'completed',
           },
         },
         {
           $group: {
             _id: null,
-            totalReturns: { $sum: "$totalRefund" },
+            totalReturns: { $sum: '$totalRefund' },
             returnCount: { $sum: 1 },
-            returnedVAT: { $sum: "$vatAmount" },
+            returnedVAT: { $sum: '$vatAmount' },
           },
         },
       ])
       .toArray();
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     // Cost of Goods Sold (COGS)
     const cogs = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "items.productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
-        { $unwind: "$product" },
+        { $unwind: '$product' },
         {
           $group: {
             _id: null,
             totalCOGS: {
               $sum: {
-                $multiply: ["$items.qty", "$product.purchasePrice"],
+                $multiply: ['$items.qty', '$product.purchasePrice'],
               },
             },
           },
@@ -316,30 +314,30 @@ router.get(
 
     // Return COGS (add back to inventory)
     const returnCOGS = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            status: "completed",
+            status: 'completed',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "items.productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
-        { $unwind: "$product" },
+        { $unwind: '$product' },
         {
           $group: {
             _id: null,
             totalReturnCOGS: {
               $sum: {
-                $multiply: ["$items.returnQuantity", "$product.purchasePrice"],
+                $multiply: ['$items.returnQuantity', '$product.purchasePrice'],
               },
             },
           },
@@ -365,7 +363,7 @@ router.get(
 
     // Operating Expenses - calculate from actual expense data
     const expenseData = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -375,7 +373,7 @@ router.get(
         {
           $group: {
             _id: null,
-            totalExpenses: { $sum: "$amount" },
+            totalExpenses: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
           },
         },
@@ -383,11 +381,11 @@ router.get(
       .toArray();
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName('expenseCategories');
 
     // Expense breakdown by category
     const expensesByCategory = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -397,18 +395,18 @@ router.get(
         {
           $lookup: {
             from: expenseCategoriesCollectionName,
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "category",
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'category',
           },
         },
-        { $unwind: "$category" },
+        { $unwind: '$category' },
         {
           $group: {
-            _id: "$categoryId",
-            categoryName: { $first: "$category.name" },
-            categoryType: { $first: "$category.type" },
-            totalAmount: { $sum: "$amount" },
+            _id: '$categoryId',
+            categoryName: { $first: '$category.name' },
+            categoryType: { $first: '$category.type' },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
           },
         },
@@ -480,7 +478,7 @@ router.get(
  * Get daily financial summary
  */
 router.get(
-  "/daily-summary",
+  '/daily-summary',
   requirePermission(PERMISSIONS.VIEW_SALES_REPORT),
   cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:daily-summary:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
@@ -498,29 +496,29 @@ router.get(
 
     // Daily sales summary
     const dailySales = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay, $lt: endOfDay },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
             totalSales: { $sum: 1 },
-            totalRevenue: { $sum: "$grandTotal" },
-            totalDiscount: { $sum: "$discount" },
-            totalVAT: { $sum: "$vatAmount" },
+            totalRevenue: { $sum: '$grandTotal' },
+            totalDiscount: { $sum: '$discount' },
+            totalVAT: { $sum: '$vatAmount' },
             cashSales: {
               $sum: {
-                $cond: [{ $gt: ["$cashPaid", 0] }, "$cashPaid", 0],
+                $cond: [{ $gt: ['$cashPaid', 0] }, '$cashPaid', 0],
               },
             },
             bankSales: {
               $sum: {
-                $cond: [{ $gt: ["$bankPaid", 0] }, "$bankPaid", 0],
+                $cond: [{ $gt: ['$bankPaid', 0] }, '$bankPaid', 0],
               },
             },
           },
@@ -530,19 +528,19 @@ router.get(
 
     // Daily returns summary
     const dailyReturns = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: { $gte: startOfDay, $lt: endOfDay },
-            status: "completed",
+            status: 'completed',
           },
         },
         {
           $group: {
             _id: null,
             totalReturns: { $sum: 1 },
-            totalRefund: { $sum: "$totalRefund" },
+            totalRefund: { $sum: '$totalRefund' },
           },
         },
       ])
@@ -550,7 +548,7 @@ router.get(
 
     // Daily expenses summary
     const dailyExpenses = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -561,20 +559,20 @@ router.get(
           $group: {
             _id: null,
             totalExpenses: { $sum: 1 },
-            totalAmount: { $sum: "$amount" },
+            totalAmount: { $sum: '$amount' },
             cashExpenses: {
               $sum: {
-                $cond: [{ $eq: ["$paymentMethod", "cash"] }, "$amount", 0],
+                $cond: [{ $eq: ['$paymentMethod', 'cash'] }, '$amount', 0],
               },
             },
             bankExpenses: {
               $sum: {
-                $cond: [{ $eq: ["$paymentMethod", "bank"] }, "$amount", 0],
+                $cond: [{ $eq: ['$paymentMethod', 'bank'] }, '$amount', 0],
               },
             },
             cardExpenses: {
               $sum: {
-                $cond: [{ $eq: ["$paymentMethod", "card"] }, "$amount", 0],
+                $cond: [{ $eq: ['$paymentMethod', 'card'] }, '$amount', 0],
               },
             },
           },
@@ -583,11 +581,11 @@ router.get(
       .toArray();
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName("expenseCategories");
+      shopDb.getCollectionName('expenseCategories');
 
     // Top expense categories today
     const topExpenseCategories = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -597,17 +595,17 @@ router.get(
         {
           $lookup: {
             from: expenseCategoriesCollectionName,
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "category",
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'category',
           },
         },
-        { $unwind: "$category" },
+        { $unwind: '$category' },
         {
           $group: {
-            _id: "$categoryId",
-            categoryName: { $first: "$category.name" },
-            totalAmount: { $sum: "$amount" },
+            _id: '$categoryId',
+            categoryName: { $first: '$category.name' },
+            totalAmount: { $sum: '$amount' },
             expenseCount: { $sum: 1 },
           },
         },
@@ -616,21 +614,21 @@ router.get(
       ])
       .toArray();
     const topProducts = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay, $lt: endOfDay },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $group: {
-            _id: "$items.productId",
-            productName: { $first: "$items.name" },
-            totalQuantity: { $sum: "$items.qty" },
-            totalRevenue: { $sum: "$items.total" },
+            _id: '$items.productId',
+            productName: { $first: '$items.name' },
+            totalQuantity: { $sum: '$items.qty' },
+            totalRevenue: { $sum: '$items.total' },
           },
         },
         { $sort: { totalQuantity: -1 } },
@@ -640,19 +638,19 @@ router.get(
 
     // Hourly sales pattern
     const hourlySales = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay, $lt: endOfDay },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
-            _id: { $hour: "$saleDate" },
+            _id: { $hour: '$saleDate' },
             sales: { $sum: 1 },
-            revenue: { $sum: "$grandTotal" },
+            revenue: { $sum: '$grandTotal' },
           },
         },
         { $sort: { _id: 1 } },
@@ -721,7 +719,7 @@ router.get(
  * Get product profitability analysis
  */
 router.get(
-  "/product-profitability",
+  '/product-profitability',
   requirePermission(PERMISSIONS.VIEW_PROFIT_REPORT),
   cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:product-profitability:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
@@ -739,57 +737,57 @@ router.get(
       ? new Date(endDate)
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    const productsCollectionName = shopDb.getCollectionName("products");
+    const productsCollectionName = shopDb.getCollectionName('products');
 
     // Product profitability analysis with index hint for date range
     const productProfitability = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "items.productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
-        { $unwind: "$product" },
+        { $unwind: '$product' },
         {
           $group: {
-            _id: "$items.productId",
-            productName: { $first: "$items.name" },
-            sku: { $first: "$product.sku" },
-            category: { $first: "$product.category" },
-            totalQuantitySold: { $sum: "$items.qty" },
-            totalRevenue: { $sum: "$items.total" },
-            averageSellingPrice: { $avg: "$items.price" },
-            purchasePrice: { $first: "$product.purchasePrice" },
+            _id: '$items.productId',
+            productName: { $first: '$items.name' },
+            sku: { $first: '$product.sku' },
+            category: { $first: '$product.category' },
+            totalQuantitySold: { $sum: '$items.qty' },
+            totalRevenue: { $sum: '$items.total' },
+            averageSellingPrice: { $avg: '$items.price' },
+            purchasePrice: { $first: '$product.purchasePrice' },
             totalCost: {
               $sum: {
-                $multiply: ["$items.qty", "$product.purchasePrice"],
+                $multiply: ['$items.qty', '$product.purchasePrice'],
               },
             },
           },
         },
         {
           $addFields: {
-            grossProfit: { $subtract: ["$totalRevenue", "$totalCost"] },
+            grossProfit: { $subtract: ['$totalRevenue', '$totalCost'] },
             profitMargin: {
               $cond: [
-                { $gt: ["$totalRevenue", 0] },
+                { $gt: ['$totalRevenue', 0] },
                 {
                   $multiply: [
                     {
                       $divide: [
-                        { $subtract: ["$totalRevenue", "$totalCost"] },
-                        "$totalRevenue",
+                        { $subtract: ['$totalRevenue', '$totalCost'] },
+                        '$totalRevenue',
                       ],
                     },
                     100,
@@ -800,11 +798,11 @@ router.get(
             },
             profitPerUnit: {
               $cond: [
-                { $gt: ["$totalQuantitySold", 0] },
+                { $gt: ['$totalQuantitySold', 0] },
                 {
                   $divide: [
-                    { $subtract: ["$totalRevenue", "$totalCost"] },
-                    "$totalQuantitySold",
+                    { $subtract: ['$totalRevenue', '$totalCost'] },
+                    '$totalQuantitySold',
                   ],
                 },
                 0,
@@ -819,49 +817,49 @@ router.get(
 
     // Category profitability
     const categoryProfitability = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $lookup: {
             from: productsCollectionName,
-            localField: "items.productId",
-            foreignField: "_id",
-            as: "product",
+            localField: 'items.productId',
+            foreignField: '_id',
+            as: 'product',
           },
         },
-        { $unwind: "$product" },
+        { $unwind: '$product' },
         {
           $group: {
-            _id: "$product.category",
-            totalRevenue: { $sum: "$items.total" },
+            _id: '$product.category',
+            totalRevenue: { $sum: '$items.total' },
             totalCost: {
               $sum: {
-                $multiply: ["$items.qty", "$product.purchasePrice"],
+                $multiply: ['$items.qty', '$product.purchasePrice'],
               },
             },
-            totalQuantity: { $sum: "$items.qty" },
-            productCount: { $addToSet: "$items.productId" },
+            totalQuantity: { $sum: '$items.qty' },
+            productCount: { $addToSet: '$items.productId' },
           },
         },
         {
           $addFields: {
-            grossProfit: { $subtract: ["$totalRevenue", "$totalCost"] },
+            grossProfit: { $subtract: ['$totalRevenue', '$totalCost'] },
             profitMargin: {
               $cond: [
-                { $gt: ["$totalRevenue", 0] },
+                { $gt: ['$totalRevenue', 0] },
                 {
                   $multiply: [
                     {
                       $divide: [
-                        { $subtract: ["$totalRevenue", "$totalCost"] },
-                        "$totalRevenue",
+                        { $subtract: ['$totalRevenue', '$totalCost'] },
+                        '$totalRevenue',
                       ],
                     },
                     100,
@@ -870,7 +868,7 @@ router.get(
                 0,
               ],
             },
-            productCount: { $size: "$productCount" },
+            productCount: { $size: '$productCount' },
           },
         },
         { $sort: { grossProfit: -1 } },
@@ -902,7 +900,7 @@ router.get(
  * Get return impact analysis
  */
 router.get(
-  "/return-analysis",
+  '/return-analysis',
   requirePermission(PERMISSIONS.VIEW_RETURNS),
   cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:return-analysis:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
@@ -919,20 +917,20 @@ router.get(
 
     // Return analysis by reason
     const returnsByReason = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            status: "completed",
+            status: 'completed',
           },
         },
         {
           $group: {
-            _id: "$returnReason",
+            _id: '$returnReason',
             count: { $sum: 1 },
-            totalRefund: { $sum: "$totalRefund" },
-            averageRefund: { $avg: "$totalRefund" },
+            totalRefund: { $sum: '$totalRefund' },
+            averageRefund: { $avg: '$totalRefund' },
           },
         },
         { $sort: { count: -1 } },
@@ -941,22 +939,22 @@ router.get(
 
     // Return analysis by product
     const returnsByProduct = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            status: "completed",
+            status: 'completed',
           },
         },
-        { $unwind: "$items" },
+        { $unwind: '$items' },
         {
           $group: {
-            _id: "$items.productId",
-            productName: { $first: "$items.name" },
-            sku: { $first: "$items.sku" },
-            totalReturned: { $sum: "$items.returnQuantity" },
-            totalRefund: { $sum: "$items.total" },
+            _id: '$items.productId',
+            productName: { $first: '$items.name' },
+            sku: { $first: '$items.sku' },
+            totalReturned: { $sum: '$items.returnQuantity' },
+            totalRefund: { $sum: '$items.total' },
             returnCount: { $sum: 1 },
           },
         },
@@ -967,39 +965,39 @@ router.get(
 
     // Monthly return trend
     const monthlyTrend = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: {
               $gte: new Date(defaultStartDate.getFullYear() - 1, 0, 1),
             },
-            status: "completed",
+            status: 'completed',
           },
         },
         {
           $group: {
             _id: {
-              year: { $year: "$returnDate" },
-              month: { $month: "$returnDate" },
+              year: { $year: '$returnDate' },
+              month: { $month: '$returnDate' },
             },
             count: { $sum: 1 },
-            totalRefund: { $sum: "$totalRefund" },
+            totalRefund: { $sum: '$totalRefund' },
           },
         },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
       ])
       .toArray();
 
     // Return rate calculation
-    const totalSales = await shopDb.collection("sales").countDocuments({
+    const totalSales = await shopDb.collection('sales').countDocuments({
       saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-      paymentStatus: "Paid",
+      paymentStatus: 'Paid',
     });
 
-    const totalReturns = await shopDb.collection("returns").countDocuments({
+    const totalReturns = await shopDb.collection('returns').countDocuments({
       returnDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-      status: "completed",
+      status: 'completed',
     });
 
     const returnRate = totalSales > 0 ? (totalReturns / totalSales) * 100 : 0;
@@ -1010,18 +1008,18 @@ router.get(
       0,
     );
     const totalSalesRevenue = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalRevenue: { $sum: "$grandTotal" },
+            totalRevenue: { $sum: '$grandTotal' },
           },
         },
       ])
@@ -1065,7 +1063,7 @@ router.get(
  * Get cash flow analysis
  */
 router.get(
-  "/cash-flow",
+  '/cash-flow',
   requirePermission(PERMISSIONS.VIEW_PROFIT_REPORT),
   cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:cash-flow:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
@@ -1082,20 +1080,20 @@ router.get(
 
     // Cash inflows (sales)
     const cashInflows = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalCashSales: { $sum: "$cashPaid" },
-            totalBankSales: { $sum: "$bankPaid" },
-            totalSales: { $sum: "$grandTotal" },
+            totalCashSales: { $sum: '$cashPaid' },
+            totalBankSales: { $sum: '$bankPaid' },
+            totalSales: { $sum: '$grandTotal' },
           },
         },
       ])
@@ -1103,18 +1101,18 @@ router.get(
 
     // Cash outflows (returns and expenses)
     const cashOutflows = await shopDb
-      .collection("returns")
+      .collection('returns')
       .aggregate([
         {
           $match: {
             returnDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            status: "completed",
+            status: 'completed',
           },
         },
         {
           $group: {
-            _id: "$refundMethod",
-            totalRefund: { $sum: "$totalRefund" },
+            _id: '$refundMethod',
+            totalRefund: { $sum: '$totalRefund' },
             count: { $sum: 1 },
           },
         },
@@ -1123,7 +1121,7 @@ router.get(
 
     // Expense outflows by payment method
     const expenseOutflows = await shopDb
-      .collection("expenses")
+      .collection('expenses')
       .aggregate([
         {
           $match: {
@@ -1132,8 +1130,8 @@ router.get(
         },
         {
           $group: {
-            _id: "$paymentMethod",
-            totalExpenses: { $sum: "$amount" },
+            _id: '$paymentMethod',
+            totalExpenses: { $sum: '$amount' },
             count: { $sum: 1 },
           },
         },
@@ -1142,19 +1140,19 @@ router.get(
 
     // Purchase outflows
     const purchaseOutflows = await shopDb
-      .collection("purchases")
+      .collection('purchases')
       .aggregate([
         {
           $match: {
             purchaseDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: { $in: ["Paid", "Partial"] },
+            paymentStatus: { $in: ['Paid', 'Partial'] },
           },
         },
         {
           $group: {
             _id: null,
-            totalPurchases: { $sum: "$totalAmount" },
-            paidAmount: { $sum: "$paidAmount" },
+            totalPurchases: { $sum: '$totalAmount' },
+            paidAmount: { $sum: '$paidAmount' },
           },
         },
       ])
@@ -1162,20 +1160,20 @@ router.get(
 
     // Daily cash flow
     const dailyCashFlow = await shopDb
-      .collection("sales")
+      .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: "Paid",
+            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: {
-              $dateToString: { format: "%Y-%m-%d", date: "$saleDate" },
+              $dateToString: { format: '%Y-%m-%d', date: '$saleDate' },
             },
-            cashIn: { $sum: "$grandTotal" },
+            cashIn: { $sum: '$grandTotal' },
             salesCount: { $sum: 1 },
           },
         },
@@ -1187,19 +1185,19 @@ router.get(
     const purchases = purchaseOutflows[0] || {};
 
     const totalCashRefunds = cashOutflows
-      .filter((item) => item._id === "cash")
+      .filter((item) => item._id === 'cash')
       .reduce((sum, item) => sum + item.totalRefund, 0);
 
     const totalCashExpenses = expenseOutflows
-      .filter((item) => item._id === "cash")
+      .filter((item) => item._id === 'cash')
       .reduce((sum, item) => sum + item.totalExpenses, 0);
 
     const totalBankExpenses = expenseOutflows
-      .filter((item) => item._id === "bank")
+      .filter((item) => item._id === 'bank')
       .reduce((sum, item) => sum + item.totalExpenses, 0);
 
     const totalCardExpenses = expenseOutflows
-      .filter((item) => item._id === "card")
+      .filter((item) => item._id === 'card')
       .reduce((sum, item) => sum + item.totalExpenses, 0);
 
     const totalExpenseOutflows =

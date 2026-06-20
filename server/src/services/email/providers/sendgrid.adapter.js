@@ -1,12 +1,12 @@
 // server/src/services/email/providers/sendgrid.adapter.js
-const sgMail = require("@sendgrid/mail");
-const BaseEmailAdapter = require("./base.adapter");
+const sgMail = require('@sendgrid/mail');
+const BaseEmailAdapter = require('./base.adapter');
 
 class SendGridAdapter extends BaseEmailAdapter {
   constructor() {
     super();
     const apiKey = process.env.SENDGRID_API_KEY;
-    if (apiKey && apiKey.startsWith("SG.")) {
+    if (apiKey && apiKey.startsWith('SG.')) {
       sgMail.setApiKey(apiKey);
       this.configured = true;
     } else {
@@ -20,7 +20,7 @@ class SendGridAdapter extends BaseEmailAdapter {
     }
     this.fromEmail = process.env.SENDGRID_FROM_EMAIL;
     this.fromName =
-      process.env.SENDGRID_FROM_NAME || "Healthcare Plus Pharmacy";
+      process.env.SENDGRID_FROM_NAME || 'Healthcare Plus Pharmacy';
   }
 
   async sendEmail(to, subject, content, options = {}) {
@@ -28,15 +28,15 @@ class SendGridAdapter extends BaseEmailAdapter {
       return {
         success: false,
         error: "SendGrid is not configured. Set a valid SENDGRID_API_KEY (must start with 'SG.').",
-        provider: "sendgrid",
-        status: "not_configured",
+        provider: 'sendgrid',
+        status: 'not_configured',
       };
     }
     if (!this.validateEmail(to)) {
       return {
         success: false,
-        error: "Invalid email address",
-        provider: "sendgrid",
+        error: 'Invalid email address',
+        provider: 'sendgrid',
       };
     }
 
@@ -53,7 +53,7 @@ class SendGridAdapter extends BaseEmailAdapter {
         templateId: options.templateId,
         dynamicTemplateData: options.templateData,
         attachments: options.attachments,
-        categories: options.categories || ["transactional"],
+        categories: options.categories || ['transactional'],
         customArgs: {
           shopId: options.shopId,
           orderId: options.orderId,
@@ -64,15 +64,15 @@ class SendGridAdapter extends BaseEmailAdapter {
 
       return {
         success: true,
-        messageId: result[0].headers["x-message-id"],
-        provider: "sendgrid",
-        status: "sent",
+        messageId: result[0].headers['x-message-id'],
+        provider: 'sendgrid',
+        status: 'sent',
       };
     } catch (error) {
       return {
         success: false,
         error: error.message,
-        provider: "sendgrid",
+        provider: 'sendgrid',
       };
     }
   }
@@ -82,8 +82,8 @@ class SendGridAdapter extends BaseEmailAdapter {
       return {
         success: false,
         error: "SendGrid is not configured. Set a valid SENDGRID_API_KEY (must start with 'SG.').",
-        provider: "sendgrid",
-        status: "not_configured",
+        provider: 'sendgrid',
+        status: 'not_configured',
       };
     }
     try {
@@ -95,7 +95,7 @@ class SendGridAdapter extends BaseEmailAdapter {
         },
         subject: email.subject,
         html: email.content,
-        categories: ["bulk", "marketing"],
+        categories: ['bulk', 'marketing'],
       }));
 
       const result = await sgMail.send(messages);
@@ -103,13 +103,13 @@ class SendGridAdapter extends BaseEmailAdapter {
       return {
         success: true,
         sent: result.length,
-        provider: "sendgrid",
+        provider: 'sendgrid',
       };
     } catch (error) {
       return {
         success: false,
         error: error.message,
-        provider: "sendgrid",
+        provider: 'sendgrid',
       };
     }
   }
@@ -117,19 +117,19 @@ class SendGridAdapter extends BaseEmailAdapter {
   async getEmailStats(messageId) {
     // SendGrid Event Webhook provides delivery stats
     // This queries the webhook data stored in DB
-    const { getShopDatabase } = require("../../config/database");
-    const db = getShopDatabase("main_store");
+    const { getShopDatabase } = require('../../config/database');
+    const db = getShopDatabase('main_store');
 
     const events = await db
-      .collection("email_events")
+      .collection('email_events')
       .find({ messageId })
       .toArray();
 
     return {
-      delivered: events.some((e) => e.event === "delivered"),
-      opened: events.some((e) => e.event === "open"),
-      clicked: events.some((e) => e.event === "click"),
-      bounced: events.some((e) => e.event === "bounce"),
+      delivered: events.some((e) => e.event === 'delivered'),
+      opened: events.some((e) => e.event === 'open'),
+      clicked: events.some((e) => e.event === 'click'),
+      bounced: events.some((e) => e.event === 'bounce'),
       events: events,
     };
   }

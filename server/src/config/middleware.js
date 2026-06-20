@@ -3,19 +3,19 @@
  * Centralized middleware setup for the Medical Store POS System
  */
 
-const { requestLogger } = require("./logging");
-const { authenticate } = require("../middleware/auth-multi-tenant");
+const { requestLogger } = require('./logging');
+const { authenticate } = require('../middleware/auth-multi-tenant');
 const {
   createRateLimiters,
   createValidators,
   handleValidationErrors,
   xssProtection,
-} = require("./security");
+} = require('./security');
 const {
   advancedSecurityHeaders,
   sanitizeRequest,
   preventSessionFixation,
-} = require("../middleware/security-headers");
+} = require('../middleware/security-headers');
 
 /**
  * Setup application middleware
@@ -42,24 +42,24 @@ const setupMiddleware = (app) => {
     createRateLimiters();
 
   // Apply rate limiters to specific routes
-  app.use("/api/auth/login", authLimiter);
-  app.use("/api/auth/forgot-password", passwordResetLimiter);
-  app.use("/api/", apiLimiter);
+  app.use('/api/auth/login', authLimiter);
+  app.use('/api/auth/forgot-password', passwordResetLimiter);
+  app.use('/api/', apiLimiter);
 
   // Request ID middleware for tracking
   app.use((req, res, next) => {
     req.id = Math.random().toString(36).substr(2, 9);
-    res.setHeader("X-Request-ID", req.id);
+    res.setHeader('X-Request-ID', req.id);
     next();
   });
 
   // Shop context middleware (for multi-tenant operations)
-  app.use("/api/", (req, res, next) => {
+  app.use('/api/', (req, res, next) => {
     // Skip auth routes and public endpoints
     if (
-      req.path.startsWith("/auth/") ||
-      req.path === "/health" ||
-      req.path === "/test"
+      req.path.startsWith('/auth/') ||
+      req.path === '/health' ||
+      req.path === '/test'
     ) {
       return next();
     }
