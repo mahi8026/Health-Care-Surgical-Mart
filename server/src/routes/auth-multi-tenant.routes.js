@@ -1,6 +1,7 @@
 /**
  * Multi-Tenant Authentication Routes
  * Login for all user types
+ * Updated: 2026-06-20 - Fixed shop database schema
  */
 
 const express = require('express');
