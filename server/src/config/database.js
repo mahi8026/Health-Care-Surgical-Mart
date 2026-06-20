@@ -108,7 +108,7 @@ async function connectToDatabase() {
  * @returns {Object} Database wrapper with shop-specific collection access
  */
 function getShopDatabase(shopId) {
-  if (!isConnected || !database) {
+  if (!isConnected || !client) {
     throw new Error('Database not connected. Call connectToDatabase() first.');
   }
 
@@ -116,23 +116,12 @@ function getShopDatabase(shopId) {
     throw new Error('Invalid shopId provided');
   }
 
-  // Return a wrapper that prefixes collection names with shopId
-  return {
-    collection: (collectionName) => {
-      // Prefix collection name with shopId (e.g., "shop1_products")
-      const prefixedName = `${shopId}_${collectionName}`;
-      return database.collection(prefixedName);
-    },
-    // Expose shopId for use in aggregation pipelines
-    shopId: shopId,
-    // Helper to get prefixed collection name
-    getCollectionName: (collectionName) => `${shopId}_${collectionName}`,
-    // Pass through other database methods
-    command: (...args) => database.command(...args),
-    admin: () => database.admin(),
-    listCollections: () => database.listCollections(),
-    stats: () => database.stats(),
-  };
+  // Return shop-specific database (Phase 5A architecture)
+  // Each shop has its own database: shop_6a020466789ca874348b2557
+  const shopDbName = `shop_${shopId}`;
+  const shopDatabase = client.db(shopDbName);
+
+  return shopDatabase;
 }
 
 /**
