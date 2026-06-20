@@ -325,6 +325,15 @@ const gracefulShutdown = async (signal) => {
     // Flush Sentry events
     await flushSentry(2000);
     
+    // Close Redis connection
+    try {
+      const { closeRedis } = require('./config/redis');
+      await closeRedis();
+      logger.info('Redis connection closed');
+    } catch (error) {
+      logger.warn('Error closing Redis:', error.message);
+    }
+    
     // Close email queue
     try {
       const emailService = require('./services/email/email.service');
@@ -399,6 +408,27 @@ const startServer = async () => {
   try {
     await connectToDatabase();
     logger.info("Database connected successfully");
+
+    // Initialize Redis (optional, non-blocking)
+    let redisClient = null;
+    try {
+      const { initializeRedis } = require("./config/redis");
+      redisClient = await initializeRedis();
+      if (redisClient) {
+        logger.info("Redis connected successfully - using for token blacklist");
+      } else {
+        logger.info("Redis not configured - using MongoDB for token blacklist");
+      }
+    } catch (redisError) {
+      logger.warn("Redis connection failed, falling back to MongoDB:", redisError.message);
+    }
+
+    // Initialize TokenBlacklistService with Redis (if available) and MongoDB
+    const { initializeTokenBlacklistService } = require("./middleware/auth-multi-tenant");
+    const { getSystemDatabase } = require("./config/database");
+    const systemDb = getSystemDatabase();
+    initializeTokenBlacklistService(redisClient, systemDb);
+    logger.info("TokenBlacklistService initialized");
 
     // Initialize audit log indexes (non-blocking, fire-and-forget)
     const auditLogService = require("./services/audit-log.service");

@@ -631,11 +631,9 @@ router.post("/request-password-reset", bruteForceProtection, async (req, res) =>
       },
     );
 
-    // TODO: Send email with reset code via SendGrid/Nodemailer
-    // For now, log it in development only (NEVER log in production)
-    if (process.env.NODE_ENV === 'development') {
-      logger.info(`[DEV ONLY] Password reset code for ${email}: ${resetCode} (expires in 15 minutes)`);
-    }
+    // Send password reset email
+    const emailService = require('../services/email.service');
+    await emailService.sendPasswordResetEmail(email, resetCode, 15);
 
     // Audit: password reset requested
     auditLog.log(req, AUDIT_ACTIONS.UPDATE, "user", user._id?.toString(),

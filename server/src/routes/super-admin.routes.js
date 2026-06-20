@@ -5,6 +5,7 @@
 
 const express = require("express");
 const router = express.Router();
+const rateLimit = require("express-rate-limit");
 const { authenticate } = require("../middleware/auth-multi-tenant");
 const { requireRole } = require("../utils/rbac");
 const { ROLES } = require("../utils/rbac");
@@ -20,6 +21,18 @@ const { listAllShops, getSystemDatabase, getShopDatabase } = require("../config/
 const { logger } = require('../config/logging');
 const auditLog = require("../services/audit-log.service");
 const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+
+// Rate limiter for shop creation (prevent abuse)
+const shopCreationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // 3 shops per hour per IP
+  message: {
+    success: false,
+    message: "Shop creation rate limit exceeded. Please try again in 1 hour.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // All routes require SUPER_ADMIN role
 router.use(authenticate);
@@ -329,7 +342,7 @@ router.get("/dashboard", async (req, res) => {
  * POST /api/super-admin/shops
  * Create a new shop
  */
-router.post("/shops", async (req, res) => {
+router.post("/shops", shopCreationLimiter, async (req, res) => {
   try {
     const { shopData, adminData } = req.body;
 

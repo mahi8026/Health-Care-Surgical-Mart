@@ -23,7 +23,7 @@
   "dependencies": {
     "@google-cloud/storage": "^7.14.0",
     "@mailchimp/mailchimp_marketing": "^3.0.80",
-    "@sendgrid/mail": "^8.1.4",
+    "@sendgrid/mail": "^8.1.6",
     "@sentry/node": "^8.47.0",
     "@sentry/profiling-node": "^8.47.0",
     "axios": "^1.13.4",
@@ -48,6 +48,7 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
     "pdfkit": "^0.18.0",
+    "redis": "^6.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "twilio": "^5.12.0",

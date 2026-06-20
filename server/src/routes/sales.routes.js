@@ -5,6 +5,7 @@
 
 const express = require("express");
 const router = express.Router();
+const rateLimit = require("express-rate-limit");
 const {
   authenticate,
   checkShopStatus,
@@ -14,6 +15,18 @@ const { PERMISSIONS } = require("../utils/rbac");
 const salesController = require("../controllers/sales.controller");
 const auditLog = require("../services/audit-log.service");
 const { AUDIT_ACTIONS } = require("../models/audit-log.schema");
+
+// Rate limiter for email sending (prevent spam)
+const emailRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 emails per 15 minutes per IP
+  message: {
+    success: false,
+    message: "Too many email requests. Please try again in 15 minutes.",
+  },
+  standardHeaders: true, // Return rate limit info in headers
+  legacyHeaders: false,
+});
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -698,6 +711,7 @@ router.get(
  */
 router.post(
   "/:id/send-invoice",
+  emailRateLimiter, // Rate limit: 5 emails per 15 minutes
   requirePermission(PERMISSIONS.MANAGE_SALES),
   async (req, res) => {
     try {

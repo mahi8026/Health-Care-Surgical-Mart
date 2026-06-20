@@ -7,43 +7,45 @@ const jwt = require("jsonwebtoken");
 const { getShopDatabase, getSystemDatabase } = require("../config/database");
 const { ObjectId } = require("mongodb");
 const { logger } = require("../config/logging");
+const TokenBlacklistService = require("../services/token-blacklist.service");
 
-// Token blacklist for revoked tokens (in-memory, upgrade to Redis for production clustering)
-// Maps token signature to expiry timestamp
-const tokenBlacklist = new Map();
+// Initialize TokenBlacklistService (will be set up with Redis/MongoDB in server.js)
+let tokenBlacklistService = null;
 
-// Clean up expired tokens from blacklist every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [tokenSig, expiry] of tokenBlacklist.entries()) {
-    if (now > expiry) {
-      tokenBlacklist.delete(tokenSig);
-    }
+/**
+ * Initialize the token blacklist service
+ * Called from server.js after database connection is established
+ * @param {object} redisClient - Redis client instance (optional)
+ * @param {object} mongoDb - MongoDB database instance (optional)
+ */
+function initializeTokenBlacklistService(redisClient = null, mongoDb = null) {
+  tokenBlacklistService = new TokenBlacklistService(redisClient, mongoDb);
+  logger.info('TokenBlacklistService initialized in auth middleware');
+}
+
+/**
+ * Get the token blacklist service instance
+ * @returns {TokenBlacklistService}
+ */
+function getTokenBlacklistService() {
+  if (!tokenBlacklistService) {
+    // Lazy initialization with MongoDB fallback if not already initialized
+    const systemDb = getSystemDatabase();
+    tokenBlacklistService = new TokenBlacklistService(null, systemDb);
+    logger.warn('TokenBlacklistService lazily initialized (MongoDB only)');
   }
-}, 3600000); // 1 hour
+  return tokenBlacklistService;
+}
 
 /**
  * Add token to blacklist (revoke it)
  * @param {string} token - JWT token to revoke
+ * @returns {Promise<boolean>} Success status
  */
-function revokeToken(token) {
+async function revokeToken(token) {
   try {
-    const decoded = jwt.decode(token);
-    if (!decoded || !decoded.exp) {
-      return false;
-    }
-    
-    // Extract token signature (last part of JWT)
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return false;
-    }
-    const signature = parts[2];
-    
-    // Store signature with expiry timestamp
-    tokenBlacklist.set(signature, decoded.exp * 1000); // exp is in seconds, convert to ms
-    logger.info('Token revoked', { userId: decoded.userId, exp: new Date(decoded.exp * 1000) });
-    return true;
+    const service = getTokenBlacklistService();
+    return await service.revokeToken(token);
   } catch (error) {
     logger.error('Failed to revoke token:', error);
     return false;
@@ -53,31 +55,15 @@ function revokeToken(token) {
 /**
  * Check if token is blacklisted (revoked)
  * @param {string} token - JWT token to check
- * @returns {boolean} true if blacklisted
+ * @returns {Promise<boolean>} true if blacklisted
  */
-function isTokenBlacklisted(token) {
+async function isTokenBlacklisted(token) {
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return false;
-    }
-    const signature = parts[2];
-    
-    const expiry = tokenBlacklist.get(signature);
-    if (!expiry) {
-      return false;
-    }
-    
-    // Check if token expiry has passed (can remove from blacklist)
-    const now = Date.now();
-    if (now > expiry) {
-      tokenBlacklist.delete(signature);
-      return false;
-    }
-    
-    return true;
+    const service = getTokenBlacklistService();
+    return await service.isBlacklisted(token);
   } catch (error) {
     logger.error('Failed to check token blacklist:', error);
+    // Fail-secure: if we can't check, assume not blacklisted but log error
     return false;
   }
 }
@@ -126,7 +112,8 @@ async function authenticate(req, res, next) {
     }
 
     // SECURITY FIX: Check if token is blacklisted (revoked)
-    if (isTokenBlacklisted(token)) {
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
       return res.status(401).json({
         success: false,
         message: "Token has been revoked. Please login again.",
@@ -410,4 +397,6 @@ module.exports = {
   checkShopStatus,
   revokeToken,
   isTokenBlacklisted,
+  initializeTokenBlacklistService,
+  getTokenBlacklistService,
 };
