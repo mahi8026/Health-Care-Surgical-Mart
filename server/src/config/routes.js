@@ -131,7 +131,12 @@ const setupRoutes = (app) => {
         message: 'API is working',
         timestamp: new Date().toISOString(),
         version: process.env.npm_package_version || '2.0.0',
-        commit: 'ff88303', // Latest commit with auth fixes
+        commit: '652bd77', // Latest commit with auth route reload
+        nodeVersion: process.version,
+        routes: {
+          authMounted: !!app._router.stack.find(layer => layer.regexp && layer.regexp.test('/api/auth/login')),
+          productsMounted: !!app._router.stack.find(layer => layer.regexp && layer.regexp.test('/api/products')),
+        }
       });
     });
 
