@@ -265,35 +265,59 @@ router.post("/login", bruteForceProtection, async (req, res) => {
       let targetShopId = shopId;
 
       if (!targetShopId) {
-        // Auto-detect shopId by searching all shops for this email
-        const shops = await systemDb
-          .collection("shops")
-          .find({ status: "Active" })
-          .toArray();
+        // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
+        // Instead of O(n) loop through all shops
+        try {
+          const userShopMapping = await systemDb
+            .collection("user_shop_index")
+            .findOne({ email, isActive: true });
 
-
-        // First check if email matches shop owner email
-        for (const shop of shops) {
-          if (shop.ownerEmail === email) {
-            targetShopId = shop.shopId;
-            break;
+          if (userShopMapping) {
+            targetShopId = userShopMapping.shopId;
+            logger.debug('Login: Found shop via index lookup', { email, shopId: targetShopId });
           }
+        } catch (indexError) {
+          logger.warn('Failed to query user_shop_index, falling back to shop loop', { 
+            email, 
+            error: indexError.message 
+          });
         }
 
-        // If not found as owner, search in each shop's users collection
+        // FALLBACK: If index lookup failed, use legacy method (loop through shops)
         if (!targetShopId) {
+          logger.info('Login: Index lookup failed, using legacy shop loop', { email });
+          
+          const shops = await systemDb
+            .collection("shops")
+            .find({ status: "Active" })
+            .toArray();
+
+          // First check if email matches shop owner email
           for (const shop of shops) {
-            try {
-              const shopDb = getShopDatabase(shop.shopId);
-              const shopUser = await shopDb
-                .collection("users")
-                .findOne({ email });
-              if (shopUser) {
-                targetShopId = shop.shopId;
-                break;
+            if (shop.ownerEmail === email) {
+              targetShopId = shop.shopId;
+              break;
+            }
+          }
+
+          // If not found as owner, search in each shop's users collection
+          if (!targetShopId) {
+            for (const shop of shops) {
+              try {
+                const shopDb = getShopDatabase(shop.shopId);
+                const shopUser = await shopDb
+                  .collection("users")
+                  .findOne({ email });
+                if (shopUser) {
+                  targetShopId = shop.shopId;
+                  break;
+                }
+              } catch (error) {
+                logger.warn('Failed to query shop database during legacy login auto-detect', { 
+                  shopId: shop.shopId, 
+                  error: error.message 
+                });
               }
-            } catch (error) {
-              logger.warn('Failed to query shop database during legacy login auto-detect', { shopId: shop.shopId, error: error.message });
             }
           }
         }
@@ -559,32 +583,54 @@ router.post("/request-password-reset", bruteForceProtection, async (req, res) =>
     } else {
       // Auto-detect shopId if not provided
       if (!targetShopId) {
-        const shops = await systemDb
-          .collection("shops")
-          .find({ status: "Active" })
-          .toArray();
+        // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
+        try {
+          const userShopMapping = await systemDb
+            .collection("user_shop_index")
+            .findOne({ email, isActive: true });
 
-        for (const shop of shops) {
-          if (shop.ownerEmail === email) {
-            targetShopId = shop.shopId;
-            break;
+          if (userShopMapping) {
+            targetShopId = userShopMapping.shopId;
+            logger.debug('[PASSWORD_RESET] Found shop via index lookup', { email, shopId: targetShopId });
           }
+        } catch (indexError) {
+          logger.warn('[PASSWORD_RESET] Failed to query user_shop_index, falling back to shop loop', { 
+            email, 
+            error: indexError.message 
+          });
         }
 
+        // FALLBACK: If index lookup failed, use legacy method
         if (!targetShopId) {
+          logger.info('[PASSWORD_RESET] Index lookup failed, using legacy shop loop', { email });
+          
+          const shops = await systemDb
+            .collection("shops")
+            .find({ status: "Active" })
+            .toArray();
+
           for (const shop of shops) {
-            try {
-              const shopDb = getShopDatabase(shop.shopId);
-              const shopUser = await shopDb.collection("users").findOne({ email });
-              if (shopUser) {
-                targetShopId = shop.shopId;
-                break;
+            if (shop.ownerEmail === email) {
+              targetShopId = shop.shopId;
+              break;
+            }
+          }
+
+          if (!targetShopId) {
+            for (const shop of shops) {
+              try {
+                const shopDb = getShopDatabase(shop.shopId);
+                const shopUser = await shopDb.collection("users").findOne({ email });
+                if (shopUser) {
+                  targetShopId = shop.shopId;
+                  break;
+                }
+              } catch (error) {
+                logger.warn('[PASSWORD_RESET] Failed to query shop during password reset', { 
+                  shopId: shop.shopId, 
+                  error: error.message 
+                });
               }
-            } catch (error) {
-              logger.warn('Failed to query shop during password reset', { 
-                shopId: shop.shopId, 
-                error: error.message 
-              });
             }
           }
         }
@@ -868,34 +914,59 @@ router.post("/firebase-login", bruteForceProtection, async (req, res) => {
       let targetShopId = shopId;
 
       if (!targetShopId) {
-        // Auto-detect shopId by searching all shops for this email
-        const shops = await systemDb
-          .collection("shops")
-          .find({ status: "Active" })
-          .toArray();
+        // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
+        // Instead of O(n) loop through all shops
+        try {
+          const userShopMapping = await systemDb
+            .collection("user_shop_index")
+            .findOne({ email, isActive: true });
 
-        // First check if email matches shop owner email
-        for (const shop of shops) {
-          if (shop.ownerEmail === email) {
-            targetShopId = shop.shopId;
-            break;
+          if (userShopMapping) {
+            targetShopId = userShopMapping.shopId;
+            logger.debug('[LOGIN] Found shop via index lookup', { email, shopId: targetShopId });
           }
+        } catch (indexError) {
+          logger.warn('[LOGIN] Failed to query user_shop_index, falling back to shop loop', { 
+            email, 
+            error: indexError.message 
+          });
         }
 
-        // If not found as owner, search in each shop's users collection
+        // FALLBACK: If index lookup failed, use legacy method (loop through shops)
         if (!targetShopId) {
+          logger.info('[LOGIN] Index lookup failed, using legacy shop loop', { email });
+          
+          const shops = await systemDb
+            .collection("shops")
+            .find({ status: "Active" })
+            .toArray();
+
+          // First check if email matches shop owner email
           for (const shop of shops) {
-            try {
-              const shopDb = getShopDatabase(shop.shopId);
-              const shopUser = await shopDb
-                .collection("users")
-                .findOne({ email });
-              if (shopUser) {
-                targetShopId = shop.shopId;
-                break;
+            if (shop.ownerEmail === email) {
+              targetShopId = shop.shopId;
+              break;
+            }
+          }
+
+          // If not found as owner, search in each shop's users collection
+          if (!targetShopId) {
+            for (const shop of shops) {
+              try {
+                const shopDb = getShopDatabase(shop.shopId);
+                const shopUser = await shopDb
+                  .collection("users")
+                  .findOne({ email });
+                if (shopUser) {
+                  targetShopId = shop.shopId;
+                  break;
+                }
+              } catch (error) {
+                logger.warn('[LOGIN] Failed to query shop database during Firebase login auto-detect', { 
+                  shopId: shop.shopId, 
+                  error: error.message 
+                });
               }
-            } catch (error) {
-              logger.warn('Failed to query shop database during Firebase login auto-detect', { shopId: shop.shopId, error: error.message });
             }
           }
         }
