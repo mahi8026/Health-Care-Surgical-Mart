@@ -488,7 +488,9 @@ const StockReport = () => {
   const fetchStockData = useCallback(async () => {
     // Prevent duplicate requests using ref
     if (fetchStockDataRef.current) {
-      console.log('Already loading, skipping duplicate request');
+      if (import.meta.env.DEV) {
+        console.log('[StockReport] Already loading, skipping duplicate request');
+      }
       return;
     }
     
@@ -577,7 +579,7 @@ const StockReport = () => {
       fetchStockData();
     }, 2500); // Wait 2.5 seconds after component mounts
     
-    return () => clearTimeout(timeoutId);
+    return () => clearTimeout(timeoutId); // Cleanup timeout on unmount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit]); // Only refetch when page or limit changes, not on every filter change
 

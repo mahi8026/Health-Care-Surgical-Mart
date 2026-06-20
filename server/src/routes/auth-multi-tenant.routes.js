@@ -531,8 +531,9 @@ router.post("/change-password", async (req, res) => {
  * POST /api/auth/request-password-reset
  * Request password reset (sends email verification code)
  * SECURITY FIX: Added email verification before password reset
+ * SECURITY FIX: Added brute force protection to prevent email enumeration
  */
-router.post("/request-password-reset", async (req, res) => {
+router.post("/request-password-reset", bruteForceProtection, async (req, res) => {
   try {
     const { email, shopId } = req.body;
 
@@ -630,9 +631,11 @@ router.post("/request-password-reset", async (req, res) => {
       },
     );
 
-    // TODO: Send email with reset code
-    // For now, log it (remove in production)
-    logger.info(`Password reset code for ${email}: ${resetCode} (expires in 15 minutes)`);
+    // TODO: Send email with reset code via SendGrid/Nodemailer
+    // For now, log it in development only (NEVER log in production)
+    if (process.env.NODE_ENV === 'development') {
+      logger.info(`[DEV ONLY] Password reset code for ${email}: ${resetCode} (expires in 15 minutes)`);
+    }
 
     // Audit: password reset requested
     auditLog.log(req, AUDIT_ACTIONS.UPDATE, "user", user._id?.toString(),

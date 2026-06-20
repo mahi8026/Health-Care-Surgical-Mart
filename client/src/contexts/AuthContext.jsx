@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
 
   // Token refresh interval ref
   const tokenRefreshInterval = useRef(null);
+  const refreshInProgress = useRef(false); // Prevent concurrent refreshes
 
   // Setup Firebase token refresh (every 50 minutes, before 1-hour expiry)
   useEffect(() => {
@@ -35,6 +36,15 @@ export const AuthProvider = ({ children }) => {
 
       // Refresh Firebase token every 50 minutes
       tokenRefreshInterval.current = setInterval(async () => {
+        // Prevent concurrent refresh attempts
+        if (refreshInProgress.current) {
+          if (import.meta.env.DEV) {
+            console.log('[AUTH] Token refresh already in progress, skipping');
+          }
+          return;
+        }
+        
+        refreshInProgress.current = true;
         try {
           if (import.meta.env.DEV) {
             console.log('[AUTH] Refreshing Firebase token...');
@@ -60,6 +70,8 @@ export const AuthProvider = ({ children }) => {
           console.error('[AUTH] Token refresh failed:', error);
           // If refresh fails, let the user continue until next interval
           // or until a 401 forces logout
+        } finally {
+          refreshInProgress.current = false;
         }
       }, 50 * 60 * 1000); // 50 minutes
     }
@@ -68,6 +80,7 @@ export const AuthProvider = ({ children }) => {
       if (tokenRefreshInterval.current) {
         clearInterval(tokenRefreshInterval.current);
       }
+      refreshInProgress.current = false;
     };
   }, [firebaseUser]);
 
@@ -99,14 +112,18 @@ export const AuthProvider = ({ children }) => {
                 return;
               } else {
                 // Token expired - clear it
-                console.log('[AUTH] Token expired, clearing session');
+                if (import.meta.env.DEV) {
+                  console.log('[AUTH] Token expired, clearing session');
+                }
                 localStorage.removeItem("user");
                 localStorage.removeItem("token");
               }
             }
           } catch (error) {
             // Invalid token or user data - clear it
-            console.error('[AUTH] Failed to parse stored session:', error);
+            if (import.meta.env.DEV) {
+              console.error('[AUTH] Failed to parse stored session:', error);
+            }
             localStorage.removeItem("user");
             localStorage.removeItem("token");
           }

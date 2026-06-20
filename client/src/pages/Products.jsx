@@ -18,6 +18,7 @@ const Products = () => {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [adjustingStock, setAdjustingStock] = useState(null);
+  const [initializingSnapshots, setInitializingSnapshots] = useState(false);
 
   const categories = ["Medical", "Lab", "Surgical"];
   const units = ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr"];
@@ -162,6 +163,28 @@ const Products = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Initialize missing stock snapshots
+  const initializeMissingSnapshots = async () => {
+    if (!window.confirm("This will create stock snapshots for products that don't have them. Continue?")) {
+      return;
+    }
+
+    setInitializingSnapshots(true);
+    try {
+      const response = await api.post("/stock/init-missing-snapshots");
+      if (response.success) {
+        alert(`Success! Created ${response.data.snapshotsCreated} snapshots. ${response.data.snapshotsSkipped} already existed.`);
+        fetchProducts(); // Refresh the list
+      } else {
+        setError(response.message || "Failed to initialize snapshots");
+      }
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to initialize snapshots");
+    } finally {
+      setInitializingSnapshots(false);
+    }
   };
   const handleBulkDelete = async () => {
     try {
