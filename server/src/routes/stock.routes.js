@@ -193,9 +193,9 @@ router.get(
     const { page = 1, limit = 50, startDate, endDate, movementType } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    // No shopId filter needed — already scoped to the correct shop DB
     const query = {
       productId: new ObjectId(req.params.productId),
-      shopId: req.user.shopId,
     };
 
     // Date range filter
@@ -251,7 +251,7 @@ router.get(
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const query = { shopId: req.user.shopId };
+    const query = {};
 
     if (productId) {
       query.productId = new ObjectId(productId);
@@ -390,7 +390,6 @@ router.get(
     const lowStockProducts = await shopDb
       .collection('stock_snapshots')
       .find({
-        shopId: req.user.shopId,
         $expr: { $lte: ['$availableQty', '$reorderPoint'] },
       })
       .sort({ availableQty: 1 })
@@ -418,7 +417,7 @@ router.get(
 
     const snapshots = await shopDb
       .collection('stock_snapshots')
-      .find({ shopId: req.user.shopId })
+      .find({})
       .toArray();
 
     // Get product details for pricing

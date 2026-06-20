@@ -104,7 +104,6 @@ class StockCommandService {
       // 1. Get current snapshot with optimistic lock check
       const snapshot = await shopDb.collection('stock_snapshots').findOne({
         productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
-        shopId
       });
 
       if (!snapshot) {
@@ -139,12 +138,11 @@ class StockCommandService {
       // 4. Prepare ledger entry
       const ledgerData = {
         productId: snapshot.productId,
-        shopId,
         movementType,
         direction: movementType === 'ADJUSTMENT_SET' ? 'SET' : direction,
         quantity,
         runningBalance: newBalance,
-        version: snapshot.lastLedgerVersion + 1,
+        version: (snapshot.lastLedgerVersion || 0) + 1,
         referenceType,
         referenceId: referenceId ? (ObjectId.isValid(referenceId) ? new ObjectId(referenceId) : referenceId) : null,
         batchNo,
@@ -177,7 +175,6 @@ class StockCommandService {
       const snapshotResult = await shopDb.collection('stock_snapshots').findOneAndUpdate(
         {
           productId: snapshot.productId,
-          shopId,
           lastLedgerVersion: snapshot.lastLedgerVersion // Optimistic lock
         },
         snapshotUpdate,
@@ -201,7 +198,7 @@ class StockCommandService {
             : { $inc: { quantity: -alloc.quantity } };
 
           await shopDb.collection('stock_batches').updateOne(
-            { _id: new ObjectId(alloc.batchId), shopId },
+            { _id: new ObjectId(alloc.batchId) },
             batchUpdate
           );
         }
@@ -244,11 +241,10 @@ class StockCommandService {
     const batches = await shopDb.collection('stock_batches')
       .find({
         productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
-        shopId,
         status: 'ACTIVE',
         quantity: { $gt: 0 }
       })
-      .sort({ expiryDate: 1 }) // Earliest expiry first
+      .sort({ expiryDate: 1 })
       .toArray();
 
     const allocations = [];
@@ -315,7 +311,6 @@ class StockCommandService {
     const shopDb = getShopDatabase(shopId);
     return await shopDb.collection('stock_snapshots').findOne({
       productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
-      shopId
     });
   }
 
@@ -333,7 +328,6 @@ class StockCommandService {
 
     const query = {
       productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
-      shopId
     };
 
     if (startDate || endDate) {
