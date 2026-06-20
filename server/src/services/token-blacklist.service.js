@@ -11,7 +11,7 @@
  */
 
 const jwt = require('jsonwebtoken');
-const logger = require('../utils/logger');
+const logger = require('../config/logging').logger;
 
 class TokenBlacklistService {
   constructor(redisClient = null, mongoDb = null) {

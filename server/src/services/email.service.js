@@ -6,7 +6,7 @@
  */
 
 const sgMail = require('@sendgrid/mail');
-const logger = require('../utils/logger');
+const logger = require('../config/logging').logger;
 
 class EmailService {
   constructor() {

@@ -6,7 +6,7 @@
  */
 
 const redis = require('redis');
-const logger = require('../utils/logger');
+const logger = require('./logging').logger;
 
 let redisClient = null;
 
