@@ -44,7 +44,7 @@ const setupMiddleware = (app) => {
   // Apply rate limiters to specific routes
   app.use('/api/auth/login', authLimiter);
   app.use('/api/auth/forgot-password', passwordResetLimiter);
-  app.use('/api/', apiLimiter);
+  app.use('/api', apiLimiter);
 
   // Request ID middleware for tracking
   app.use((req, res, next) => {
@@ -54,7 +54,7 @@ const setupMiddleware = (app) => {
   });
 
   // Shop context middleware (for multi-tenant operations)
-  app.use('/api/', (req, res, next) => {
+  app.use('/api', (req, res, next) => {
     // Skip auth routes and public endpoints
     if (
       req.path.startsWith('/auth/') ||

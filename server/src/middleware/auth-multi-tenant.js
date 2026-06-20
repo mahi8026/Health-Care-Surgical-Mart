@@ -352,7 +352,7 @@ async function checkShopStatus(req, res, next) {
 
     const systemDb = getSystemDatabase();
     const shop = await systemDb.collection('shops').findOne({
-      shopId: req.user.shopId,
+      _id: new ObjectId(req.user.shopId), // Convert string to ObjectId
     });
 
     if (!shop) {

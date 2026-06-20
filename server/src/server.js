@@ -150,7 +150,7 @@ const limiter = rateLimit({
   },
 });
 
-app.use('/api/', limiter);
+app.use('/api', limiter);
 
 // CORS configuration
 const corsOptions = {
@@ -372,7 +372,7 @@ const gracefulShutdown = async (signal) => {
 let server;
 
 const startServer = async () => {
-  // Start HTTP server first — always, regardless of DB status
+  // Start HTTP server first ï¿½ always, regardless of DB status
   server = app.listen(PORT, HOST, () => {
     logger.info(`?? Medical Store POS Server running on ${HOST}:${PORT}`);
     logger.info(`?? Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -404,7 +404,7 @@ const startServer = async () => {
   });
 
   // Connect to database after server is listening
-  // In development, a failed DB connection is non-fatal — server keeps running
+  // In development, a failed DB connection is non-fatal ï¿½ server keeps running
   try {
     await connectToDatabase();
     logger.info('Database connected successfully');
@@ -446,11 +446,11 @@ const startServer = async () => {
     startKeepAlive();
   } catch (error) {
     if (process.env.NODE_ENV === 'production') {
-      logger.error('Database connection failed in production — shutting down:', error.message);
+      logger.error('Database connection failed in production ï¿½ shutting down:', error.message);
       process.exit(1);
     } else {
       logger.warn(
-        '??  Database connection failed — server is running WITHOUT database. ' +
+        '??  Database connection failed ï¿½ server is running WITHOUT database. ' +
         'API endpoints requiring DB will return 503. Swagger UI is available at ' +
         `http://${HOST}:${PORT}/api/docs`,
         { error: error.message }
