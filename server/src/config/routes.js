@@ -131,6 +131,7 @@ const setupRoutes = (app) => {
         message: 'API is working',
         timestamp: new Date().toISOString(),
         version: process.env.npm_package_version || '2.0.0',
+        commit: 'ff88303', // Latest commit with auth fixes
       });
     });
 
