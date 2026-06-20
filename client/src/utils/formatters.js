@@ -1,96 +1,324 @@
 /**
- * Formatting Utilities
- * Common formatting functions for the application
+ * Centralized Formatting Utilities
+ * 
+ * Eliminates duplicate formatting code across components
+ * Ensures consistent display throughout the application
  */
 
-import { DATE_FORMATS } from "../config/constants";
+/**
+ * Format currency in Bangladeshi Taka
+ * @param {number} amount - Amount to format
+ * @param {object} options - Formatting options
+ * @returns {string} Formatted currency string
+ */
+export const formatCurrency = (amount, options = {}) => {
+  const {
+    locale = 'en-BD',
+    currency = 'BDT',
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 2,
+    useSymbol = true
+  } = options;
 
-// Date formatting
-export const formatDate = (date, format = DATE_FORMATS.DISPLAY) => {
-  if (!date) return "";
+  const numAmount = Number(amount) || 0;
 
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return "";
-
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const year = d.getFullYear();
-  const hours = d.getHours().toString().padStart(2, "0");
-  const minutes = d.getMinutes().toString().padStart(2, "0");
-
-  switch (format) {
-    case DATE_FORMATS.DISPLAY:
-      return `${day}/${month}/${year}`;
-    case DATE_FORMATS.API:
-      return `${year}-${month}-${day}`;
-    case DATE_FORMATS.DATETIME:
-      return `${day}/${month}/${year} ${hours}:${minutes}`;
-    default:
-      return d.toLocaleDateString();
+  if (useSymbol) {
+    // Use "Tk" prefix for better print compatibility
+    const formatted = new Intl.NumberFormat(locale, {
+      minimumFractionDigits,
+      maximumFractionDigits
+    }).format(numAmount);
+    return `Tk ${formatted}`;
   }
-};
 
-// Currency formatting
-export const formatCurrency = (amount, currency = "INR") => {
-  if (amount === null || amount === undefined) return "";
-
-  const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-
-  if (isNaN(numAmount)) return "";
-
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits,
+    maximumFractionDigits
   }).format(numAmount);
 };
 
-// Number formatting
-export const formatNumber = (number, decimals = 2) => {
-  if (number === null || number === undefined) return "";
+/**
+ * Format date in localized format
+ * @param {Date|string} date - Date to format
+ * @param {object} options - Formatting options
+ * @returns {string} Formatted date string
+ */
+export const formatDate = (date, options = {}) => {
+  if (!date) return '—';
 
-  const num = typeof number === "string" ? parseFloat(number) : number;
+  const {
+    locale = 'en-US',
+    year = 'numeric',
+    month = 'short',
+    day = '2-digit'
+  } = options;
 
-  if (isNaN(num)) return "";
-
-  return new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(num);
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString(locale, { year, month, day });
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return '—';
+  }
 };
 
-// Percentage formatting
-export const formatPercentage = (value, decimals = 1) => {
-  if (value === null || value === undefined) return "";
+/**
+ * Format date with time in localized format
+ * @param {Date|string} date - Date to format
+ * @param {object} options - Formatting options
+ * @returns {string} Formatted datetime string
+ */
+export const formatDateTime = (date, options = {}) => {
+  if (!date) return '—';
 
-  const num = typeof value === "string" ? parseFloat(value) : value;
+  const {
+    locale = 'en-BD',
+    year = 'numeric',
+    month = 'short',
+    day = '2-digit',
+    hour = '2-digit',
+    minute = '2-digit',
+    hour12 = false
+  } = options;
 
-  if (isNaN(num)) return "";
-
-  return `${num.toFixed(decimals)}%`;
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleString(locale, { 
+      year, month, day, hour, minute, hour12 
+    });
+  } catch (error) {
+    console.error('DateTime formatting error:', error);
+    return '—';
+  }
 };
 
-// File size formatting
+/**
+ * Format time only
+ * @param {Date|string} date - Date to extract time from
+ * @param {object} options - Formatting options
+ * @returns {string} Formatted time string
+ */
+export const formatTime = (date, options = {}) => {
+  if (!date) return '—';
+
+  const {
+    locale = 'en-BD',
+    hour = '2-digit',
+    minute = '2-digit',
+    second = undefined,
+    hour12 = false
+  } = options;
+
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleTimeString(locale, { hour, minute, second, hour12 });
+  } catch (error) {
+    console.error('Time formatting error:', error);
+    return '—';
+  }
+};
+
+/**
+ * Format number with locale-specific separators
+ * @param {number} num - Number to format
+ * @param {object} options - Formatting options
+ * @returns {string} Formatted number string
+ */
+export const formatNumber = (num, options = {}) => {
+  const {
+    locale = 'en-BD',
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 2
+  } = options;
+
+  const numValue = Number(num) || 0;
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits,
+    maximumFractionDigits
+  }).format(numValue);
+};
+
+/**
+ * Format percentage
+ * @param {number} value - Value to format as percentage
+ * @param {object} options - Formatting options
+ * @returns {string} Formatted percentage string
+ */
+export const formatPercent = (value, options = {}) => {
+  const {
+    locale = 'en-BD',
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 2
+  } = options;
+
+  const numValue = Number(value) || 0;
+
+  return new Intl.NumberFormat(locale, {
+    style: 'percent',
+    minimumFractionDigits,
+    maximumFractionDigits
+  }).format(numValue / 100);
+};
+
+/**
+ * Format phone number (Bangladesh format)
+ * @param {string} phone - Phone number to format
+ * @returns {string} Formatted phone number
+ */
+export const formatPhone = (phone) => {
+  if (!phone) return '—';
+
+  // Remove all non-digit characters
+  const cleaned = phone.replace(/\D/g, '');
+
+  // Format: +880 1XXX-XXXXXX or 01XXX-XXXXXX
+  if (cleaned.startsWith('880')) {
+    return `+${cleaned.slice(0, 3)} ${cleaned.slice(3, 7)}-${cleaned.slice(7)}`;
+  } else if (cleaned.startsWith('01')) {
+    return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+  }
+
+  return phone; // Return as-is if format not recognized
+};
+
+/**
+ * Format file size in human-readable format
+ * @param {number} bytes - File size in bytes
+ * @returns {string} Formatted file size
+ */
 export const formatFileSize = (bytes) => {
-  if (bytes === 0) return "0 Bytes";
+  if (bytes === 0) return '0 Bytes';
 
   const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 };
 
-// Capitalize first letter
-export const capitalize = (str) => {
-  if (!str) return "";
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+/**
+ * Calculate days until expiry
+ * @param {Date|string} expiryDate - Expiry date
+ * @returns {number|null} Days until expiry (null if no date)
+ */
+export const daysUntilExpiry = (expiryDate) => {
+  if (!expiryDate) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiry = new Date(expiryDate);
+  const diffTime = expiry - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays;
 };
 
-// Truncate text
+/**
+ * Get expiry status styling
+ * @param {Date|string} expiryDate - Expiry date
+ * @returns {object} Styling object with row, cell, badge, and label
+ */
+export const getExpiryStyle = (expiryDate) => {
+  const days = daysUntilExpiry(expiryDate);
+
+  if (days === null) {
+    return {
+      row: '',
+      cell: 'text-gray-400',
+      badge: 'bg-gray-100 text-gray-500',
+      label: '—'
+    };
+  }
+
+  if (days < 0) {
+    return {
+      row: 'bg-red-100',
+      cell: 'text-red-700 font-semibold',
+      badge: 'bg-red-600 text-white',
+      label: `Expired ${Math.abs(days)}d ago`
+    };
+  }
+
+  if (days <= 30) {
+    return {
+      row: 'bg-orange-50',
+      cell: 'text-orange-700 font-semibold',
+      badge: 'bg-orange-100 text-orange-700',
+      label: `${days}d left`
+    };
+  }
+
+  if (days <= 60) {
+    return {
+      row: 'bg-yellow-50',
+      cell: 'text-yellow-700',
+      badge: 'bg-yellow-100 text-yellow-700',
+      label: `${days}d left`
+    };
+  }
+
+  return {
+    row: '',
+    cell: 'text-green-700',
+    badge: 'bg-green-100 text-green-700',
+    label: `${days}d left`
+  };
+};
+
+/**
+ * Truncate text with ellipsis
+ * @param {string} text - Text to truncate
+ * @param {number} maxLength - Maximum length
+ * @returns {string} Truncated text
+ */
 export const truncateText = (text, maxLength = 50) => {
-  if (!text) return "";
+  if (!text) return '';
   if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + "...";
+  return text.substring(0, maxLength) + '...';
+};
+
+/**
+ * Capitalize first letter of each word
+ * @param {string} text - Text to capitalize
+ * @returns {string} Capitalized text
+ */
+export const capitalizeWords = (text) => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+/**
+ * Format invoice number with padding
+ * @param {number|string} invoiceNo - Invoice number
+ * @param {number} padding - Minimum digits
+ * @returns {string} Formatted invoice number
+ */
+export const formatInvoiceNumber = (invoiceNo, padding = 6) => {
+  const num = String(invoiceNo);
+  return num.padStart(padding, '0');
+};
+
+// Default exports for convenience
+export default {
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  formatTime,
+  formatNumber,
+  formatPercent,
+  formatPhone,
+  formatFileSize,
+  daysUntilExpiry,
+  getExpiryStyle,
+  truncateText,
+  capitalizeWords,
+  formatInvoiceNumber
 };
