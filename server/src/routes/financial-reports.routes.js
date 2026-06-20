@@ -277,7 +277,7 @@ router.get(
         },
       ])
       .toArray();
-    const productsCollectionName = shopDb.getCollectionName('products');
+    const productsCollectionName = 'products';
 
     // Cost of Goods Sold (COGS)
     const cogs = await shopDb
@@ -381,7 +381,7 @@ router.get(
       .toArray();
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expenseCategories');
+      'expense_categories';
 
     // Expense breakdown by category
     const expensesByCategory = await shopDb
@@ -581,7 +581,7 @@ router.get(
       .toArray();
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expenseCategories');
+      'expense_categories';
 
     // Top expense categories today
     const topExpenseCategories = await shopDb
@@ -737,7 +737,7 @@ router.get(
       ? new Date(endDate)
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    const productsCollectionName = shopDb.getCollectionName('products');
+    const productsCollectionName = 'products';
 
     // Product profitability analysis with index hint for date range
     const productProfitability = await shopDb

@@ -276,7 +276,7 @@ router.get(
       matchQuery.supplierId = toObjectId(supplierId);
     }
 
-    const suppliersCollectionName = shopDb.getCollectionName('suppliers');
+    const suppliersCollectionName = 'suppliers';
 
     const pipeline = [
       { $match: matchQuery },
@@ -353,8 +353,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const suppliersCollectionName = shopDb.getCollectionName('suppliers');
-    const usersCollectionName = shopDb.getCollectionName('users');
+    const suppliersCollectionName = 'suppliers';
+    const usersCollectionName = 'users';
 
     const purchase = await shopDb
       .collection('purchases')

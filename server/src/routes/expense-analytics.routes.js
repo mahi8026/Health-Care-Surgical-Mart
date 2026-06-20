@@ -398,7 +398,7 @@ router.get(
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expenseCategories');
+      'expense_categories';
 
     // Category distribution aggregation
     const distribution = await shopDb
@@ -681,7 +681,7 @@ router.get(
       .toArray();
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expenseCategories');
+      'expense_categories';
 
     // Get expense breakdown by category
     const expensesByCategory = await shopDb
@@ -1055,7 +1055,7 @@ router.get(
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expenseCategories');
+      'expense_categories';
 
     // Get top categories with detailed analytics
     const topCategories = await shopDb

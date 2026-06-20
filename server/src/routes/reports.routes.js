@@ -270,9 +270,7 @@ router.get(
       .collection('products')
       .countDocuments({ isActive: true });
 
-    const productsCollectionName = shopDb.getCollectionName('products');
-
-    // Get low stock products
+    // Get low stock products  
     const lowStockProducts = await shopDb
       .collection('stock')
       .aggregate([
@@ -283,7 +281,7 @@ router.get(
         },
         {
           $lookup: {
-            from: productsCollectionName,
+            from: 'products', // In new schema, just use collection name directly
             localField: 'productId',
             foreignField: '_id',
             as: 'product',
@@ -409,8 +407,7 @@ router.get(
       ])
       .toArray();
 
-    const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expenseCategories');
+    // Collection name in new schema
 
     // Get top expense categories (current month)
     const topExpenseCategories = await shopDb
@@ -423,7 +420,7 @@ router.get(
         },
         {
           $lookup: {
-            from: expenseCategoriesCollectionName,
+            from: 'expense_categories',
             localField: 'categoryId',
             foreignField: '_id',
             as: 'category',
@@ -511,14 +508,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const productsCollectionName = shopDb.getCollectionName('products');
+    // Collection name in new schema
 
     const stockValuation = await shopDb
       .collection('stock')
       .aggregate([
         {
           $lookup: {
-            from: productsCollectionName,
+            from: 'products',
             localField: 'productId',
             foreignField: '_id',
             as: 'product',
@@ -600,12 +597,12 @@ router.get(
       matchStage.isLowStock = true;
     }
 
-    const productsCollectionName = shopDb.getCollectionName('products');
+    // Collection name in new schema
 
     const pipeline = [
       {
         $lookup: {
-          from: productsCollectionName,
+          from: 'products',
           localField: 'productId',
           foreignField: '_id',
           as: 'product',
@@ -676,12 +673,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const productsCollectionName = shopDb.getCollectionName('products');
+    // Collection name in new schema
 
     const pipeline = [
       {
         $lookup: {
-          from: productsCollectionName,
+          from: 'products',
           localField: 'productId',
           foreignField: '_id',
           as: 'product',
@@ -874,7 +871,7 @@ router.get(
       ])
       .toArray();
 
-    const productsCollectionName = shopDb.getCollectionName('products');
+    // Collection name in new schema
 
     // Get COGS (Cost of Goods Sold)
     const cogsData = await shopDb
@@ -891,7 +888,7 @@ router.get(
         { $unwind: '$items' },
         {
           $lookup: {
-            from: productsCollectionName,
+            from: 'products',
             localField: 'items.productId',
             foreignField: '_id',
             as: 'product',
@@ -1117,7 +1114,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const productsCollectionName = shopDb.getCollectionName('products');
+    // Collection name in new schema
 
     // Get product profitability
     const products = await shopDb
@@ -1127,7 +1124,7 @@ router.get(
         { $unwind: '$items' },
         {
           $lookup: {
-            from: productsCollectionName,
+            from: 'products',
             localField: 'items.productId',
             foreignField: '_id',
             as: 'product',
@@ -1190,7 +1187,7 @@ router.get(
         { $unwind: '$items' },
         {
           $lookup: {
-            from: productsCollectionName,
+            from: 'products',
             localField: 'items.productId',
             foreignField: '_id',
             as: 'product',

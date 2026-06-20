@@ -289,7 +289,7 @@ router.get(
         },
         {
           $lookup: {
-            from: shopDb.getCollectionName('products'),
+            from: 'products',
             localField: 'productId',
             foreignField: '_id',
             as: 'product',
@@ -447,7 +447,7 @@ router.get(
         },
         {
           $lookup: {
-            from: shopDb.getCollectionName('products'),
+            from: 'products',
             localField: 'productId',
             foreignField: '_id',
             as: 'product',
@@ -515,7 +515,7 @@ router.get(
         },
         {
           $lookup: {
-            from: shopDb.getCollectionName('products'),
+            from: 'products',
             localField: 'productId',
             foreignField: '_id',
             as: 'product',

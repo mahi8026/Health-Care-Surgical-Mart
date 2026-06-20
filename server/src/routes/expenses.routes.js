@@ -424,8 +424,8 @@ router.get(
     }
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expense_categories');
-    const usersCollectionName = shopDb.getCollectionName('users');
+      'expense_categories';
+    const usersCollectionName = 'users';
 
     const pipeline = [
       { $match: matchQuery },
@@ -678,8 +678,8 @@ router.get(
     const shopDb = getShopDatabase(req.user.shopId);
 
     const expenseCategoriesCollectionName =
-      shopDb.getCollectionName('expense_categories');
-    const usersCollectionName = shopDb.getCollectionName('users');
+      'expense_categories';
+    const usersCollectionName = 'users';
 
     const expense = await shopDb
       .collection('expenses')
