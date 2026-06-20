@@ -63,14 +63,15 @@ const Modal = ({
 
         <div
           className={clsx(
-            "relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 w-full",
+            "relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 w-full flex flex-col",
+            "max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]",
             sizes[size],
             className,
           )}
         >
           {/* Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
               {title && (
                 <h3 className="text-lg font-medium text-gray-900">{title}</h3>
               )}
@@ -87,8 +88,8 @@ const Modal = ({
             </div>
           )}
 
-          {/* Content */}
-          <div className="px-6 py-4">{children}</div>
+          {/* Content — scrollable */}
+          <div className="px-6 py-4 overflow-y-auto">{children}</div>
         </div>
       </div>
     </div>
