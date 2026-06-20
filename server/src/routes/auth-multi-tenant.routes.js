@@ -949,7 +949,7 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
           // First check if email matches shop owner email
           for (const shop of shops) {
             if (shop.ownerEmail === email) {
-              targetShopId = shop.shopId;
+              targetShopId = shop._id.toString(); // Use _id, not shopId
               break;
             }
           }
@@ -958,17 +958,17 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
           if (!targetShopId) {
             for (const shop of shops) {
               try {
-                const shopDb = getShopDatabase(shop.shopId);
+                const shopDb = getShopDatabase(shop._id.toString()); // Use _id, not shopId
                 const shopUser = await shopDb
                   .collection('users')
                   .findOne({ email });
                 if (shopUser) {
-                  targetShopId = shop.shopId;
+                  targetShopId = shop._id.toString(); // Use _id, not shopId
                   break;
                 }
               } catch (error) {
                 logger.warn('[LOGIN] Failed to query shop database during Firebase login auto-detect', {
-                  shopId: shop.shopId,
+                  shopId: shop._id.toString(),
                   error: error.message
                 });
               }
@@ -986,10 +986,15 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
         }
       }
 
-      // Verify shop exists
+      // Verify shop exists (find by _id as string or ObjectId)
       const shop = await systemDb
         .collection('shops')
-        .findOne({ shopId: targetShopId });
+        .findOne({
+          $or: [
+            { shopId: targetShopId },
+            { _id: targetShopId }
+          ]
+        });
       if (!shop) {
         return res.status(404).json({
           success: false,
