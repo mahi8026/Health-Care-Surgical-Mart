@@ -296,6 +296,16 @@ export const capitalizeWords = (text) => {
 };
 
 /**
+ * Capitalize first letter only
+ * @param {string} text - Text to capitalize
+ * @returns {string} Capitalized text
+ */
+export const capitalize = (text) => {
+  if (!text) return '';
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+};
+
+/**
  * Format invoice number with padding
  * @param {number|string} invoiceNo - Invoice number
  * @param {number} padding - Minimum digits
@@ -319,6 +329,7 @@ export default {
   daysUntilExpiry,
   getExpiryStyle,
   truncateText,
+  capitalize,
   capitalizeWords,
   formatInvoiceNumber
 };
