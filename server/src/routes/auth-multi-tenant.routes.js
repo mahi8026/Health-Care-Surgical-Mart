@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const { ObjectId } = require('mongodb');
 const { getShopDatabase, getSystemDatabase } = require('../config/database');
 const { generateToken } = require('../middleware/auth-multi-tenant');
 const { logger } = require('../config/logging');
@@ -331,15 +332,20 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         }
       }
 
-      // Verify shop exists (find by _id as string or ObjectId)
-      const shop = await systemDb
-        .collection('shops')
-        .findOne({
+      // Verify shop exists (find by _id as ObjectId or shopId as string)
+      let shop;
+      try {
+        shop = await systemDb.collection('shops').findOne({
           $or: [
             { shopId: targetShopId },
-            { _id: targetShopId }
+            { _id: new ObjectId(targetShopId) }
           ]
         });
+      } catch (error) {
+        // If targetShopId is not a valid ObjectId, try shopId only
+        shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
+      }
+      
       if (!shop) {
         return res.status(404).json({
           success: false,
@@ -369,8 +375,17 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       });
     }
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    // Verify password (support both passwordHash and password fields for backwards compatibility)
+    const passwordHashField = user.passwordHash || user.password;
+    if (!passwordHashField) {
+      logger.error('User has no password hash', { email: user.email });
+      return res.status(500).json({
+        success: false,
+        message: 'Login failed',
+      });
+    }
+    
+    const isPasswordValid = await bcrypt.compare(password, passwordHashField);
     if (!isPasswordValid) {
       // Increment login attempts on failure
       if (req.incrementLoginAttempts) {
@@ -509,10 +524,18 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
-    // Verify old password
+    // Verify old password (support both passwordHash and password fields)
+    const passwordHashField = user.passwordHash || user.password;
+    if (!passwordHashField) {
+      return res.status(500).json({
+        success: false,
+        message: 'User password configuration error',
+      });
+    }
+    
     const isOldPasswordValid = await bcrypt.compare(
       oldPassword,
-      user.passwordHash,
+      passwordHashField,
     );
     if (!isOldPasswordValid) {
       return res.status(401).json({
@@ -987,15 +1010,20 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
         }
       }
 
-      // Verify shop exists (find by _id as string or ObjectId)
-      const shop = await systemDb
-        .collection('shops')
-        .findOne({
+      // Verify shop exists (find by _id as ObjectId or shopId as string)
+      let shop;
+      try {
+        shop = await systemDb.collection('shops').findOne({
           $or: [
             { shopId: targetShopId },
-            { _id: targetShopId }
+            { _id: new ObjectId(targetShopId) }
           ]
         });
+      } catch (error) {
+        // If targetShopId is not a valid ObjectId, try shopId only
+        shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
+      }
+      
       if (!shop) {
         return res.status(404).json({
           success: false,
