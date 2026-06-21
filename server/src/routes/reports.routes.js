@@ -194,15 +194,18 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    const today = new Date();
-    const startOfDay = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-    );
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay());
+    // Use UTC-based date boundaries so the dashboard is accurate regardless
+    // of the timezone the server process runs in (Render runs in UTC).
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date();
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date();
+    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay());
+    startOfWeek.setUTCHours(0, 0, 0, 0);
 
     // Get today's sales
     const todaySales = await shopDb
@@ -270,49 +273,40 @@ router.get(
       .collection('products')
       .countDocuments({ isActive: true });
 
-    // Get low stock products  
+    // Get low stock products from stock_snapshots (not the legacy 'stock' collection).
+    // A product is low stock when onHandQty <= reorderPoint.
     const lowStockProducts = await shopDb
-      .collection('stock')
+      .collection('stock_snapshots')
       .aggregate([
         {
+          // Only snapshots where quantity is at or below reorder point
           $match: {
-            isLowStock: true,
+            $expr: { $lte: ['$onHandQty', '$reorderPoint'] },
           },
         },
         {
           $lookup: {
-            from: 'products', // In new schema, just use collection name directly
+            from: 'products',
             localField: 'productId',
             foreignField: '_id',
             as: 'product',
           },
         },
+        { $unwind: '$product' },
         {
-          $unwind: '$product',
-        },
-        {
-          $match: {
-            'product.isActive': true,
-          },
+          // Active products only
+          $match: { 'product.isActive': true },
         },
         {
           $project: {
             productName: '$product.name',
-            currentQty: 1,
-            minStockLevel: 1,
-            product: {
-              name: 1,
-              sku: 1,
-              category: 1,
-            },
+            currentQty: '$onHandQty',
+            reorderPoint: 1,
+            product: { name: 1, sku: 1, category: 1 },
           },
         },
-        {
-          $sort: { currentQty: 1 },
-        },
-        {
-          $limit: 10,
-        },
+        { $sort: { currentQty: 1 } },
+        { $limit: 10 },
       ])
       .toArray();
 
