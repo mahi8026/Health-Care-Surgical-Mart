@@ -434,7 +434,6 @@ const startServer = async () => {
 
     // Initialize TokenBlacklistService with Redis (if available) and MongoDB
     const { initializeTokenBlacklistService } = require('./middleware/auth-multi-tenant');
-    const { getSystemDatabase } = require('./config/database');
     const systemDb = getSystemDatabase();
     initializeTokenBlacklistService(redisClient, systemDb);
     logger.info('TokenBlacklistService initialized');
