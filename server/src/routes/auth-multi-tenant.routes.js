@@ -457,6 +457,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
           email: user.email,
           role: user.role,
           shopId: user.shopId || null,
+          permissions: user.permissions || [],
         },
         token: token, // Include token for cross-domain setups
       },
@@ -1127,6 +1128,7 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
           email: user.email,
           role: user.role,
           shopId: user.shopId || null,
+          permissions: user.permissions || [],
         },
         token: token, // Include token for cross-domain setups
       },
@@ -1276,6 +1278,7 @@ router.get('/me', async (req, res) => {
           email: user.email,
           role: user.role,
           shopId: user.shopId || null,
+          permissions: user.permissions || [],
         },
       },
     });

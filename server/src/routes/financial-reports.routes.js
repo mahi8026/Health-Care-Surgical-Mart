@@ -771,7 +771,10 @@ router.get(
             purchasePrice: { $first: '$product.purchasePrice' },
             totalCost: {
               $sum: {
-                $multiply: ['$items.qty', '$product.purchasePrice'],
+                $multiply: [
+                  '$items.qty',
+                  { $ifNull: ['$items.costPrice', '$product.purchasePrice'] }
+                ],
               },
             },
           },
@@ -841,7 +844,10 @@ router.get(
             totalRevenue: { $sum: '$items.total' },
             totalCost: {
               $sum: {
-                $multiply: ['$items.qty', '$product.purchasePrice'],
+                $multiply: [
+                  '$items.qty',
+                  { $ifNull: ['$items.costPrice', '$product.purchasePrice'] }
+                ],
               },
             },
             totalQuantity: { $sum: '$items.qty' },

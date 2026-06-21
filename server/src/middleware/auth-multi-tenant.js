@@ -268,6 +268,14 @@ async function authenticate(req, res, next) {
     if (req.user.shopId) {
       try {
         req.shopDb = getShopDatabase(req.user.shopId);
+        
+        // Ensure shop indexes exist (fire-and-forget, non-blocking)
+        const { createShopIndexes } = require('../config/database');
+        setImmediate(() => {
+          createShopIndexes(req.user.shopId).catch((err) => {
+            logger.warn(`Failed to verify shop indexes for ${req.user.shopId}:`, err.message);
+          });
+        });
       } catch (dbError) {
         logger.error('Failed to get shop database in authenticate middleware:', {
           error: dbError.message,

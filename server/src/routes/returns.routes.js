@@ -652,12 +652,29 @@ router.post(
           userId: req.user._id || req.user.id,
           referenceType: 'RETURN',
           referenceId: result.insertedId,
+          batchNo: item.batchNumber || `RET-${returnNumber}`,
+          expiryDate: item.expiryDate,
           note: `Return from sale ${originalInvoiceNumber}`,
           metadata: {
             returnNumber,
             originalSaleId,
             reason: returnReason
           }
+        });
+
+        // Create a return batch
+        await shopDb.collection('stock_batches').insertOne({
+          productId: item.productId,
+          batchNo: item.batchNumber || `RET-${returnNumber}`,
+          lotNo: null,
+          quantity: item.returnQuantity,
+          expiryDate: item.expiryDate || null,
+          costPrice: item.price, // Use the original selling price as cost
+          status: 'ACTIVE',
+          source: 'RETURN',
+          referenceId: result.insertedId,
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
 
         // Log stock movement (legacy - for backward compatibility)

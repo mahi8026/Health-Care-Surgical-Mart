@@ -242,7 +242,8 @@ class StockCommandService {
       .find({
         productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
         status: 'ACTIVE',
-        quantity: { $gt: 0 }
+        quantity: { $gt: 0 },
+        expiryDate: { $gte: new Date() }
       })
       .sort({ expiryDate: 1 })
       .toArray();
@@ -266,6 +267,24 @@ class StockCommandService {
     }
 
     if (remaining > 0) {
+      // Check if there are expired batches
+      const expiredBatches = await shopDb.collection('stock_batches')
+        .find({
+          productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
+          status: 'ACTIVE',
+          quantity: { $gt: 0 },
+          expiryDate: { $lt: new Date() }
+        })
+        .toArray();
+
+      if (expiredBatches.length > 0) {
+        throw new InsufficientStockError(
+          `Cannot complete sale: all remaining stock has expired. Available expired quantity: ${expiredBatches.reduce((sum, b) => sum + b.quantity, 0)}`,
+          qtyNeeded - remaining,
+          qtyNeeded
+        );
+      }
+
       throw new InsufficientStockError(
         `Insufficient stock across all batches. Needed: ${qtyNeeded}, Available: ${qtyNeeded - remaining}`,
         qtyNeeded - remaining,

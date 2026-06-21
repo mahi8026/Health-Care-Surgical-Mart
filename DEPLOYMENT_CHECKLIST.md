@@ -1,295 +1,520 @@
-# Deployment Checklist - User Management Lockdown
+# DEPLOYMENT CHECKLIST - Healthcare POS System
+## Pre-Production Launch Verification
 
-**Date**: June 15, 2026  
-**Critical Security Fix**: Lock User Management to SUPER_ADMIN Only
-
----
-
-## ✅ Pre-Deployment Checklist
-
-### Code Review
-- [x] Backend RBAC permissions updated (`server/src/utils/rbac.js`)
-- [x] Backend route permissions updated (`server/src/routes/users.routes.js`)
-- [x] Frontend permissions updated (`client/src/utils/permissions.js`)
-- [x] Settings tab filtering added (`client/src/pages/Settings.jsx`)
-- [x] UserManagement buttons hidden (`client/src/components/UserManagement.jsx`)
-- [x] No TypeScript/ESLint errors
-- [x] Documentation created
-
-### Testing (Local)
-- [ ] Backend server starts without errors
-- [ ] Frontend builds without errors
-- [ ] SHOP_ADMIN cannot access GET /api/users (403)
-- [ ] SHOP_ADMIN cannot access POST /api/users (403)
-- [ ] SUPER_ADMIN can access GET /api/users (200)
-- [ ] SUPER_ADMIN can access POST /api/users (201)
-- [ ] SHOP_ADMIN doesn't see User Management tab
-- [ ] SUPER_ADMIN sees User Management tab
-
-### Git Preparation
-- [ ] All changes committed to local branch
-- [ ] Commit messages are clear and descriptive
-- [ ] No uncommitted changes remain
+**Date:** ____________  
+**Completed By:** ____________  
+**System:** Health Care Surgical Mart POS  
 
 ---
 
-## 🚀 Deployment Steps
+## ✅ PHASE 0: PRE-DEPLOYMENT PREPARATION
 
-### Step 1: Backend Deployment
-- [ ] Push backend changes to GitHub main branch
-- [ ] Verify Render auto-deploy started
-- [ ] Wait for Render build to complete (~5 minutes)
-- [ ] Check Render logs for errors
-- [ ] Test backend health: `curl https://health-care-surgical-mart.onrender.com/health`
+### Documentation Review
+- [ ] Read `AUDIT_SUMMARY_EXECUTIVE.md` (10 min)
+- [ ] Review `PRODUCTION_READY_REPORT.md` sections 1-5 (30 min)
+- [ ] Read `QUICK_START_FIXES.md` (5 min)
+- [ ] Bookmark `COMMANDS_REFERENCE.md` for quick access
 
-### Step 2: Frontend Deployment
-- [ ] Run `cd client && npm run build`
-- [ ] Verify build completed without errors
-- [ ] Run `firebase deploy --only hosting`
-- [ ] Verify Firebase deployment succeeded
-- [ ] Check Firebase hosting dashboard
+### Environment Verification
+- [ ] Backend `.env` file has all required variables
+- [ ] Frontend `.env` file configured correctly
+- [ ] MongoDB Atlas connection string is correct
+- [ ] Firebase credentials are valid
+- [ ] JWT_SECRET is at least 32 characters
+- [ ] ALLOWED_ORIGINS includes production domain
 
-### Step 3: Cache Clearing
-- [ ] Clear browser cache (Ctrl+Shift+Del)
-- [ ] Open incognito/private window for testing
-- [ ] Hard refresh (Ctrl+F5) on production site
+**Commands to verify:**
+```bash
+# Backend health
+curl https://health-care-surgical-mart.onrender.com/api/health
 
----
+# Auth health
+curl https://health-care-surgical-mart.onrender.com/api/auth/health
+```
 
-## 🧪 Post-Deployment Testing
-
-### Backend API Testing
-
-#### Test with SHOP_ADMIN
-Login as: `healthcaresurgicalmart@gmail.com`
-
-- [ ] GET /api/users → Returns **403 Forbidden**
-- [ ] POST /api/users → Returns **403 Forbidden**
-- [ ] PUT /api/users/:id → Returns **403 Forbidden**
-- [ ] DELETE /api/users/:id → Returns **403 Forbidden**
-
-Response should be:
+**Expected Results:**
 ```json
 {
-  "success": false,
-  "message": "Insufficient permissions",
-  "required": "view_users",
-  "userRole": "SHOP_ADMIN"
+  "status": "healthy",
+  "checks": {
+    "firebaseAdmin": "ok",
+    "mongodbConnection": "ok",
+    "jwtSecret": "set"
+  }
 }
 ```
 
-#### Test with SUPER_ADMIN
-Login as: `mahimrahman07@gmail.com` or `superadmin@medicalpos.com`
-
-- [ ] GET /api/users → Returns **200 OK** with user list
-- [ ] POST /api/users → Returns **201 Created**
-- [ ] PUT /api/users/:id → Returns **200 OK**
-- [ ] DELETE /api/users/:id → Returns **200 OK**
-
-### Frontend UI Testing
-
-#### Test as SHOP_ADMIN
-Login: `healthcaresurgicalmart@gmail.com`
-
-- [ ] Navigate to Dashboard → Works ✅
-- [ ] Navigate to POS → Works ✅
-- [ ] Navigate to Products → Works ✅
-- [ ] Navigate to Sales History → Works ✅
-- [ ] Navigate to Reports → Works ✅
-- [ ] Navigate to Settings → Works ✅
-- [ ] In Settings, User Management tab is **NOT visible** ✅
-- [ ] Try direct URL: `/settings` with manual tab switch → User Management content hidden ✅
-- [ ] No JavaScript errors in console ✅
-
-#### Test as SUPER_ADMIN
-Login: `mahimrahman07@gmail.com`
-
-- [ ] Navigate to Dashboard → Works ✅
-- [ ] Navigate to Settings → Works ✅
-- [ ] User Management tab **IS visible** ✅
-- [ ] Click User Management tab → Opens successfully ✅
-- [ ] User list loads ✅
-- [ ] "+ Add User" button **IS visible** ✅
-- [ ] Click "+ Add User" → Modal opens ✅
-- [ ] Create test user → Success ✅
-- [ ] Edit user button visible ✅
-- [ ] Delete user button visible ✅
-- [ ] No JavaScript errors in console ✅
-
-#### Test as STAFF
-Login: `staff@shop.com` (if active)
-
-- [ ] Navigate to Dashboard → Works ✅
-- [ ] Settings not visible in navigation ✅
-- [ ] Direct URL to `/settings` → Should redirect or show limited view ✅
-
-### Security Testing
-
-#### Attempt Bypass (SHOP_ADMIN)
-- [ ] Try API call in browser console → Returns 403
-- [ ] Try direct tab manipulation → Content still hidden
-- [ ] Try modifying localStorage → No effect (cookies used)
-- [ ] Try modified fetch request → Returns 403
-
-#### Verify Defense in Depth
-- [ ] RBAC middleware blocks request → Yes ✅
-- [ ] Controller-level check blocks request → Yes ✅
-- [ ] Frontend hides UI elements → Yes ✅
-
 ---
 
-## 📊 Monitoring
+## ✅ PHASE 1: CRITICAL FIXES VERIFICATION (30 minutes)
 
-### First 24 Hours After Deployment
-- [ ] Check Render logs for 403 errors (expected from SHOP_ADMIN)
-- [ ] Monitor error rates in Render dashboard
-- [ ] Check Firebase analytics for errors
-- [ ] Monitor support channels for user complaints
+### 1.1 Product Deletion Protection
+**Test:** Try to delete a product with stock
 
-### Check These Metrics
-- [ ] No 500 errors on user endpoints
-- [ ] 403 errors for SHOP_ADMIN (expected, not a bug)
-- [ ] SUPER_ADMIN can still create users successfully
-- [ ] No spike in frontend JavaScript errors
-
----
-
-## 🆘 Rollback Plan
-
-If critical issues arise:
-
-### Issue: Backend Errors
 ```bash
-# Rollback backend
-git log --oneline -5
-git revert <backend-commit-hash>
-git push origin main
-# Wait for Render to redeploy
+# Find a product with stock
+curl -X GET "https://health-care-surgical-mart.onrender.com/api/products" \
+  -H "Authorization: Bearer <token>" | jq '.data[] | select(.stockQuantity > 0) | {_id, name, stockQuantity}'
+
+# Try to delete it (should fail with 409)
+curl -X DELETE "https://health-care-surgical-mart.onrender.com/api/products/<product-id>" \
+  -H "Authorization: Bearer <token>"
 ```
 
-### Issue: Frontend Errors
+**Expected Response:**
+```json
+{
+  "success": false,
+  "message": "Cannot delete product. It has X units in stock.",
+  "statusCode": 409
+}
+```
+
+- [ ] ✅ Returns 409 error
+- [ ] ✅ Shows clear error message with quantity
+- [ ] ✅ Product NOT deleted from database
+
+### 1.2 Auth Permissions Field
+**Test:** Check all auth endpoints return permissions
+
 ```bash
-# Rollback frontend
-git log --oneline -5
-git revert <frontend-commit-hash>
-cd client
-npm run build
-firebase deploy --only hosting
+# Test login
+curl -X POST "https://health-care-surgical-mart.onrender.com/api/auth/firebase-login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<test-email>","idToken":"<firebase-token>"}' | jq '.data.user.permissions'
+
+# Test /me endpoint
+curl -X GET "https://health-care-surgical-mart.onrender.com/api/auth/me" \
+  -H "Authorization: Bearer <token>" | jq '.data.user.permissions'
 ```
 
-### Issue: SUPER_ADMIN Can't Access
-**DO NOT ROLLBACK** - This indicates a different problem.
-1. Check if logged in as correct user
-2. Check browser console for errors
-3. Check if cookie is being set
-4. Try incognito window
-
----
-
-## 📞 Communication Plan
-
-### Notify These People
-- [ ] System administrator (you)
-- [ ] Other SUPER_ADMIN users
-- [ ] SHOP_ADMIN users (explain they lost user management access)
-
-### Message Template for SHOP_ADMIN
-```
-Subject: Security Update - User Management Changes
-
-We've deployed a security update that restricts user management 
-to system administrators only.
-
-What changed:
-- The "User Management" tab is no longer visible in Settings
-- You can no longer create or edit user accounts
-- All other features remain unchanged (POS, Products, Sales, Reports, etc.)
-
-Why this change:
-- Enhanced security and compliance
-- Centralized user management
-- Prevention of unauthorized account creation
-
-What you can still do:
-- Everything related to daily operations
-- POS transactions
-- Product management
-- Sales and reports
-- Customer management
-- Expense tracking
-
-If you need a new user account created, please contact:
-Email: mahimrahman07@gmail.com
-
-Thank you for your understanding.
+**Expected Response:**
+```json
+{
+  "data": {
+    "user": {
+      "_id": "...",
+      "name": "...",
+      "email": "...",
+      "role": "SHOP_ADMIN",
+      "shopId": "...",
+      "permissions": ["VIEW_PRODUCTS", "CREATE_SALE", "..."]
+    }
+  }
+}
 ```
 
----
+- [ ] ✅ POST `/api/auth/login` returns permissions array
+- [ ] ✅ POST `/api/auth/firebase-login` returns permissions array
+- [ ] ✅ GET `/api/auth/me` returns permissions array
+- [ ] ✅ Permissions array is not empty for valid users
 
-## 📝 Post-Deployment Actions
+### 1.3 Stock Integrity Check
+**Test:** Run the integrity verification script
 
-### Immediate (Within 1 Hour)
-- [ ] Verify all tests passed
-- [ ] Document any issues encountered
-- [ ] Notify team of successful deployment
+```bash
+# From project root
+node run-integrity-check.js
+```
 
-### Short-term (Within 24 Hours)
-- [ ] Monitor error logs
-- [ ] Respond to user questions
-- [ ] Update user documentation if needed
+**Review Output:**
+- [ ] ✅ Script completes without errors
+- [ ] ✅ Products Checked > 0
+- [ ] ✅ Missing Snapshots = 0 (or auto-created)
+- [ ] ✅ Ledger Discrepancies = 0 (or auto-fixed)
+- [ ] ✅ Batch Discrepancies = 0 (or auto-fixed)
+- [ ] ✅ Negative Quantities = 0 (or auto-fixed)
+- [ ] ✅ JSON results file generated
 
-### Long-term (Within 1 Week)
-- [ ] Review audit logs for unusual activity
-- [ ] Confirm no bypass attempts succeeded
-- [ ] Consider additional security hardening
-
----
-
-## 📚 Documentation Reference
-
-- **USER_MANAGEMENT_LOCKDOWN.md** - Full implementation details
-- **test-user-management-lockdown.md** - Testing procedures
-- **LOCKDOWN_CHANGES_SUMMARY.md** - Line-by-line changes
-- **RBAC_BEFORE_AFTER.md** - Visual comparison
-- **QUICK_DEPLOYMENT_GUIDE.md** - Fast deployment steps
+**If any issues found:**
+- [ ] Review the discrepancies in detail
+- [ ] Verify auto-fixes are correct
+- [ ] Run script again to confirm fixes
 
 ---
 
-## ✅ Final Sign-Off
+## ✅ PHASE 2: DATABASE INTEGRITY (20 minutes)
 
-### Before Deployment
-- [ ] All pre-deployment checks complete
-- [ ] Backup of current production state taken
-- [ ] Rollback plan documented and understood
-- [ ] Team notified of deployment window
+### 2.1 Add Invoice Number Uniqueness
+```javascript
+// Connect to MongoDB Atlas
+use Health_Care_Shop_DB
 
-### After Deployment
-- [ ] All post-deployment tests passed
-- [ ] No critical errors in logs
-- [ ] Users notified of changes
-- [ ] Documentation updated
+// Add unique index
+db.sales.createIndex(
+  { invoiceNo: 1 },
+  { unique: true, background: true }
+)
 
-### Deployment Approved By
-- [ ] Developer: ___________________ Date: ___________
-- [ ] System Admin: ________________ Date: ___________
+// Verify index
+db.sales.getIndexes()
+```
+
+- [ ] ✅ Index created successfully
+- [ ] ✅ Index appears in getIndexes() output
+- [ ] ✅ No duplicate invoices exist (check first)
+
+### 2.2 Check for Data Anomalies
+```javascript
+// Check for duplicate invoices
+db.sales.aggregate([
+  { $group: { _id: "$invoiceNo", count: { $sum: 1 } } },
+  { $match: { count: { $gt: 1 } } }
+])
+// Expected: []
+
+// Check for negative stock
+db.stock_snapshots.find({ onHandQty: { $lt: 0 } }).count()
+// Expected: 0
+
+// Check for orphaned snapshots
+db.stock_snapshots.aggregate([
+  {
+    $lookup: {
+      from: "products",
+      localField: "productId",
+      foreignField: "_id",
+      as: "product"
+    }
+  },
+  { $match: { product: { $size: 0 } } }
+])
+// Expected: []
+```
+
+- [ ] ✅ No duplicate invoice numbers
+- [ ] ✅ No negative stock quantities
+- [ ] ✅ No orphaned stock snapshots
+- [ ] ✅ All products have corresponding snapshots
+
+### 2.3 Performance Indexes (Optional but Recommended)
+```javascript
+// Add performance indexes
+db.products.createIndex({ sku: 1 }, { background: true })
+db.products.createIndex({ name: "text" }, { background: true })
+db.sales.createIndex({ saleDate: -1 }, { background: true })
+db.sales.createIndex({ customerId: 1, saleDate: -1 }, { background: true })
+db.stock_ledger.createIndex({ productId: 1, timestamp: -1 }, { background: true })
+```
+
+- [ ] ✅ All indexes created
+- [ ] ✅ No errors during creation
+- [ ] ✅ Indexes verified with getIndexes()
 
 ---
 
-## 🎯 Success Criteria
+## ✅ PHASE 3: FUNCTIONAL TESTING (45 minutes)
 
-Deployment is considered successful when:
+### 3.1 Authentication Flow
+**Test as Shop Admin:**
+- [ ] ✅ Can login with Firebase
+- [ ] ✅ Can login with password
+- [ ] ✅ Receives valid JWT token
+- [ ] ✅ Token includes permissions
+- [ ] ✅ Can access /me endpoint
+- [ ] ✅ Can logout successfully
+- [ ] ✅ Cannot access with expired token (401)
 
-1. ✅ SHOP_ADMIN cannot see User Management tab
-2. ✅ SHOP_ADMIN gets 403 on all user endpoints
-3. ✅ SUPER_ADMIN can see User Management tab
-4. ✅ SUPER_ADMIN can create/edit/delete users
-5. ✅ No JavaScript errors in console
-6. ✅ All other features work for SHOP_ADMIN
-7. ✅ No 500 errors in backend logs
-8. ✅ Users can still login and work normally
+**Test as Staff:**
+- [ ] ✅ Can login
+- [ ] ✅ Has limited permissions
+- [ ] ✅ Cannot access admin-only features
+
+### 3.2 Product Management
+- [ ] ✅ Can view product list
+- [ ] ✅ Can search products by name/SKU
+- [ ] ✅ Can filter by category
+- [ ] ✅ Can add new product
+- [ ] ✅ Product appears in list immediately
+- [ ] ✅ Can edit product details
+- [ ] ✅ Can deactivate product (soft delete)
+- [ ] ✅ **CANNOT** delete product with stock (409 error)
+- [ ] ✅ **CAN** delete product with 0 stock
+
+### 3.3 Point of Sale (POS)
+**Create a Test Sale:**
+- [ ] ✅ Can search for products
+- [ ] ✅ Can add items to cart
+- [ ] ✅ Quantity validation works (cannot exceed stock)
+- [ ] ✅ Can apply discount
+- [ ] ✅ Can select customer (optional)
+- [ ] ✅ Can choose payment method
+- [ ] ✅ **Cannot sell expired items** (error shown)
+- [ ] ✅ Sale generates invoice number (format: SHOP1-SALE-00001)
+- [ ] ✅ Invoice number is sequential
+- [ ] ✅ Stock decreases immediately
+- [ ] ✅ Can view/print receipt
+
+**Verify After Sale:**
+```bash
+# Check stock decreased
+curl -X GET "https://health-care-surgical-mart.onrender.com/api/stock/snapshots" \
+  -H "Authorization: Bearer <token>" | jq '.data[] | select(.productId == "<product-id>")'
+
+# Check sale recorded
+curl -X GET "https://health-care-surgical-mart.onrender.com/api/sales?limit=1" \
+  -H "Authorization: Bearer <token>" | jq '.data.sales[0]'
+```
+
+- [ ] ✅ Stock quantity reduced by sale quantity
+- [ ] ✅ Sale appears in sales history
+- [ ] ✅ Invoice number is correct
+- [ ] ✅ Customer info recorded (if provided)
+
+### 3.4 Stock Management
+- [ ] ✅ Can view stock report
+- [ ] ✅ Stock quantities match database
+- [ ] ✅ Low stock alerts showing correctly
+- [ ] ✅ Can filter by category/status
+- [ ] ✅ Can view movement history for product
+- [ ] ✅ Can perform stock adjustment
+- [ ] ✅ Adjustment requires reason
+- [ ] ✅ Adjustment creates ledger entry
+
+### 3.5 Purchases
+**Create a Purchase:**
+- [ ] ✅ Can create purchase order
+- [ ] ✅ Can add items with batch info
+- [ ] ✅ Can mark purchase as received
+- [ ] ✅ Stock increases after receiving
+- [ ] ✅ Batches created correctly
+- [ ] ✅ FEFO allocation works (oldest expiry first)
+
+### 3.6 Returns
+**Process a Return:**
+- [ ] ✅ Can select original sale
+- [ ] ✅ Can choose items to return
+- [ ] ✅ Cannot return more than purchased
+- [ ] ✅ Stock increases after return
+- [ ] ✅ Refund amount calculated correctly
+- [ ] ✅ Return appears in returns list
+
+### 3.7 Customers
+- [ ] ✅ Can add new customer
+- [ ] ✅ Can view customer list
+- [ ] ✅ Can edit customer details
+- [ ] ✅ Can view purchase history
+- [ ] ✅ Outstanding balance shows correctly
+- [ ] ✅ Credit limit enforcement works
+
+### 3.8 Dashboard
+- [ ] ✅ Today's sales shows correct amount
+- [ ] ✅ Weekly/monthly totals accurate
+- [ ] ✅ Low stock alerts clickable
+- [ ] ✅ Expiring items alerts working
+- [ ] ✅ Charts render without errors
+- [ ] ✅ Recent sales list showing
+
+### 3.9 Reports
+- [ ] ✅ Sales report generates correctly
+- [ ] ✅ Date range filtering works
+- [ ] ✅ Stock valuation accurate
+- [ ] ✅ Profit/Loss report shows data
+- [ ] ✅ Can export to CSV/PDF
 
 ---
 
-**Deployment Status**: ⏳ Pending
+## ✅ PHASE 4: BUSINESS LOGIC VALIDATION (30 minutes)
 
-Update this document as you complete each step!
+### 4.1 Stock Integrity Rules
+**Test Scenarios:**
+- [ ] ✅ Cannot sell more than available stock
+- [ ] ✅ Cannot sell expired items
+- [ ] ✅ FEFO allocation works (oldest batch first)
+- [ ] ✅ Returns add stock back correctly
+- [ ] ✅ Adjustments create audit trail
+- [ ] ✅ Concurrent sales don't oversell
+
+### 4.2 Financial Accuracy
+**Verify Calculations:**
+- [ ] ✅ Subtotal = Sum of (quantity × price)
+- [ ] ✅ Discount applied correctly (% or fixed)
+- [ ] ✅ Tax calculated properly (if applicable)
+- [ ] ✅ Grand Total = Subtotal - Discount + Tax
+- [ ] ✅ Change calculated correctly
+- [ ] ✅ Profit = Revenue - COGS
+
+### 4.3 Permission Enforcement
+**Test Access Control:**
+- [ ] ✅ STAFF cannot delete products
+- [ ] ✅ STAFF cannot view financial reports
+- [ ] ✅ STAFF cannot manage users
+- [ ] ✅ SHOP_ADMIN has full access
+- [ ] ✅ Permissions respected on backend
+
+---
+
+## ✅ PHASE 5: ERROR HANDLING (20 minutes)
+
+### 5.1 API Error Responses
+**Test Error Cases:**
+- [ ] ✅ Invalid product ID → 404
+- [ ] ✅ Missing required fields → 400
+- [ ] ✅ Expired JWT → 401
+- [ ] ✅ Insufficient permissions → 403
+- [ ] ✅ Duplicate SKU → 409
+- [ ] ✅ Validation errors → 422
+- [ ] ✅ Server errors → 500 (with generic message, no stack trace)
+
+### 5.2 Frontend Error Display
+- [ ] ✅ Network errors shown to user
+- [ ] ✅ Validation errors highlighted on form
+- [ ] ✅ Session expired redirects to login
+- [ ] ✅ No blank/white screens on errors
+
+---
+
+## ✅ PHASE 6: PERFORMANCE & SCALABILITY (Optional)
+
+### 6.1 Load Testing
+**Test with Realistic Data:**
+- [ ] 1,000+ products loaded
+- [ ] 10,000+ sales records
+- [ ] 100+ concurrent users (simulate)
+- [ ] Response time < 2 seconds for most queries
+
+### 6.2 Optimization
+- [ ] Database indexes in place
+- [ ] API pagination working
+- [ ] Large lists load incrementally
+- [ ] Images/assets optimized
+
+---
+
+## ✅ PHASE 7: BACKUP & RECOVERY (15 minutes)
+
+### 7.1 Backup Configuration
+- [ ] ✅ MongoDB Atlas automated backups enabled
+- [ ] ✅ Retention policy set (minimum 7 days)
+- [ ] ✅ Point-in-time recovery available
+- [ ] ✅ Backup schedule documented
+
+### 7.2 Test Restore Process
+- [ ] ✅ Can manually trigger backup
+- [ ] ✅ Can restore from backup
+- [ ] ✅ Recovery time < 1 hour
+- [ ] ✅ Procedure documented
+
+---
+
+## ✅ PHASE 8: MONITORING & ALERTING (20 minutes)
+
+### 8.1 Logging Setup
+- [ ] ✅ Error logs accessible (Render dashboard)
+- [ ] ✅ Auth failures logged
+- [ ] ✅ Stock movements logged
+- [ ] ✅ Audit trail complete
+
+### 8.2 Health Checks
+```bash
+# Set up automated checks
+# Add to monitoring tool or cron job:
+
+# Every 5 minutes
+curl https://health-care-surgical-mart.onrender.com/api/health
+
+# Every hour
+curl https://health-care-surgical-mart.onrender.com/api/auth/health
+```
+
+- [ ] ✅ Health endpoint monitored
+- [ ] ✅ Alert if endpoint fails
+- [ ] ✅ Response time tracked
+
+---
+
+## ✅ PHASE 9: DOCUMENTATION & TRAINING (30 minutes)
+
+### 9.1 User Documentation
+- [ ] ✅ Staff trained on POS operations
+- [ ] ✅ Admin trained on product management
+- [ ] ✅ Admin trained on reports
+- [ ] ✅ Quick reference guide created
+
+### 9.2 Technical Documentation
+- [ ] ✅ API endpoints documented
+- [ ] ✅ Database schema documented
+- [ ] ✅ Deployment procedure documented
+- [ ] ✅ Emergency procedures documented
+
+---
+
+## ✅ PHASE 10: GO/NO-GO DECISION
+
+### Critical Go Criteria (Must Pass All)
+- [ ] ✅ Stock integrity check passes
+- [ ] ✅ Product deletion protection working
+- [ ] ✅ Auth permissions included in responses
+- [ ] ✅ Invoice number uniqueness enforced
+- [ ] ✅ No duplicate invoices exist
+- [ ] ✅ No negative stock quantities
+- [ ] ✅ Can complete end-to-end sale
+- [ ] ✅ Stock decreases correctly after sale
+- [ ] ✅ Backups configured and tested
+- [ ] ✅ Staff trained on basic operations
+
+### Important (Should Pass Most)
+- [ ] ✅ Returns workflow tested
+- [ ] ✅ Reports generate accurately
+- [ ] ✅ Performance acceptable
+- [ ] ✅ Error handling comprehensive
+- [ ] ✅ Permission enforcement working
+
+### Decision Matrix
+
+**If ALL Critical criteria pass:**  
+✅ **APPROVED FOR PRODUCTION LAUNCH**
+
+**If 1-2 Critical criteria fail:**  
+⚠️ **CONDITIONAL APPROVAL** - Fix issues within 24 hours
+
+**If 3+ Critical criteria fail:**  
+🔴 **HOLD LAUNCH** - Address issues before reconsidering
+
+---
+
+## 📝 SIGN-OFF
+
+### Technical Lead
+**Name:** ____________________  
+**Date:** ____________________  
+**Signature:** ____________________
+
+### Shop Owner/Manager
+**Name:** ____________________  
+**Date:** ____________________  
+**Signature:** ____________________
+
+### Notes/Comments:
+```
+_____________________________________________________________
+
+_____________________________________________________________
+
+_____________________________________________________________
+```
+
+---
+
+## 🚀 POST-LAUNCH MONITORING (First 7 Days)
+
+### Daily Checks
+- [ ] Day 1: Run integrity check, review logs
+- [ ] Day 2: Review audit logs, check for errors
+- [ ] Day 3: Verify report accuracy
+- [ ] Day 4: Check stock levels vs physical count
+- [ ] Day 5: Review user feedback
+- [ ] Day 6: Performance check
+- [ ] Day 7: Full system review, document issues
+
+### Week 1 Summary
+**Issues Found:** ____________________  
+**Hotfixes Applied:** ____________________  
+**User Satisfaction:** ____________________  
+**System Stability:** ____________________
+
+---
+
+**Checklist Version:** 1.0  
+**Last Updated:** June 21, 2026  
+**Next Review:** 7 days post-launch

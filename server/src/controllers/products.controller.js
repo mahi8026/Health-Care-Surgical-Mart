@@ -237,14 +237,67 @@ class ProductsController extends BaseController {
 
   /**
    * Delete product (soft delete)
+   * CRITICAL FIX: Check for active stock before deletion
    */
   async deleteProduct(req, res) {
     try {
+      // Check if product exists
+      const product = await req.shopDb.collection('products').findOne({
+        _id: new ObjectId(req.params.id),
+      });
+
+      if (!product) {
+        return this.sendError(res, 'Product not found', 404);
+      }
+
+      // CRITICAL: Check if product has active stock
+      const snapshot = await req.shopDb.collection('stock_snapshots').findOne({
+        productId: new ObjectId(req.params.id),
+      });
+
+      if (snapshot && snapshot.onHandQty > 0) {
+        return this.sendError(
+          res,
+          `Cannot delete product "${product.name}". It has ${snapshot.onHandQty} units in stock. Please adjust stock to zero before deleting.`,
+          409
+        );
+      }
+
+      // Check legacy stock collection as fallback
+      const legacyStock = await req.shopDb.collection('stock').findOne({
+        productId: new ObjectId(req.params.id),
+      });
+
+      if (legacyStock && legacyStock.currentQty > 0) {
+        return this.sendError(
+          res,
+          `Cannot delete product "${product.name}". It has ${legacyStock.currentQty} units in stock. Please adjust stock to zero before deleting.`,
+          409
+        );
+      }
+
+      // Check for active batches
+      const activeBatches = await req.shopDb.collection('stock_batches').countDocuments({
+        productId: new ObjectId(req.params.id),
+        status: 'ACTIVE',
+        quantity: { $gt: 0 },
+      });
+
+      if (activeBatches > 0) {
+        return this.sendError(
+          res,
+          `Cannot delete product "${product.name}". It has ${activeBatches} active batch(es) with stock. Please consume or adjust all batches before deleting.`,
+          409
+        );
+      }
+
+      // Soft delete the product
       const result = await req.shopDb.collection('products').updateOne(
         { _id: new ObjectId(req.params.id) },
         {
           $set: {
             isActive: false,
+            deletedAt: new Date(),
             updatedAt: new Date(),
           },
         },
@@ -256,8 +309,11 @@ class ProductsController extends BaseController {
 
       // Audit: product deleted (soft delete)
       auditLog.log(req, AUDIT_ACTIONS.PRODUCT_DELETED, 'product', req.params.id,
-        `Deleted (deactivated) product ID ${req.params.id}`,
-        { after: { isActive: false } }
+        `Deleted (deactivated) product "${product.name}" (SKU: ${product.sku})`,
+        {
+          before: { name: product.name, sku: product.sku, isActive: true },
+          after: { isActive: false, deletedAt: new Date() }
+        }
       );
 
       // Invalidate products cache

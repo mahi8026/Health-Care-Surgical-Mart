@@ -409,6 +409,15 @@ const startServer = async () => {
     await connectToDatabase();
     logger.info('Database connected successfully');
 
+    // Create system indexes
+    const { createSystemIndexes, getSystemDatabase } = require('./config/database');
+    try {
+      await createSystemIndexes();
+      logger.info('System indexes verified');
+    } catch (indexError) {
+      logger.warn('Failed to create system indexes (non-fatal):', indexError.message);
+    }
+
     // Initialize Redis (optional, non-blocking)
     let redisClient = null;
     try {

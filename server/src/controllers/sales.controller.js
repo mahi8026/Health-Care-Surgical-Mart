@@ -83,7 +83,7 @@ class SalesController {
       const invoiceNumberService = require('../services/invoice-number.service');
       const invoiceNo = await invoiceNumberService.generateInvoiceNumber(req.user.shopId);
 
-      // Enrich items with product details (outside transaction — read-only)
+      // Enrich items with product details (outside transaction ï¿½ read-only)
       const enrichedItems = await this._enrichSaleItems(req.shopDb, items);
 
       // Fetch customer's previous due balance before this sale
@@ -145,13 +145,13 @@ class SalesController {
             }
           });
         } catch (txError) {
-          // Replica-set not available — fall back to non-transactional writes
+          // Replica-set not available ï¿½ fall back to non-transactional writes
           if (
             txError.message?.includes('Transaction numbers are only allowed on a replica set') ||
             txError.codeName === 'IllegalOperation'
           ) {
             logger.warn(
-              'MongoDB transactions not supported (standalone node) — falling back to non-transactional writes',
+              'MongoDB transactions not supported (standalone node) ï¿½ falling back to non-transactional writes',
               { error: txError.message },
             );
             const result = await req.shopDb.collection('sales').insertOne(sale);
@@ -169,8 +169,8 @@ class SalesController {
           await session.endSession();
         }
       } else {
-        // Client not yet available (e.g. test environment) — non-transactional
-        logger.warn('MongoDB client unavailable — using non-transactional sale insert');
+        // Client not yet available (e.g. test environment) ï¿½ non-transactional
+        logger.warn('MongoDB client unavailable ï¿½ using non-transactional sale insert');
         const result = await req.shopDb.collection('sales').insertOne(sale);
         insertedId = result.insertedId;
         await this._updateStockForSale(req.shopDb, enrichedItems, null, insertedId, req.user._id, req.user.shopId);
@@ -193,7 +193,7 @@ class SalesController {
         const auditLog = require('../services/audit-log.service');
         const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
         auditLog.log(req, AUDIT_ACTIONS.SALE_CREATED, 'sale', insertedId.toString(),
-          `Created sale ${sale.invoiceNo} — total ?${sale.grandTotal}`,
+          `Created sale ${sale.invoiceNo} ï¿½ total ?${sale.grandTotal}`,
           { after: { invoiceNo: sale.invoiceNo, grandTotal: sale.grandTotal, itemCount: enrichedItems.length } }
         );
       } catch (_) { /* never block the response */ }
@@ -341,6 +341,7 @@ class SalesController {
           customName: item.customName,
           name: item.customName,
           rate: parseFloat(item.sellingPrice),
+          costPrice: 0,
           qty: parseFloat(item.quantity),
           total: parseFloat(item.sellingPrice) * parseFloat(item.quantity),
         });
@@ -380,6 +381,7 @@ class SalesController {
         productId: new ObjectId(item.productId),
         name: product.name,
         rate: parseFloat(item.sellingPrice || product.sellingPrice),
+        costPrice: parseFloat(product.purchasePrice || 0),
         qty: parseFloat(item.quantity),
         total:
           parseFloat(item.sellingPrice || product.sellingPrice) *
