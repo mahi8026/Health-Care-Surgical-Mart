@@ -104,6 +104,8 @@ router.get(
         },
       },
       { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
+      // Exclude inactive products — snapshots outlive product deactivation
+      { $match: { 'product.isActive': true } },
       // Merge useful product fields into the snapshot for easy access
       {
         $addFields: {
@@ -389,10 +391,25 @@ router.get(
 
     const lowStockProducts = await shopDb
       .collection('stock_snapshots')
-      .find({
-        $expr: { $lte: ['$availableQty', '$reorderPoint'] },
-      })
-      .sort({ availableQty: 1 })
+      .aggregate([
+        {
+          $match: {
+            $expr: { $lte: ['$availableQty', '$reorderPoint'] },
+          },
+        },
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'productId',
+            foreignField: '_id',
+            as: 'product',
+          },
+        },
+        { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
+        // Active products only
+        { $match: { 'product.isActive': true } },
+        { $sort: { availableQty: 1 } },
+      ])
       .toArray();
 
     res.json({
@@ -465,15 +482,15 @@ router.get(
  * Note: EventSource API doesn't support custom headers,
  * so we accept token via query parameter for this endpoint only.
  * The authenticate middleware will check req.query.token automatically.
+ * Must NOT be wrapped in asyncHandler — SSE connections are long-lived.
  */
 router.get(
   '/events',
-  authenticate, // Reads token from query param (see auth-multi-tenant.js)
-  checkShopStatus,
-  asyncHandler(async (req, res) => {
+  // authenticate + checkShopStatus already applied via router.use() above
+  (req, res) => {
     const sseManager = require('../services/sse-manager.service');
     sseManager.handleConnection(req, res);
-  })
+  }
 );
 
 /**
