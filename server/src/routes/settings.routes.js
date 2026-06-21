@@ -343,9 +343,9 @@ router.put(
       timezone,
     } = req.body;
 
-    // Validate required fields
-    if (!name || !address || !phone) {
-      throw createError.badRequest('Name, address, and phone are required');
+    // Validate required fields — only name is mandatory
+    if (!name || !name.trim()) {
+      throw createError.badRequest('Shop name is required');
     }
 
     const settingsData = {
