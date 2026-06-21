@@ -211,18 +211,12 @@ const ROLE_PERMISSIONS = {
     // View customers only
     PERMISSIONS.VIEW_CUSTOMERS,
 
-    // Limited reports (no profit)
+    // Limited reports — sales and stock only, NO profit/financial reports
     PERMISSIONS.VIEW_SALES_REPORT,
     PERMISSIONS.VIEW_STOCK_REPORT,
 
-    // View expense categories only
-    PERMISSIONS.VIEW_EXPENSE_CATEGORIES,
-
-    // View expenses only
-    PERMISSIONS.VIEW_EXPENSES,
-
-    // View settings only
-    PERMISSIONS.VIEW_SETTINGS,
+    // NOTE: No VIEW_EXPENSES, VIEW_EXPENSE_CATEGORIES, VIEW_SETTINGS, VIEW_PROFIT_REPORT
+    // Staff cannot access: Financial Reports, Expenses, Settings
   ],
 };
 

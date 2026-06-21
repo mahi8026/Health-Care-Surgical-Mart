@@ -26,6 +26,21 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
     });
   };
 
+  // Helper function to format date + time
+  const formatDateTime = (date) => {
+    if (!date) return "N/A";
+    const d = new Date(date);
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }) + " " + d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
   // Helper function to format currency
   const formatCurrency = (amount) => {
     if (amount === undefined || amount === null) return "0.00";
@@ -36,7 +51,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
   const subtotal =
     sale?.items?.reduce(
       (sum, item) =>
-        sum + (item.qty || item.quantity) * (item.saleRate || item.rate),
+        sum + (item.qty || item.quantity || 0) * (item.saleRate || item.sellingPrice || item.rate || 0),
       0,
     ) || 0;
   const vat = sale?.vat || 0;
@@ -139,9 +154,9 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
                 </span>
               </div>
               <div className="flex justify-between mb-1">
-                <span className="text-xs text-gray-500">Date:</span>
+                <span className="text-xs text-gray-500">Date & Time:</span>
                 <span className="font-medium text-gray-900 text-xs">
-                  {formatDate(sale?.saleDate || sale?.createdAt || sale?.date)}
+                  {formatDateTime(sale?.saleDate || sale?.createdAt || sale?.date)}
                 </span>
               </div>
               <div className="flex justify-between">
