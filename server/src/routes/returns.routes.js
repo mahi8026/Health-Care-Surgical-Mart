@@ -581,7 +581,7 @@ router.post(
         throw createError.badRequest(`Product ${productId} not found`);
       }
 
-      const itemReturnAmount = originalItem.price * returnQuantity;
+      const itemReturnAmount = (originalItem.sellingPrice || originalItem.saleRate || originalItem.price || 0) * returnQuantity;
       totalReturnAmount += itemReturnAmount;
 
       returnItems.push({
@@ -590,7 +590,8 @@ router.post(
         sku: originalItem.sku,
         originalQuantity: originalItem.qty,
         returnQuantity: parseInt(returnQuantity),
-        price: originalItem.price,
+        price: originalItem.sellingPrice || originalItem.saleRate || originalItem.price || 0,
+        costPrice: originalItem.costPrice || product.purchasePrice || 0,
         total: itemReturnAmount,
         returnReason: itemReason || returnReason,
         batchNumber: originalItem.batchNumber || null,

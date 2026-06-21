@@ -304,7 +304,10 @@ router.get(
             _id: null,
             totalCOGS: {
               $sum: {
-                $multiply: ['$items.qty', '$product.purchasePrice'],
+                $multiply: [
+                  '$items.qty',
+                  { $ifNull: ['$items.costPrice', '$product.purchasePrice'] }
+                ],
               },
             },
           },
@@ -337,7 +340,10 @@ router.get(
             _id: null,
             totalReturnCOGS: {
               $sum: {
-                $multiply: ['$items.returnQuantity', '$product.purchasePrice'],
+                $multiply: [
+                  '$items.returnQuantity',
+                  { $ifNull: ['$items.costPrice', '$product.purchasePrice'] }
+                ],
               },
             },
           },
