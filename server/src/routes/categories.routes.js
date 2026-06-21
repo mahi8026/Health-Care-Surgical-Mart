@@ -61,24 +61,78 @@ router.get(
   cacheResponse(TTL.CATEGORIES, (req) => `categories:${req.user.shopId}`),
   async (req, res) => {
     try {
-      // Return predefined categories for medical store
+      // Return comprehensive categories for surgical/medical store
       const categories = [
         {
-          _id: 'medical',
-          name: 'Medical',
+          _id: 'medicines',
+          name: 'Medicines',
           description: 'Pharmaceutical medicines and drugs',
           isActive: true,
         },
         {
-          _id: 'lab',
-          name: 'Lab',
+          _id: 'surgical-instruments',
+          name: 'Surgical Instruments',
+          description: 'Surgical instruments and tools',
+          isActive: true,
+        },
+        {
+          _id: 'disposables',
+          name: 'Disposables',
+          description: 'Disposable medical supplies',
+          isActive: true,
+        },
+        {
+          _id: 'lab-equipment',
+          name: 'Lab Equipment',
           description: 'Laboratory equipment and diagnostic tools',
           isActive: true,
         },
         {
-          _id: 'surgical',
-          name: 'Surgical',
-          description: 'Surgical instruments and supplies',
+          _id: 'bandages-dressing',
+          name: 'Bandages & Dressing',
+          description: 'Bandages, gauzes, and wound dressing materials',
+          isActive: true,
+        },
+        {
+          _id: 'injection-syringes',
+          name: 'Injections & Syringes',
+          description: 'Injection syringes, needles, and IV supplies',
+          isActive: true,
+        },
+        {
+          _id: 'medical-equipment',
+          name: 'Medical Equipment',
+          description: 'Medical devices and equipment',
+          isActive: true,
+        },
+        {
+          _id: 'ppe',
+          name: 'PPE',
+          description: 'Personal protective equipment (gloves, masks, etc.)',
+          isActive: true,
+        },
+        {
+          _id: 'first-aid',
+          name: 'First Aid',
+          description: 'First aid supplies and kits',
+          isActive: true,
+        },
+        {
+          _id: 'supplements',
+          name: 'Supplements',
+          description: 'Nutritional and dietary supplements',
+          isActive: true,
+        },
+        {
+          _id: 'baby-care',
+          name: 'Baby Care',
+          description: 'Baby care products and supplies',
+          isActive: true,
+        },
+        {
+          _id: 'personal-care',
+          name: 'Personal Care',
+          description: 'Personal care and hygiene products',
           isActive: true,
         },
       ];

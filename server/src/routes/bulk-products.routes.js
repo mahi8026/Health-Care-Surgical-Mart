@@ -191,93 +191,47 @@ const mapProductColumns = (rawProduct) => {
   const columnMappings = {
     // Standard mappings
     name: [
-      'name',
-      'product_name',
-      'productname',
-      'item_name',
-      'itemname',
-      'product',
-      'item',
-      'description',
-      'product_description',
-      'product description',
+      'name', 'product_name', 'productname', 'item_name', 'itemname',
+      'product', 'item', 'description', 'product_description', 'product description',
     ],
     sku: [
-      'sku',
-      'code',
-      'product_code',
-      'productcode',
-      'item_code',
-      'itemcode',
-      'barcode',
-      'id',
-      'product_id',
-      's/n',
-      'sn',
-      'serial',
-      'serial_number',
+      'sku', 'code', 'product_code', 'productcode', 'item_code', 'itemcode',
+      'barcode', 'id', 'product_id', 's/n', 'sn', 'serial', 'serial_number',
     ],
     category: [
-      'category',
-      'cat',
-      'type',
-      'group',
-      'product_category',
-      'item_category',
+      'category', 'cat', 'type', 'group', 'product_category', 'item_category',
+    ],
+    brand: [
+      'brand', 'brand_name', 'brandname', 'manufacturer', 'company', 'make',
     ],
     purchasePrice: [
-      'purchase_price',
-      'purchaseprice',
-      'cost_price',
-      'costprice',
-      'cost',
-      'buy_price',
-      'buyprice',
-      'wholesale_price',
-      'distributor price (tk)',
+      'purchase_price', 'purchaseprice', 'cost_price', 'costprice', 'cost',
+      'buy_price', 'buyprice', 'wholesale_price', 'distributor price (tk)',
       'distributor_price',
     ],
     sellingPrice: [
-      'selling_price',
-      'sellingprice',
-      'sale_price',
-      'saleprice',
-      'price',
-      'retail_price',
-      'retailprice',
-      'mrp',
-      'price (tk)',
-      'price_tk',
+      'selling_price', 'sellingprice', 'sale_price', 'saleprice', 'price',
+      'retail_price', 'retailprice', 'mrp', 'price (tk)', 'price_tk',
     ],
     unit: [
-      'unit',
-      'uom',
-      'unit_of_measure',
-      'measure',
-      'qty_unit',
-      'quantity_unit',
-      'pack size',
-      'pack_size',
-      'packsize',
+      'unit', 'uom', 'unit_of_measure', 'measure', 'qty_unit', 'quantity_unit',
+      'pack size', 'pack_size', 'packsize',
     ],
     minStockLevel: [
-      'min_stock_level',
-      'minstocklevel',
-      'min_stock',
-      'minstock',
-      'reorder_level',
-      'reorderlevel',
-      'minimum_quantity',
-      'test/pack',
-      'test_pack',
+      'min_stock_level', 'minstocklevel', 'min_stock', 'minstock',
+      'reorder_level', 'reorderlevel', 'minimum_quantity', 'test/pack', 'test_pack',
+    ],
+    initialStock: [
+      'initial_stock', 'initialstock', 'opening_stock', 'openingstock',
+      'quantity', 'qty', 'stock', 'current_stock', 'currentstock',
+      'on_hand', 'onhand', 'stock_qty', 'stockqty',
+    ],
+    expiryDate: [
+      'expiry_date', 'expirydate', 'expiry', 'expiration_date', 'exp_date',
+      'expdate', 'best_before', 'bestbefore',
     ],
     description: [
-      'description',
-      'desc',
-      'details',
-      'notes',
-      'remarks',
-      'product_details',
+      'description', 'desc', 'details', 'notes', 'remarks', 'product_details',
     ],
   };
 
@@ -469,14 +423,18 @@ router.post(
           }
 
           // Create product
+          const initialQty = parseInt(productData.initialStock) || 0;
           const newProduct = {
             name: productData.name.trim(),
             sku: productData.sku.trim(),
             category: productData.category.trim(),
+            brand: productData.brand?.trim() || '',
             purchasePrice: parseFloat(productData.purchasePrice),
             sellingPrice: parseFloat(productData.sellingPrice),
             unit: productData.unit.trim(),
-            minStockLevel: parseInt(productData.minStockLevel) || 0,
+            minStockLevel: parseInt(productData.minStockLevel) || 10,
+            reorderPoint: parseInt(productData.minStockLevel) || 10,
+            expiryDate: productData.expiryDate ? new Date(productData.expiryDate) : null,
             description: productData.description?.trim() || '',
             isActive: true,
             createdAt: new Date(),
@@ -486,18 +444,59 @@ router.post(
           const productResult = await req.shopDb.collection('products').insertOne(newProduct);
           const newProductId = productResult.insertedId;
 
-          // Create initial stock entry
+          // Create legacy stock entry
           await req.shopDb.collection('stock').insertOne({
             productId: newProductId,
             productName: newProduct.name,
-            currentQty: 0,
+            currentQty: initialQty,
             reservedQty: 0,
-            availableQty: 0,
+            availableQty: initialQty,
             minStockLevel: newProduct.minStockLevel,
-            isLowStock: true,
+            isLowStock: initialQty <= newProduct.minStockLevel,
             lastUpdated: new Date(),
             createdAt: new Date(),
           });
+
+          // Create stock_snapshot (single source of truth for stock quantities)
+          await req.shopDb.collection('stock_snapshots').insertOne({
+            productId: newProductId,
+            productName: newProduct.name,
+            sku: newProduct.sku,
+            category: newProduct.category,
+            unit: newProduct.unit,
+            onHandQty: initialQty,
+            reservedQty: 0,
+            availableQty: initialQty,
+            avgCostPrice: newProduct.purchasePrice,
+            totalCostValue: initialQty * newProduct.purchasePrice,
+            reorderPoint: newProduct.reorderPoint,
+            lastMovementType: initialQty > 0 ? 'OPENING_STOCK' : null,
+            lastMovementDate: initialQty > 0 ? new Date() : null,
+            lastLedgerVersion: 0,
+            lastLedgerEntryId: null,
+            version: 0,
+            updatedAt: new Date(),
+            createdAt: new Date(),
+          });
+
+          // If initial stock > 0, record a ledger event for audit trail
+          if (initialQty > 0) {
+            await req.shopDb.collection('stock_ledger').insertOne({
+              productId: newProductId,
+              movementType: 'OPENING_STOCK',
+              direction: 'IN',
+              quantity: initialQty,
+              runningBalance: initialQty,
+              version: 1,
+              referenceType: 'BULK_IMPORT',
+              referenceId: null,
+              costPrice: newProduct.purchasePrice,
+              userId: req.user?._id || null,
+              timestamp: new Date(),
+              note: 'Opening stock from bulk import',
+              metadata: { source: 'bulk_import' },
+            });
+          }
 
           results.imported.push({
             name: newProduct.name,

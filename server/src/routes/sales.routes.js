@@ -15,6 +15,7 @@ const { PERMISSIONS } = require('../utils/rbac');
 const salesController = require('../controllers/sales.controller');
 const auditLog = require('../services/audit-log.service');
 const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
+const { getShopDatabase } = require('../config/database');
 
 // Rate limiter for email sending (prevent spam)
 const emailRateLimiter = rateLimit({
@@ -31,6 +32,12 @@ const emailRateLimiter = rateLimit({
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
 router.use(checkShopStatus);
+
+// Attach shopDb to request for controller
+router.use((req, res, next) => {
+  req.shopDb = getShopDatabase(req.user.shopId);
+  next();
+});
 
 /**
  * GET /api/sales/next-invoice-number

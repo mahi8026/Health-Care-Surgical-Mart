@@ -358,10 +358,8 @@ class ProductsController extends BaseController {
                 },
               },
             },
-            category: {
-              _id: { $toLower: '$category' },
-              name: '$category',
-            },
+            // Keep category as-is (string)
+            // Frontend now loads categories from /api/categories endpoint
           },
         },
         { $project: { snapshot: 0, legacyStock: 0 } },
@@ -469,8 +467,29 @@ class ProductsController extends BaseController {
 
     await shopDb.collection('stock_snapshots').insertOne(snapshot);
 
-    // If initial quantity > 0, create a stock event for audit trail
+    // If initial quantity > 0, create stock batch and event for audit trail
     if (quantity > 0) {
+      // Create a stock batch (required for FEFO allocation)
+      const batch = {
+        productId: productId,
+        productName: name,
+        sku: sku || null,
+        batchNo: `INIT-${Date.now()}`,
+        lotNo: null,
+        quantity: quantity,
+        originalQuantity: quantity,
+        costPrice: parseFloat(costPrice) || 0,
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Default 1 year from now
+        receivedDate: new Date(),
+        status: 'ACTIVE',
+        supplierId: null,
+        supplierName: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const batchResult = await shopDb.collection('stock_batches').insertOne(batch);
+
+      // Create stock event for audit trail
       await shopDb.collection('stock_events').insertOne({
         productId: productId,
         productName: name,
@@ -484,6 +503,8 @@ class ProductsController extends BaseController {
         totalValue: quantity * (parseFloat(costPrice) || 0),
         reason: 'Initial stock when product was created',
         performedBy: null, // Will be set by middleware if available
+        batchId: batchResult.insertedId,
+        batchNo: batch.batchNo,
         createdAt: new Date(),
         version: 0,
       });
