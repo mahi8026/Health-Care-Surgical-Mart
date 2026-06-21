@@ -672,6 +672,31 @@ router.post(
 
     const result = await shopDb.collection('stock_batches').insertOne(batch);
 
+    // Create ledger entry for this batch
+    const stockCommand = require('../services/stock-command.service');
+    try {
+      await stockCommand.recordMovement({
+        shopId: req.user.shopId,
+        productId: new ObjectId(productId),
+        movementType: 'ADJUSTMENT_ADD',
+        quantity: parseInt(quantity),
+        userId: req.user._id,
+        referenceType: 'MANUAL_BATCH',
+        referenceId: result.insertedId,
+        batchNo,
+        expiryDate: new Date(expiryDate),
+        costPrice: parseFloat(costPrice),
+        note: `Manual batch creation: ${batchNo}${notes ? ' - ' + notes : ''}`,
+        metadata: {
+          source: 'manual_batch_creation',
+          batchId: result.insertedId.toString()
+        }
+      });
+    } catch (ledgerError) {
+      logger.error('Failed to create ledger entry for manual batch:', ledgerError);
+      // Batch already created, log error but don't fail
+    }
+
     logger.info('Batch created', {
       shopId: req.user.shopId,
       batchId: result.insertedId,

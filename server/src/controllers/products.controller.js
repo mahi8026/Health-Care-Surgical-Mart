@@ -523,7 +523,7 @@ class ProductsController extends BaseController {
 
     await shopDb.collection('stock_snapshots').insertOne(snapshot);
 
-    // If initial quantity > 0, create stock batch and event for audit trail
+    // If initial quantity > 0, create stock batch and ledger entry
     if (quantity > 0) {
       // Create a stock batch (required for FEFO allocation)
       const batch = {
@@ -545,7 +545,32 @@ class ProductsController extends BaseController {
       };
       const batchResult = await shopDb.collection('stock_batches').insertOne(batch);
 
-      // Create stock event for audit trail
+      // Create ledger entry via stock command service
+      const stockCommand = require('../services/stock-command.service');
+      try {
+        await stockCommand.recordMovement({
+          shopId: shopId,
+          productId: productId,
+          movementType: 'OPENING_STOCK',
+          quantity: quantity,
+          userId: null,
+          referenceType: 'PRODUCT_CREATION',
+          referenceId: productId,
+          batchNo: batch.batchNo,
+          expiryDate: batch.expiryDate,
+          costPrice: parseFloat(costPrice) || 0,
+          note: `Initial stock when product was created: ${name}`,
+          metadata: {
+            source: 'product_creation',
+            batchId: batchResult.insertedId.toString()
+          }
+        });
+      } catch (ledgerError) {
+        logger.error('Failed to create ledger entry for initial stock:', ledgerError);
+        // Don't fail product creation, but log it
+      }
+
+      // Create stock event for audit trail (legacy)
       await shopDb.collection('stock_events').insertOne({
         productId: productId,
         productName: name,
