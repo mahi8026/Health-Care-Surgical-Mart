@@ -1,0 +1,83 @@
+{
+  "productsChecked": 9,
+  "snapshotDiscrepancies": [
+    {
+      "productId": "6a3693ff409bb5a417614e2c",
+      "productName": "Paracetamol 500mg",
+      "sku": "PARA-500MG-001",
+      "ledgerBalance": 0,
+      "snapshotBalance": 300,
+      "difference": 300
+    },
+    {
+      "productId": "6a369560b14491872bb9e4e2",
+      "productName": "Surgical Scissors",
+      "sku": "SURG-MED-SCIS-1234",
+      "ledgerBalance": 0,
+      "snapshotBalance": 50,
+      "difference": 50
+    },
+    {
+      "productId": "6a3695c4a921aab533baea64",
+      "productName": "Sterile Gauze Pads",
+      "sku": "BAND-MED-GAUZ-5678",
+      "ledgerBalance": -5,
+      "snapshotBalance": 95,
+      "difference": 100
+    },
+    {
+      "productId": "6a36bd6b29ebf91d4677b023",
+      "productName": "Paracetamol 500mg",
+      "sku": "MED-SQ-PARA-9999",
+      "ledgerBalance": 0,
+      "snapshotBalance": 100,
+      "difference": 100
+    },
+    {
+      "productId": "6a3816438814255167287eaf",
+      "productName": "Aspirin 75mg",
+      "sku": "MED-BAY-ASPI-8888",
+      "ledgerBalance": -10,
+      "snapshotBalance": 190,
+      "difference": 200
+    }
+  ],
+  "batchDiscrepancies": [
+    {
+      "productId": "6a369560b14491872bb9e4e2",
+      "productName": "Surgical Scissors",
+      "batchTotal": 50,
+      "snapshotQty": 0,
+      "difference": 50,
+      "batchCount": 1
+    },
+    {
+      "productId": "6a3695c4a921aab533baea64",
+      "productName": "Sterile Gauze Pads",
+      "batchTotal": 95,
+      "snapshotQty": -5,
+      "difference": 100,
+      "batchCount": 1
+    },
+    {
+      "productId": "6a36bd6b29ebf91d4677b023",
+      "productName": "Paracetamol 500mg",
+      "batchTotal": 100,
+      "snapshotQty": 0,
+      "difference": 100,
+      "batchCount": 1
+    },
+    {
+      "productId": "6a3816438814255167287eaf",
+      "productName": "Aspirin 75mg",
+      "batchTotal": 190,
+      "snapshotQty": -10,
+      "difference": 200,
+      "batchCount": 1
+    }
+  ],
+  "negativeQuantities": [],
+  "missingSnapshots": [],
+  "fixedSnapshots": 5,
+  "fixedBatches": 4
+}

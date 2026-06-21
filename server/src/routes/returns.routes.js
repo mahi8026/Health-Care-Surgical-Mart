@@ -669,7 +669,7 @@ router.post(
           lotNo: null,
           quantity: item.returnQuantity,
           expiryDate: item.expiryDate || null,
-          costPrice: item.price, // Use the original selling price as cost
+          costPrice: item.costPrice || item.purchasePrice || 0,
           status: 'ACTIVE',
           source: 'RETURN',
           referenceId: result.insertedId,

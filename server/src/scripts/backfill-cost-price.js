@@ -5,6 +5,9 @@
  * by using the product's current purchasePrice as a best-effort approximation
  */
 
+// Load environment variables FIRST
+require('dotenv').config({ path: require('path').join(__dirname, '../../../.env') });
+
 const { getSystemDatabase, getShopDatabase, connectToDatabase } = require('../config/database');
 const { logger } = require('../config/logging');
 const { ObjectId } = require('mongodb');
