@@ -518,10 +518,9 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    // Collection name in new schema
-
+    // Use stock_snapshots (current system) joined to active products
     const stockValuation = await shopDb
-      .collection('stock')
+      .collection('stock_snapshots')
       .aggregate([
         {
           $lookup: {
@@ -531,34 +530,25 @@ router.get(
             as: 'product',
           },
         },
-        {
-          $unwind: '$product',
-        },
-        {
-          $match: {
-            'product.isActive': true,
-            currentQty: { $gt: 0 },
-          },
-        },
+        { $unwind: '$product' },
+        { $match: { 'product.isActive': true, onHandQty: { $gt: 0 } } },
         {
           $project: {
             productName: '$product.name',
             sku: '$product.sku',
             category: '$product.category',
-            currentQty: 1,
+            currentQty: '$onHandQty',
             purchasePrice: '$product.purchasePrice',
             sellingPrice: '$product.sellingPrice',
             purchaseValue: {
-              $multiply: ['$currentQty', '$product.purchasePrice'],
+              $multiply: ['$onHandQty', { $ifNull: ['$product.purchasePrice', 0] }],
             },
             sellingValue: {
-              $multiply: ['$currentQty', '$product.sellingPrice'],
+              $multiply: ['$onHandQty', { $ifNull: ['$product.sellingPrice', 0] }],
             },
           },
         },
-        {
-          $sort: { sellingValue: -1 },
-        },
+        { $sort: { sellingValue: -1 } },
       ])
       .toArray();
 
