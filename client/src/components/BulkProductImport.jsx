@@ -38,10 +38,15 @@ const BulkProductImport = ({ onClose, onSuccess }) => {
   };
 
   const downloadTemplate = () => {
-    const template = `name,sku,category,purchasePrice,sellingPrice,unit,minStockLevel,description
-Surgical Gloves,SG-001,Medical Supplies,50,75,Box,10,Sterile surgical gloves
-Bandage Roll,BR-002,Medical Supplies,15,25,Roll,20,Cotton bandage roll
-Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
+    const template = [
+      // Headers
+      "name,sku,category,brand,purchasePrice,sellingPrice,unit,initialStock,minStockLevel,expiryDate,description",
+      // Sample rows
+      "Surgical Gloves,SG-001,Medical Supplies,Ansell,50,75,Box,100,10,,Sterile surgical gloves size M",
+      "Dengue NS1 Rapid Test,DNS-002,Lab,Accurate,28,35,pcs,200,20,2026-12-31,Dengue NS1 antigen rapid test kit",
+      "Bandage Roll,BR-003,Medical Supplies,3M,15,25,Roll,50,20,,Cotton bandage roll 6 inch",
+      "Syringe 5ml,SY-004,Instruments,,5,10,pcs,500,50,,Disposable syringe 5ml",
+    ].join("\n");
 
     const blob = new Blob([template], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
@@ -149,12 +154,29 @@ Syringe 5ml,SY-003,Instruments,5,10,Piece,50,Disposable syringe`;
               <i className="fas fa-info-circle"></i>
               Import Instructions
             </h3>
-            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-              <li>Download the template CSV file below</li>
-              <li>Fill in your product data following the template format</li>
-              <li>Upload the completed CSV or Excel file</li>
-              <li>Review the import results and fix any errors</li>
+            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside mb-3">
+              <li>Download the template and fill in your product data</li>
+              <li>Upload the completed CSV or Excel (.xlsx) file</li>
+              <li>Products with duplicate SKUs will be skipped</li>
+              <li>Review errors and fix before re-importing</li>
             </ul>
+            <div className="bg-white rounded border border-blue-200 p-3">
+              <p className="text-xs font-semibold text-blue-900 mb-2">Column reference:</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs text-blue-800">
+                <span><span className="font-semibold text-red-600">*</span> name — Product name</span>
+                <span><span className="font-semibold text-red-600">*</span> sku — Unique code/barcode</span>
+                <span><span className="font-semibold text-red-600">*</span> category — e.g. Lab, Medicine</span>
+                <span>brand — Manufacturer name</span>
+                <span><span className="font-semibold text-red-600">*</span> purchasePrice — Buy price</span>
+                <span><span className="font-semibold text-red-600">*</span> sellingPrice — Sell price</span>
+                <span><span className="font-semibold text-red-600">*</span> unit — pcs / box / bottle</span>
+                <span>initialStock — Current qty on hand</span>
+                <span>minStockLevel — Reorder alert level</span>
+                <span>expiryDate — YYYY-MM-DD format</span>
+                <span>description — Optional notes</span>
+              </div>
+              <p className="text-xs text-red-600 mt-2"><span className="font-semibold">*</span> Required fields</p>
+            </div>
           </div>
 
           {/* Template Download */}

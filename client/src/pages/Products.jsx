@@ -20,8 +20,20 @@ const Products = () => {
   const [adjustingStock, setAdjustingStock] = useState(null);
   const [initializingSnapshots, setInitializingSnapshots] = useState(false);
 
-  const categories = ["Medical", "Lab", "Surgical"];
-  const units = ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr"];
+  // Load categories from API instead of hardcoding
+  const [categories, setCategories] = useState([]);
+  const units = ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr", "tablet", "capsule", "sachet", "ampoule", "tube", "roll", "pair"];
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get("/categories");
+      if (res.success && res.data?.length > 0) {
+        setCategories(res.data.map((c) => typeof c === "object" ? c.name : c));
+      }
+    } catch (err) {
+      console.warn("Could not load categories:", err.message);
+    }
+  };
 
   // Fetch products from real database
   const fetchProducts = async () => {
@@ -91,6 +103,7 @@ const Products = () => {
 
   // Initial fetch only
   useEffect(() => {
+    fetchCategories();
     fetchProducts();
   }, []);
 
