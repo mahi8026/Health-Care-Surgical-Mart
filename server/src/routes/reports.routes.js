@@ -316,6 +316,20 @@ router.get(
       ])
       .toArray();
 
+    // Get expiring products count (next 30 days)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    const expiringCount = await shopDb
+      .collection('stock_batches')
+      .countDocuments({
+        status: 'ACTIVE',
+        expiryDate: {
+          $gte: new Date(),
+          $lte: thirtyDaysFromNow
+        }
+      });
+
     // Get top selling products (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -480,6 +494,8 @@ router.get(
           (monthlyExpenses[0]?.totalExpenses || 0),
       },
       totalProducts,
+      lowStockCount: lowStockProducts.length,
+      expiringCount,
       lowStockProducts: lowStockProducts,
       topProducts: topProducts,
       topExpenseCategories: topExpenseCategories.map((category) => ({
