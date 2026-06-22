@@ -20,6 +20,7 @@ const Sales = () => {
   const [lastSale, setLastSale] = useState(null);
   const [showCustomItemForm, setShowCustomItemForm] = useState(false);
   const [customItemErrors, setCustomItemErrors] = useState({});
+  const [shopSettings, setShopSettings] = useState(null);
 
   // POS Form State
   const [posData, setPosData] = useState({
@@ -106,6 +107,19 @@ const Sales = () => {
     }
   };
 
+  // Fetch shop settings for invoice
+  const fetchShopSettings = async () => {
+    try {
+      const response = await api.get("/settings/shop");
+      if (response.success) {
+        setShopSettings(response.data);
+      }
+    } catch (error) {
+      console.error("Fetch shop settings error:", error);
+      // Fallback to null — invoice will use COMPANY constants
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
   }, [searchTerm]);
@@ -116,6 +130,7 @@ const Sales = () => {
 
   useEffect(() => {
     fetchNextInvoiceNumber();
+    fetchShopSettings();
   }, []);
 
   // Handle form changes
@@ -486,7 +501,7 @@ const Sales = () => {
             Point of Sale
           </h2>
         </div>
-        <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 bg-gray-50">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Invoice Number
@@ -563,7 +578,7 @@ const Sales = () => {
       )}
 
       {/* Main Content */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Customer Information */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4">
@@ -1289,7 +1304,7 @@ const Sales = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">SL</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
+                <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Rate</th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
@@ -1328,7 +1343,7 @@ const Sales = () => {
                         )}
                       </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="hidden md:table-cell px-6 py-4">
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
                       {item.category}
                     </span>
@@ -1433,6 +1448,7 @@ const Sales = () => {
       {showInvoiceModal && lastSale && (
         <ProfessionalInvoice
           sale={lastSale}
+          shopSettings={shopSettings}
           onClose={() => setShowInvoiceModal(false)}
           onDownload={async (saleId, invoiceNo) => {
             try {

@@ -1,7 +1,7 @@
 import React from "react";
 import { COMPANY } from "../config/constants";
 
-const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
+const ProfessionalInvoice = ({ sale, onClose, onDownload, shopSettings }) => {
   const handlePrint = () => {
     // Trigger browser print dialog
     // Note: Browser will show "Save as PDF" if no printer is set as default
@@ -81,7 +81,7 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
           {/* Company Name - Larger and more prominent */}
           <div className="flex-grow text-center">
             <h1 className="text-5xl font-bold text-green-800 mb-2">
-              {COMPANY.NAME}
+              {shopSettings?.name || COMPANY.NAME}
             </h1>
             <div className="bg-orange-500 text-white px-6 py-2 inline-block text-base font-bold shadow-md">
               {COMPANY.TAGLINE}
@@ -400,7 +400,10 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload }) => {
       <footer className="mt-4 pt-3 border-t border-gray-300 text-center">
         <div className="text-xs text-gray-600">
           <p className="mb-1">
-            <strong>Contact:</strong> Phone: {COMPANY.PHONE} | Email: {COMPANY.EMAIL}
+            <strong>Contact:</strong> Phone: {shopSettings?.phone || COMPANY.PHONE} | Email: {shopSettings?.email || COMPANY.EMAIL}
+            {shopSettings?.address && (
+              <span> | Address: {shopSettings.address}</span>
+            )}
           </p>
           <p className="text-[10px] text-gray-500 italic">
             Thank you for your business! This is a computer generated invoice — no signature required.
