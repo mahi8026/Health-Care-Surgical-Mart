@@ -212,7 +212,9 @@ const Products = () => {
       setSelectedProducts([]);
       setShowBulkActions(false);
     } catch (error) {
-      setError(error?.response?.data?.message || "Failed to delete selected products");
+      // Keep selection intact so user can see which product(s) failed
+      // Do NOT reset selectedProducts or hide the bulk action bar
+      setError(error?.response?.data?.message || error?.message || "Failed to delete selected products");
       console.error("Bulk delete error:", error);
     }
   };
@@ -226,10 +228,14 @@ const Products = () => {
         setProducts(products.filter((p) => p._id !== productId));
         setShowDeleteConfirm(null);
       } else {
+        // Close modal so the error banner is visible, keep product in list
+        setShowDeleteConfirm(null);
         setError(response.message || "Failed to delete product");
       }
     } catch (error) {
-      setError(error?.response?.data?.message || "Failed to delete product");
+      // Close modal so the error banner is visible, keep product in list
+      setShowDeleteConfirm(null);
+      setError(error?.response?.data?.message || error?.message || "Failed to delete product");
       console.error("Delete product error:", error);
     }
   };
