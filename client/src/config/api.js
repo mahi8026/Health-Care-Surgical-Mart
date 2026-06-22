@@ -54,6 +54,13 @@ api.interceptors.response.use(
       window.location.href = "/login";
     }
 
+    // Attach the server's error message directly on the error object
+    // so any catch block can use error.serverMessage without digging into
+    // error.response.data.message manually
+    if (error.response?.data?.message) {
+      error.serverMessage = error.response.data.message;
+    }
+
     return Promise.reject(error);
   },
 );

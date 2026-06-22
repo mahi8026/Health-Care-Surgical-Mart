@@ -214,7 +214,7 @@ const Products = () => {
     } catch (error) {
       // Keep selection intact so user can see which product(s) failed
       // Do NOT reset selectedProducts or hide the bulk action bar
-      setError(error?.response?.data?.message || error?.message || "Failed to delete selected products");
+      setError(error.serverMessage || error?.response?.data?.message || error?.message || "Failed to delete selected products");
       console.error("Bulk delete error:", error);
     }
   };
@@ -235,7 +235,7 @@ const Products = () => {
     } catch (error) {
       // Close modal so the error banner is visible, keep product in list
       setShowDeleteConfirm(null);
-      setError(error?.response?.data?.message || error?.message || "Failed to delete product");
+      setError(error.serverMessage || error?.response?.data?.message || error?.message || "Failed to delete product");
       console.error("Delete product error:", error);
     }
   };
