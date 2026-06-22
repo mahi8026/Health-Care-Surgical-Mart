@@ -300,6 +300,62 @@ This is an automated message from Health Care Surgical Mart POS System.
   }
 
   /**
+   * General-purpose send method used throughout the app.
+   * Accepts { to, subject, html, text, attachments } and sends via SendGrid.
+   * attachments format (SendGrid):
+   *   [{ content: <base64 string>, filename, type, disposition }]
+   *
+   * @param {object} opts
+   * @param {string} opts.to
+   * @param {string} opts.subject
+   * @param {string} [opts.html]
+   * @param {string} [opts.text]
+   * @param {Array}  [opts.attachments]
+   * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+   */
+  async send({ to, subject, html, text, attachments }) {
+    if (!this.enabled) {
+      logger.warn(`EmailService.send: disabled — would have sent "${subject}" to ${to}`);
+      // In development log it so we know it would have fired
+      if (process.env.NODE_ENV !== 'production') {
+        logger.info(`[DEV] Email skipped: to=${to} subject=${subject}`);
+      }
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    if (!to || !subject) {
+      return { success: false, error: 'Missing required fields: to, subject' };
+    }
+
+    try {
+      const msg = {
+        to,
+        from: { email: this.fromEmail, name: 'Health Care Surgical Mart' },
+        subject,
+        html: html || '',
+        text: text || '',
+        categories: ['transactional'],
+      };
+
+      if (attachments && attachments.length > 0) {
+        msg.attachments = attachments;
+      }
+
+      const response = await sgMail.send(msg);
+      const messageId = response[0]?.headers?.['x-message-id'];
+
+      logger.info(`EmailService.send: sent "${subject}" to ${to} (msgId: ${messageId})`);
+      return { success: true, messageId };
+    } catch (error) {
+      logger.error(`EmailService.send: failed to send "${subject}" to ${to}:`, {
+        error: error.message,
+        response: error.response?.body,
+      });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Get service statistics
    * @returns {object} Service stats
    */

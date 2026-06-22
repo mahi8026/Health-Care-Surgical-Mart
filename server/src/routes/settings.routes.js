@@ -798,12 +798,18 @@ router.get(
     }
 
     if (!backupPath || !fs.existsSync(backupPath)) {
-      return res.status(500).json({ success: false, message: 'Backup generation failed. Try again.' });
+      return res.status(500).json({
+        success: false,
+        message: 'Backup generation failed. Try again.',
+        note: 'This server has an ephemeral filesystem — backup files are deleted on every restart or deploy. Use POST /api/settings/backup/trigger then download immediately.',
+      });
     }
 
     const filename = nodePath.basename(backupPath);
+    // Warn in the response headers that this file is ephemeral
     res.setHeader('Content-Type', 'application/gzip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Backup-Warning', 'File is only available until the next server restart or deploy. Save to external storage immediately.');
 
     const readStream = fs.createReadStream(backupPath);
     readStream.on('error', () => res.status(500).end());
