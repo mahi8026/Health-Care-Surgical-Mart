@@ -218,8 +218,13 @@ class SalesController {
     } catch (error) {
       logger.error('Create sale error:', error);
 
-      // Expired item or business rule violation ? 400
+      // Expired item or business rule violation → 400
       if (error.message?.startsWith('Cannot sell expired item')) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+
+      // Insufficient stock → 400 (not 500)
+      if (error.message?.startsWith('Insufficient stock')) {
         return res.status(400).json({ success: false, message: error.message });
       }
 

@@ -357,7 +357,9 @@ const Sales = () => {
         setError(response.message || "Failed to process sale");
       }
     } catch (error) {
-      setError("Failed to process sale");
+      // Show server error message if available (e.g. insufficient stock caught at backend)
+      const serverMsg = error?.response?.data?.message;
+      setError(serverMsg || "Failed to process sale");
       console.error("Process sale error:", error);
     } finally {
       setLoading(false);
