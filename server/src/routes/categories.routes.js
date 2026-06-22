@@ -88,6 +88,12 @@ router.get(
           isActive: true,
         },
         {
+          _id: 'lab-reagent',
+          name: 'Lab Reagent',
+          description: 'Laboratory reagents, chemicals, and test kits',
+          isActive: true,
+        },
+        {
           _id: 'bandages-dressing',
           name: 'Bandages & Dressing',
           description: 'Bandages, gauzes, and wound dressing materials',
