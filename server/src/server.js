@@ -450,6 +450,11 @@ const startServer = async () => {
     require('./jobs/expiry-alert.job');
     logger.info('Expiry alert cron job initialized');
 
+    // Start daily backup job (runs 2:00 AM Bangladesh time)
+    const { startBackupJob } = require('./jobs/backup.job');
+    startBackupJob();
+    logger.info('Daily backup cron job initialized');
+
     // Start keep-alive cron to prevent Render free-tier cold starts
     startKeepAlive();
   } catch (error) {

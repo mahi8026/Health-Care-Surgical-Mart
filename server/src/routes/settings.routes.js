@@ -762,4 +762,75 @@ router.get(
   }),
 );
 
+/**
+ * GET /api/settings/backup/download
+ * Download the latest backup file (SHOP_ADMIN only)
+ * Streams the most recent .json.gz backup file for this shop.
+ * If no backup exists yet, generates one on the fly (takes ~10s).
+ */
+router.get(
+  '/backup/download',
+  requirePermission(PERMISSIONS.EDIT_SETTINGS),
+  asyncHandler(async (req, res) => {
+    const { getLatestBackupPath, backupShop } = require('../jobs/backup.job');
+    const { getSystemDatabase } = require('../config/database');
+    const { ObjectId } = require('mongodb');
+    const fs = require('fs');
+    const nodePath = require('path');
+
+    const systemDb = getSystemDatabase();
+    const shopObjId = ObjectId.isValid(req.user.shopId) ? new ObjectId(req.user.shopId) : null;
+    const shop = shopObjId
+      ? await systemDb.collection('shops').findOne({ _id: shopObjId })
+      : await systemDb.collection('shops').findOne({ shopId: req.user.shopId });
+
+    if (!shop) {
+      return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+
+    const shopId = shop.shopId || shop._id.toString();
+    let backupPath = getLatestBackupPath(shopId);
+
+    // No backup yet — generate one synchronously
+    if (!backupPath) {
+      const result = await backupShop(shop);
+      backupPath = result.path;
+    }
+
+    if (!backupPath || !fs.existsSync(backupPath)) {
+      return res.status(500).json({ success: false, message: 'Backup generation failed. Try again.' });
+    }
+
+    const filename = nodePath.basename(backupPath);
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const readStream = fs.createReadStream(backupPath);
+    readStream.on('error', () => res.status(500).end());
+    readStream.pipe(res);
+  })
+);
+
+/**
+ * POST /api/settings/backup/trigger
+ * Manually trigger an immediate backup (SHOP_ADMIN only)
+ */
+router.post(
+  '/backup/trigger',
+  requirePermission(PERMISSIONS.EDIT_SETTINGS),
+  asyncHandler(async (req, res) => {
+    const { runBackup } = require('../jobs/backup.job');
+
+    // Fire and forget — respond immediately
+    runBackup().catch(err => {
+      require('../config/logging').logger.error('Manual backup trigger failed:', err);
+    });
+
+    res.json({
+      success: true,
+      message: 'Backup started. Download via GET /api/settings/backup/download in ~30 seconds.',
+    });
+  })
+);
+
 module.exports = router;
