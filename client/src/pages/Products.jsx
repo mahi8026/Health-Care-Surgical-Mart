@@ -212,7 +212,7 @@ const Products = () => {
       setSelectedProducts([]);
       setShowBulkActions(false);
     } catch (error) {
-      setError("Failed to delete selected products");
+      setError(error?.response?.data?.message || "Failed to delete selected products");
       console.error("Bulk delete error:", error);
     }
   };
@@ -229,7 +229,7 @@ const Products = () => {
         setError(response.message || "Failed to delete product");
       }
     } catch (error) {
-      setError("Failed to delete product");
+      setError(error?.response?.data?.message || "Failed to delete product");
       console.error("Delete product error:", error);
     }
   };
