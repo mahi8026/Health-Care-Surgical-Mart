@@ -870,6 +870,13 @@ const ProductModal = ({
                 className="input-field"
               >
                 <option value="">Select Category</option>
+                {/* If stored category doesn't match any option (legacy short names like "Lab"),
+                    show it as a labelled option so the select doesn't blank out */}
+                {formData.category && !categories.includes(formData.category) && (
+                  <option value={formData.category}>
+                    {formData.category} (current — please update)
+                  </option>
+                )}
                 {categories.map((category) => (
                   <option key={category} value={category}>
                     {category}
