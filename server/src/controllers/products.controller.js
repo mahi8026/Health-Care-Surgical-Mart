@@ -269,11 +269,21 @@ class ProductsController extends BaseController {
       });
 
       if (legacyStock && legacyStock.currentQty > 0) {
-        return this.sendError(
-          res,
-          `Cannot delete product "${product.name}". It has ${legacyStock.currentQty} units in stock. Please adjust stock to zero before deleting.`,
-          409
-        );
+        // AUTO-FIX: If snapshot shows 0 but legacy stock shows quantity,
+        // clear the legacy stock automatically (snapshot is source of truth)
+        if (!snapshot || snapshot.onHandQty === 0) {
+          await req.shopDb.collection('stock').updateOne(
+            { productId: new ObjectId(req.params.id) },
+            { $set: { currentQty: 0, availableQty: 0, updatedAt: new Date() } }
+          );
+          logger.info(`Auto-cleared legacy stock (${legacyStock.currentQty} units) for product ${req.params.id} before deletion`);
+        } else {
+          return this.sendError(
+            res,
+            `Cannot delete product "${product.name}". It has ${legacyStock.currentQty} units in stock. Please adjust stock to zero before deleting.`,
+            409
+          );
+        }
       }
 
       // Check for active batches
