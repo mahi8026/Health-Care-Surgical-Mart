@@ -3,7 +3,7 @@
  * Strategy: network-first for API calls, cache-first for static assets
  */
 
-const CACHE_NAME = 'hc-mart-v3';
+const CACHE_NAME = 'hc-mart-v4';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
@@ -45,13 +45,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Always fetch CDN resources (fonts, Font Awesome, etc.) — never cache
+  // Always fetch external resources (CDN, fonts, analytics, Sentry) — don't interfere
   if (url.origin !== self.location.origin) {
-    event.respondWith(fetch(request).catch(() => new Response('', { status: 503 })));
+    event.respondWith(
+      fetch(request).catch((error) => {
+        // Silently fail for external resources - don't show errors
+        console.warn('External resource failed:', url.href, error);
+        return new Response('', { status: 503, statusText: 'External resource unavailable' });
+      })
+    );
     return;
   }
 
-  // Cache-first for static assets (JS, CSS, images, fonts)
+  // Cache-first for same-origin static assets (JS, CSS, images, fonts)
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
