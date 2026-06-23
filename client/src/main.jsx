@@ -14,6 +14,17 @@ import "./styles/index.css";
 // Initialize Sentry for error tracking
 initializeSentry();
 
+// Register service worker for PWA (production only)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      console.log('SW registered:', reg.scope);
+    }).catch((err) => {
+      console.warn('SW registration failed:', err);
+    });
+  });
+}
+
 // Create a client with optimized defaults
 const queryClient = new QueryClient({
   defaultOptions: {
