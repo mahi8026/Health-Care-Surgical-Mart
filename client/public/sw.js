@@ -3,7 +3,7 @@
  * Strategy: network-first for API calls, cache-first for static assets
  */
 
-const CACHE_NAME = 'hc-mart-v2';
+const CACHE_NAME = 'hc-mart-v3';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
