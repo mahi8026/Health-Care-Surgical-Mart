@@ -57,10 +57,10 @@ const Layout = () => {
             <div className="flex items-center">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="mr-4 text-gray-500 hover:text-gray-700 lg:hidden"
-                aria-label="Toggle sidebar"
+                className="mr-3 p-2 text-gray-700 hover:bg-gray-100 rounded-lg lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Toggle menu"
               >
-                <i className="fas fa-bars text-xl"></i>
+                <i className="fas fa-bars text-2xl"></i>
               </button>
               <img 
                 src={COMPANY.LOGO_URL} 
@@ -207,19 +207,22 @@ const Layout = () => {
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           >
-            <aside className="w-64 bg-white h-full shadow-lg">
+            <aside 
+              className="w-64 bg-white h-full shadow-lg overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               <nav className="p-4">
                 {/* Mobile Menu Header */}
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
                   <button
                     onClick={() => setMobileMenuOpen(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-500 hover:text-gray-700 p-2"
                   >
-                    <i className="fas fa-times"></i>
+                    <i className="fas fa-times text-xl"></i>
                   </button>
                 </div>
 
