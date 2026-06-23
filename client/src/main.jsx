@@ -9,6 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { StockProvider } from "./contexts/StockContext.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { initializeSentry } from "./config/sentry.js";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./styles/index.css";
 
 // Initialize Sentry for error tracking
