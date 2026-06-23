@@ -250,7 +250,7 @@ class ProductsController extends BaseController {
         return this.sendError(res, 'Product not found', 404);
       }
 
-      // CRITICAL: Check if product has active stock
+      // CRITICAL: Check if product has active stock (snapshot is source of truth)
       const snapshot = await req.shopDb.collection('stock_snapshots').findOne({
         productId: new ObjectId(req.params.id),
       });
@@ -263,43 +263,19 @@ class ProductsController extends BaseController {
         );
       }
 
-      // Check legacy stock collection as fallback
-      const legacyStock = await req.shopDb.collection('stock').findOne({
-        productId: new ObjectId(req.params.id),
-      });
+      // Snapshot is 0 (or missing) — auto-clear all stale legacy data before deleting
 
-      if (legacyStock && legacyStock.currentQty > 0) {
-        // AUTO-FIX: If snapshot shows 0 but legacy stock shows quantity,
-        // clear the legacy stock automatically (snapshot is source of truth)
-        if (!snapshot || snapshot.onHandQty === 0) {
-          await req.shopDb.collection('stock').updateOne(
-            { productId: new ObjectId(req.params.id) },
-            { $set: { currentQty: 0, availableQty: 0, updatedAt: new Date() } }
-          );
-          logger.info(`Auto-cleared legacy stock (${legacyStock.currentQty} units) for product ${req.params.id} before deletion`);
-        } else {
-          return this.sendError(
-            res,
-            `Cannot delete product "${product.name}". It has ${legacyStock.currentQty} units in stock. Please adjust stock to zero before deleting.`,
-            409
-          );
-        }
-      }
+      // Clear legacy stock collection (stale data from old system)
+      await req.shopDb.collection('stock').updateMany(
+        { productId: new ObjectId(req.params.id) },
+        { $set: { currentQty: 0, availableQty: 0, updatedAt: new Date() } }
+      );
 
-      // Check for active batches
-      const activeBatches = await req.shopDb.collection('stock_batches').countDocuments({
-        productId: new ObjectId(req.params.id),
-        status: 'ACTIVE',
-        quantity: { $gt: 0 },
-      });
-
-      if (activeBatches > 0) {
-        return this.sendError(
-          res,
-          `Cannot delete product "${product.name}". It has ${activeBatches} active batch(es) with stock. Please consume or adjust all batches before deleting.`,
-          409
-        );
-      }
+      // Mark all batches as DEPLETED so they don't block deletion
+      await req.shopDb.collection('stock_batches').updateMany(
+        { productId: new ObjectId(req.params.id), status: 'ACTIVE' },
+        { $set: { status: 'DEPLETED', quantity: 0, updatedAt: new Date() } }
+      );
 
       // Soft delete the product
       const result = await req.shopDb.collection('products').updateOne(
