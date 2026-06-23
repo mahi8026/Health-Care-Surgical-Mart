@@ -228,7 +228,12 @@ class ProductsController extends BaseController {
       // Invalidate products cache
       cacheService.invalidateShopCache(req.user.shopId, 'products');
 
-      this.sendSuccess(res, null, 'Product updated successfully');
+      // Return the updated product document so frontend can update list immediately
+      const updatedProduct = await req.shopDb.collection('products').findOne({
+        _id: new ObjectId(req.params.id),
+      });
+
+      this.sendSuccess(res, updatedProduct, 'Product updated successfully');
     } catch (error) {
       logger.error('Update product error:', error);
       this.sendError(res, 'Failed to update product', 500, error);

@@ -605,7 +605,7 @@ const Products = () => {
           onSave={(updatedProduct) => {
             if (updatedProduct) {
               if (editingProduct) {
-                // Update existing product in list
+                // Replace the product in the list with fresh data
                 setProducts(
                   products.map((p) =>
                     p._id === updatedProduct._id ? updatedProduct : p,
@@ -615,6 +615,9 @@ const Products = () => {
                 // Add new product to list
                 setProducts([updatedProduct, ...products]);
               }
+            } else {
+              // Fallback: if no product returned just refetch to be safe
+              fetchProducts();
             }
             setShowAddModal(false);
             setEditingProduct(null);
@@ -794,26 +797,57 @@ const ProductModal = ({
     e.preventDefault();
     setLoading(true);
 
+    // Only send fields the backend expects — don't include _id, stockQuantity, etc.
+    const payload = {
+      name: formData.name,
+      category: formData.category,
+      brand: formData.brand,
+      sku: formData.sku,
+      purchasePrice: formData.purchasePrice,
+      sellingPrice: formData.sellingPrice,
+      unit: formData.unit,
+      minStockLevel: formData.minStockLevel,
+      description: formData.description,
+      batchNo: formData.batchNo,
+      lotNo: formData.lotNo,
+      expiryDate: formData.expiryDate || null,
+      reorderPoint: formData.reorderPoint,
+      maxStock: formData.maxStock || null,
+      // Only include initialQuantity for new products
+      ...(!product && { initialQuantity: formData.initialQuantity }),
+    };
+
     try {
-      // Use real authenticated endpoints
       const response = product
-        ? await api.put(`/products/${product._id}`, formData)
-        : await api.post("/products", formData);
+        ? await api.put(`/products/${product._id}`, payload)
+        : await api.post("/products", payload);
 
       if (response.success) {
-        // Pass the created/updated product back to parent
-        onSave(response.data);
+        if (product) {
+          // Backend returns null for updates — rebuild the updated product
+          // by merging formData changes into the original product object
+          const updatedProduct = {
+            ...product,
+            ...payload,
+            updatedAt: new Date().toISOString(),
+          };
+          onSave(updatedProduct);
+        } else {
+          // New product — backend returns the created document
+          onSave(response.data);
+        }
       } else {
         onError(response.message || "Failed to save product");
       }
     } catch (error) {
-      if (
-        error.message?.includes("401") ||
-        error.message?.includes("Unauthorized")
-      ) {
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to save product";
+      if (msg.includes("401") || msg.includes("Unauthorized")) {
         onError("Session expired. Please login again.");
       } else {
-        onError(error.message || "Failed to save product");
+        onError(msg);
       }
       console.error("Save product error:", error);
     } finally {
