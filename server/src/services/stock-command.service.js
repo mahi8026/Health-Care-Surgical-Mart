@@ -84,12 +84,20 @@ class StockCommandService {
     metadata = {}
   }) {
     // Validate required parameters
-    if (!shopId || !productId || !movementType || !quantity) {
+    if (!shopId || !productId || !movementType || quantity === undefined || quantity === null) {
       throw new Error('Missing required parameters: shopId, productId, movementType, quantity');
     }
 
-    if (quantity <= 0) {
-      throw new Error('Quantity must be positive');
+    // For SET type, allow quantity of 0 (setting stock to zero is valid)
+    // For ADD/SUBTRACT, quantity must be positive
+    if (movementType === 'ADJUSTMENT_SET') {
+      if (quantity < 0) {
+        throw new Error('Quantity cannot be negative for SET adjustment');
+      }
+    } else {
+      if (quantity <= 0) {
+        throw new Error('Quantity must be positive');
+      }
     }
 
     const shopDb = getShopDatabase(shopId);
