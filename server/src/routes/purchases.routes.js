@@ -288,7 +288,7 @@ router.get(
           as: 'supplier',
         },
       },
-      { $unwind: '$supplier' },
+      { $unwind: { path: '$supplier', preserveNullAndEmptyArrays: true } },
     ];
 
     // Add search filter
@@ -490,6 +490,7 @@ router.post(
       supplierName: supplierName, // Required by schema
       supplierPhone: supplier.phone || '', // Optional
       supplierAddress: supplier.address || '', // Optional
+      supplierId: toObjectId(supplierId), // Store as ObjectId for $lookup joins
       items: validatedItems,
       totalAmount: Number(parseFloat(grandTotal.toFixed(2))), // Required by schema
       paidAmount: 0, // Default to 0

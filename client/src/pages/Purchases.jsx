@@ -308,11 +308,13 @@ const Purchases = () => {
       const response = await api.post("/purchases", purchaseOrderData);
 
       if (response.success) {
-        alert("Purchase order created successfully!\n\nSwitch to 'Purchase History' tab to receive the stock.");
         clearPurchase();
         setError("");
         // Refresh products to update stock
         fetchProducts();
+        // Auto-switch to Purchase History tab and load the new order
+        await fetchHistory();
+        setActiveTab("history");
       } else {
         setError(response.message || "Failed to create purchase order");
       }
