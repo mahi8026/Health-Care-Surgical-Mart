@@ -97,6 +97,25 @@ Last updated: 2026-06-22
 - GET /api/auth/health → `{"firebaseAdmin":"ok","mongodbConnection":"ok","jwtSecret":"set"}` ✅
 - GET /api/products (with JWT) → 200, 6 products returned ✅
 
+### BLOCK 13 — Progressive Web App (PWA) ✅
+- **App installs to home screen** on Android (Chrome) and iOS (Safari)
+- `manifest.json` created with app name, icons (192x192, 512x512), theme color, display:standalone
+- Service worker (`sw.js`) implements cache-first for static assets, network-first for `/api`
+- PWA meta tags added to `index.html` (theme-color, mobile-web-app-capable, apple-mobile-web-app)
+- Icons generated from actual logo.png (medical logo)
+- Service worker registered in `main.jsx` (production only, after page load)
+- **App opens fullscreen** like native app (no browser chrome visible)
+- Works offline: static assets cached, API calls fail gracefully
+
+### BLOCK 14 — Font Awesome Icons Fix ✅
+- **FIXED:** All Font Awesome icons now loading across entire app (web + mobile + PWA)
+- Root cause: CDN link in `index.html` was blocked; package installed but never imported
+- Solution: Import `@fortawesome/fontawesome-free/css/all.min.css` in `main.jsx`
+- Removed CDN link from `index.html` — icons now bundled with app
+- All navigation icons, action buttons, UI elements now visible
+- Works in all environments: desktop, mobile web, installed PWA, offline mode
+- Bundle size: ~900KB (CSS + web fonts), cached by service worker
+
 ---
 
 ## SMOKE TEST RESULTS — 2026-06-22 ✅
@@ -135,6 +154,9 @@ All 6 steps passed against production URLs.
 - **Backup files deleted before download**: backup job now emails file as attachment immediately after creation, so the shop owner receives the backup in their inbox regardless of server restarts
 - **Invoice header hardcoded**: `ProfessionalInvoice.jsx` now fetches and uses shop settings from API; changes in Settings > Shop appear on invoices immediately
 - **Insufficient stock returns 500 instead of 400**: `sales.controller.js` catch block now explicitly handles `error.message.startsWith('Insufficient stock')` → returns 400. Frontend `processSale` catch block now surfaces `error?.response?.data?.message` instead of generic text.
+- **Purchases not appearing in history after creation**: `supplierId` field was validated but never stored in purchase document; `$lookup` joined on nonexistent field → empty results. Fixed: POST now stores `supplierId`, GET aggregation uses `preserveNullAndEmptyArrays: true` for backwards compatibility. Frontend auto-switches to Purchase History tab and refreshes list after creation.
+- **Edit product category dropdown showing blank**: Products had short category names like `"Lab"` stored in DB; dropdown options are full names like `"Lab Equipment"`. ProductModal now renders stored category as extra `<option>` with "(current — please update)" label when no match found.
+- **Font Awesome icons missing everywhere**: CDN link blocked; package installed but never imported. Fixed by importing `@fortawesome/fontawesome-free/css/all.min.css` in `main.jsx` and removing CDN link. All icons now work (web, mobile, PWA, offline).
 
 ---
 
@@ -176,6 +198,14 @@ All 6 browser test items have been verified by code inspection (2026-06-22).
 - `feat: automated daily database backup solution`
 - `fix: backup emails file as attachment via SendGrid`
 - `fix: dynamic invoice header + responsive POS tablet layout`
+- `fix: insufficient stock error handling frontend + backend`
+- `feat: add Lab Reagent category to products`
+- `fix: show server error message on product delete (409 conflicts)`
+- `fix: purchases not appearing in history after creation`
+- `fix: edit product category dropdown showing blank for legacy data`
+- `feat: convert frontend to Progressive Web App (PWA)`
+- `fix: PWA icons using actual logo + mobile menu visibility`
+- `fix: Font Awesome icons by using local bundle instead of CDN`
 
 ---
 
