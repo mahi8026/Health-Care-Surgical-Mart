@@ -16,12 +16,43 @@ import "./styles/index.css";
 initializeSentry();
 
 // Register service worker for PWA (production only)
+// Auto-reloads the page when a new version is deployed
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((reg) => {
-      console.log('SW registered:', reg.scope);
+      console.log('[PWA] SW registered:', reg.scope);
+
+      // New SW found waiting — tell it to activate immediately
+      if (reg.waiting) {
+        reg.waiting.postMessage('SKIP_WAITING');
+      }
+
+      // New SW installed during this session — activate it immediately
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version ready — skip waiting and reload
+            console.log('[PWA] New version available, updating...');
+            newWorker.postMessage('SKIP_WAITING');
+          }
+        });
+      });
+
     }).catch((err) => {
-      console.warn('SW registration failed:', err);
+      console.warn('[PWA] SW registration failed:', err);
+    });
+
+    // When the SW takes control (after SKIP_WAITING), reload the page
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        console.log('[PWA] Controller changed — reloading for new version');
+        window.location.reload();
+      }
     });
   });
 }
