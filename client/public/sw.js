@@ -3,7 +3,7 @@
  * Strategy: network-first for API calls, cache-first for static assets
  */
 
-const CACHE_NAME = 'hc-mart-v1';
+const CACHE_NAME = 'hc-mart-v2';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
@@ -40,8 +40,14 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // Always go to network for API calls — never serve stale data
-  if (url.pathname.startsWith('/api') || url.origin !== self.location.origin) {
+  if (url.pathname.startsWith('/api')) {
     event.respondWith(fetch(request));
+    return;
+  }
+
+  // Always fetch CDN resources (fonts, Font Awesome, etc.) — never cache
+  if (url.origin !== self.location.origin) {
+    event.respondWith(fetch(request).catch(() => new Response('', { status: 503 })));
     return;
   }
 

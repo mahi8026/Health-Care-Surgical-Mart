@@ -57,10 +57,11 @@ const Layout = () => {
             <div className="flex items-center">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="mr-3 p-2 text-gray-700 hover:bg-gray-100 rounded-lg lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mr-3 p-2 text-gray-700 hover:bg-gray-100 rounded-lg lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 border-2 border-gray-300"
                 aria-label="Toggle menu"
               >
-                <i className="fas fa-bars text-2xl"></i>
+                {/* Fallback text if Font Awesome doesn't load */}
+                <span className="text-2xl font-bold" style={{ fontFamily: 'sans-serif' }}>☰</span>
               </button>
               <img 
                 src={COMPANY.LOGO_URL} 
