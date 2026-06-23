@@ -523,20 +523,25 @@ const StockReport = () => {
         setStockData(response.data || []);
         setPagination(response.pagination);
         
-        // Calculate summary
+        // Calculate summary — use /stock/valuation for accurate total
+        // (paginated snapshots only cover current page; avgCostPrice may be stale)
         const totalSKUs = response.pagination?.total || 0;
-        const totalValue = (response.data || []).reduce((sum, item) => {
-          const qty = item.onHandQty ?? item.availableQty ?? 0;
-          const cost = item.avgCostPrice ?? 0;
-          return sum + (qty * cost);
-        }, 0);
-        
-        // Fetch counts for summary cards from new endpoints (with error handling)
+
+        // Fetch accurate valuation, low-stock, and expiry counts in parallel
         try {
-          const [lowStockRes, expiringRes] = await Promise.all([
+          const [valuationRes, lowStockRes, expiringRes] = await Promise.all([
+            api.get("/stock/valuation").catch(() => ({ success: false, data: { costValue: 0 } })),
             api.get("/stock/reorder-alerts").catch(() => ({ success: false, meta: { count: 0 } })),
             api.get("/stock/expiry-alerts?days=30").catch(() => ({ success: false, meta: { count: 0 } })),
           ]);
+
+          const totalValue = valuationRes.success
+            ? (valuationRes.data?.costValue ?? 0)
+            : (response.data || []).reduce((sum, item) => {
+                const qty = item.onHandQty ?? item.availableQty ?? 0;
+                const cost = item.avgCostPrice ?? 0;
+                return sum + qty * cost;
+              }, 0);
           
           setSummary({
             totalSKUs,
@@ -545,11 +550,10 @@ const StockReport = () => {
             expiringSoonCount: expiringRes.success ? expiringRes.meta?.count || 0 : 0,
           });
         } catch (alertErr) {
-          // If alerts fail, still show main data
-          console.warn('Failed to fetch alert counts:', alertErr);
+          console.warn('Failed to fetch summary data:', alertErr);
           setSummary({
             totalSKUs,
-            totalStockValue: totalValue,
+            totalStockValue: 0,
             lowStockCount: 0,
             expiringSoonCount: 0,
           });
