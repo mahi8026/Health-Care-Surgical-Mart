@@ -1,6 +1,6 @@
 /**
  * Repair Missing Ledger Entries
- * 
+ *
  * Creates corrective OPENING_STOCK ledger entries for products where:
  * - Batch total > (ledger IN total - ledger OUT total)
  * - This indicates stock was added without ledger entries
@@ -11,7 +11,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../../.env'
 
 const { getSystemDatabase, getShopDatabase, connectToDatabase } = require('../config/database');
 const { logger } = require('../config/logging');
-const { ObjectId } = require('mongodb');
+const { _ObjectId } = require('mongodb');
 
 async function repairLedgerEntries() {
   try {
@@ -28,12 +28,12 @@ async function repairLedgerEntries() {
     for (const shop of shops) {
       totalShops++;
       const shopDb = getShopDatabase(shop._id.toString());
-      
+
       logger.info(`Processing shop: ${shop.name} (${shop._id})`);
 
       // Get all products
       const products = await shopDb.collection('products').find({ isActive: true }).toArray();
-      
+
       for (const product of products) {
         totalProducts++;
 
@@ -44,7 +44,7 @@ async function repairLedgerEntries() {
             status: 'ACTIVE'
           })
           .toArray();
-        
+
         const batchTotal = batches.reduce((sum, b) => sum + (b.quantity || 0), 0);
 
         // Calculate ledger balance

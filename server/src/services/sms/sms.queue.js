@@ -96,7 +96,7 @@ class SMSQueue {
       return await SMSService.send(to, message, options);
     });
 
-    this.queue.on('completed', (job, result) => {
+    this.queue.on('completed', (job, _result) => {
       logger.info(`SMS job ${job.id} completed successfully`);
     });
 

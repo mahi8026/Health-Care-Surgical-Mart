@@ -9,6 +9,16 @@ const fmt = (n) =>
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" }) : "Never";
 
+const getCustomerTypeBadge = (type) => {
+  const badges = {
+    "Walk-in": "bg-blue-100 text-blue-800",
+    "Hospital/Clinic": "bg-green-100 text-green-800",
+    "Diagnostic": "bg-purple-100 text-purple-800",
+    "Wholesaler": "bg-orange-100 text-orange-800",
+  };
+  return badges[type] || "bg-gray-100 text-gray-800";
+};
+
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +56,7 @@ const Customers = () => {
   });
 
   // Fetch customers
-  const fetchCustomers = async (page = 1) => {
+  const fetchCustomers = async (_page = 1) => {
     try {
       // Use real authenticated endpoint
       const response = await api.get("/customers");
@@ -87,7 +97,7 @@ const Customers = () => {
     } catch (error) {
       console.error("Fetch customers error:", error);
       if (error.message?.includes("401")) {
-        window.location.href = "/login";
+        window.setTimeout(() => { window.location.href = "/login"; }, 0);
       }
       setError("Failed to fetch customers");
     }
@@ -111,21 +121,76 @@ const Customers = () => {
 
   // Initial data load
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchCustomers();
-      setLoading(false);
-    };
-    loadData();
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/customers");
+        if (!cancelled && response.success) {
+          setCustomers(response.data);
+          calculateStats(response.data);
+          setTotalCustomers(response.data.length);
+          setCurrentPage(1);
+          setTotalPages(1);
+        } else if (!cancelled) {
+          setError("Failed to fetch customers");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Fetch customers error:", error);
+          if (error.message?.includes("401")) {
+            window.setTimeout(() => { window.location.href = "/login"; }, 0);
+          }
+          setError("Failed to fetch customers");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Search and filter effect
   useEffect(() => {
-    const delayedSearch = setTimeout(() => {
-      fetchCustomers(1);
+    const timer = setTimeout(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const response = await api.get("/customers");
+          if (!cancelled && response.success) {
+            let filteredCustomers = response.data;
+            if (searchTerm) {
+              filteredCustomers = filteredCustomers.filter(
+                (customer) =>
+                  customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  customer.phone.includes(searchTerm) ||
+                  (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())),
+              );
+            }
+            if (customerTypeFilter !== "all") {
+              filteredCustomers = filteredCustomers.filter(
+                (customer) => customer.type === customerTypeFilter,
+              );
+            }
+            setCustomers(filteredCustomers);
+            setCurrentPage(1);
+            setTotalPages(1);
+            setTotalCustomers(filteredCustomers.length);
+            calculateStats(response.data);
+          } else if (!cancelled) {
+            setError("Failed to fetch customers");
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.error("Fetch customers error:", error);
+            setError("Failed to fetch customers");
+          }
+        }
+      })();
+      return () => { cancelled = true; };
     }, 500);
 
-    return () => clearTimeout(delayedSearch);
+    return () => clearTimeout(timer);
   }, [searchTerm, customerTypeFilter]);
 
   // Format date
@@ -251,17 +316,6 @@ const Customers = () => {
   const openDetailsModal = (customer) => {
     setSelectedCustomer(customer);
     setShowDetailsModal(true);
-  };
-
-  // Get customer type badge
-  const getCustomerTypeBadge = (type) => {
-    const badges = {
-      "Walk-in": "bg-blue-100 text-blue-800",
-      "Hospital/Clinic": "bg-green-100 text-green-800",
-      "Diagnostic": "bg-purple-100 text-purple-800",
-      "Wholesaler": "bg-orange-100 text-orange-800",
-    };
-    return badges[type] || "bg-gray-100 text-gray-800";
   };
 
   if (loading && customers.length === 0) {
@@ -957,7 +1011,7 @@ const PurchaseHistoryTab = ({ customer, formatCurrency, formatDate }) => {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({
+      const params = new window.URLSearchParams({
         page: p,
         limit: 10,
         startDate: start,
@@ -986,7 +1040,38 @@ const PurchaseHistoryTab = ({ customer, formatCurrency, formatDate }) => {
 
   // Lazy load on first render of this tab
   useEffect(() => {
-    fetchHistory(1);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+      const params = new window.URLSearchParams({
+          page: "1",
+          limit: "10",
+          startDate: startDate,
+          endDate: endDate,
+        });
+        const response = await api.get(`/customers/${customer._id}/purchase-history?${params}`);
+        if (!cancelled && response.success) {
+          setPurchases(response.purchases);
+          setSummary(response.customer);
+          setPagination(response.pagination);
+          setPage(1);
+        } else if (!cancelled) {
+          setError(response.message || "Failed to load purchase history");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          if (import.meta.env.DEV) {
+            console.error("Purchase history error:", err);
+          }
+          setError("Failed to load purchase history");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFilter = () => fetchHistory(1, startDate, endDate);

@@ -341,11 +341,11 @@ router.post('/login', bruteForceProtection, async (req, res) => {
             { _id: new ObjectId(targetShopId) }
           ]
         });
-      } catch (error) {
+      } catch {
         // If targetShopId is not a valid ObjectId, try shopId only
         shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
       }
-      
+
       if (!shop) {
         return res.status(404).json({
           success: false,
@@ -384,7 +384,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         message: 'Login failed',
       });
     }
-    
+
     const isPasswordValid = await bcrypt.compare(password, passwordHashField);
     if (!isPasswordValid) {
       // Increment login attempts on failure
@@ -533,7 +533,7 @@ router.post('/change-password', async (req, res) => {
         message: 'User password configuration error',
       });
     }
-    
+
     const isOldPasswordValid = await bcrypt.compare(
       oldPassword,
       passwordHashField,
@@ -1020,11 +1020,11 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
             { _id: new ObjectId(targetShopId) }
           ]
         });
-      } catch (error) {
+      } catch {
         // If targetShopId is not a valid ObjectId, try shopId only
         shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
       }
-      
+
       if (!shop) {
         return res.status(404).json({
           success: false,

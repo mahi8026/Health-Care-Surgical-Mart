@@ -14,7 +14,7 @@ const ExpensesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(20);
   const [pagination, setPagination] = useState(null);
   
   const [filters, setFilters] = useState({
@@ -54,24 +54,48 @@ const ExpensesPage = () => {
     }
   };
 
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      const response = await api.get("/expense-categories");
-      if (response.success) {
-        setCategories(response.data || []);
-      }
-    } catch (err) {
-      console.error("Failed to fetch categories:", err);
-    }
-  };
-
   useEffect(() => {
-    fetchCategories();
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await api.get("/expense-categories");
+        if (!cancelled && response.success) {
+          setCategories(response.data || []);
+        }
+      } catch (err) {
+        if (!cancelled) console.error("Failed to fetch categories:", err);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    fetchExpenses();
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await api.get("/expenses", {
+          params: { ...filters, page, limit },
+        });
+        if (!cancelled) {
+          if (response.success) {
+            setExpenses(response.data || []);
+            setPagination(response.pagination);
+          } else {
+            setError(response.message || "Failed to fetch expenses");
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to fetch expenses:", err);
+          setError(err.response?.data?.message || err.message || "Failed to fetch expenses");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [page, limit, filters]);
 
   // Handle delete

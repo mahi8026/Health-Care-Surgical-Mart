@@ -45,7 +45,7 @@ const ErrorFallback = ({ error, resetError, eventId }) => {
 
         {/* Error Description */}
         <p className="text-gray-600 text-center mb-6">
-          We're sorry for the inconvenience. An unexpected error has occurred.
+          We&apos;re sorry for the inconvenience. An unexpected error has occurred.
           Our team has been notified and is working on a fix.
         </p>
 

@@ -1,6 +1,6 @@
 /**
  * Backfill costPrice for existing sales
- * 
+ *
  * This migration adds costPrice to all sale items that don't have it
  * by using the product's current purchasePrice as a best-effort approximation
  */
@@ -30,7 +30,7 @@ async function backfillCostPrice() {
     for (const shop of shops) {
       totalShops++;
       const shopDb = getShopDatabase(shop._id.toString());
-      
+
       logger.info(`Processing shop: ${shop.name} (${shop._id})`);
 
       // Find all sales with items missing costPrice
@@ -73,7 +73,7 @@ async function backfillCostPrice() {
           });
 
           const costPrice = product ? parseFloat(product.purchasePrice || 0) : 0;
-          
+
           updatedItems.push({
             ...item,
             costPrice
@@ -87,11 +87,11 @@ async function backfillCostPrice() {
         if (needsUpdate) {
           await shopDb.collection('sales').updateOne(
             { _id: sale._id },
-            { 
-              $set: { 
+            {
+              $set: {
                 items: updatedItems,
                 updatedAt: new Date()
-              } 
+              }
             }
           );
           totalUpdated++;

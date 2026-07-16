@@ -4,7 +4,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { COMPANY } from "../config/constants";
 import {
   hasPermission as checkPermission,
-  isAdmin,
 } from "../utils/permissions";
 import { getNavigationBySections } from "../config/navigation";
 

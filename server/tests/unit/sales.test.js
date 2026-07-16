@@ -20,6 +20,22 @@ jest.mock("../../src/services/email/email.service");
 jest.mock("../../src/middleware/auth-multi-tenant");
 jest.mock("../../src/utils/rbac");
 
+// Mock stock-command service (used lazily inside sales controller)
+const mockRecordMovement = jest.fn();
+const mockAllocateBatchesFEFO = jest.fn();
+const mockInsufficientStockError = class extends Error {
+  constructor(msg, available, requested) {
+    super(msg); this.available = available; this.requested = requested;
+  }
+};
+jest.mock("../../src/services/stock-command.service", () => {
+  const actual = jest.requireActual("../../src/services/stock-command.service");
+  actual.recordMovement = mockRecordMovement;
+  actual.allocateBatchesFEFO = mockAllocateBatchesFEFO;
+  actual.InsufficientStockError = mockInsufficientStockError;
+  return actual;
+});
+
 // Import after mocking
 const salesController = require("../../src/controllers/sales.controller");
 
@@ -36,11 +52,21 @@ describe("Sales Creation with Stock Deduction", () => {
     // Reset all mocks
     jest.clearAllMocks();
 
+    // Re-apply stock-command mocks (jest.clearAllMocks() strips mockResolvedValue)
+    mockRecordMovement.mockResolvedValue({ success: true });
+    mockAllocateBatchesFEFO.mockResolvedValue([]);
+
     // Create mock collections
     mockCollections = {
       sales: {
         insertOne: jest.fn(),
-        find: jest.fn(),
+        find: jest.fn().mockReturnValue({
+          sort: jest.fn().mockReturnValue({
+            limit: jest.fn().mockReturnValue({
+              toArray: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
         findOne: jest.fn(),
         countDocuments: jest.fn(),
       },
@@ -55,11 +81,23 @@ describe("Sales Creation with Stock Deduction", () => {
       customers: {
         findOne: jest.fn(),
       },
+      // Event-sourced stock system collections
+      stock_snapshots: {
+        findOne: jest.fn(),
+        insertOne: jest.fn(),
+        findOneAndUpdate: jest.fn(),
+      },
+      stock_ledger: {
+        insertOne: jest.fn(),
+      },
+      stock_batches: {
+        updateOne: jest.fn(),
+      },
     };
 
     // Mock shop database
     mockShopDb = {
-      collection: jest.fn((name) => mockCollections[name]),
+      collection: jest.fn((name) => mockCollections[name] || { findOne: jest.fn(), insertOne: jest.fn(), updateOne: jest.fn() }),
     };
 
     getShopDatabase.mockReturnValue(mockShopDb);
@@ -171,7 +209,7 @@ describe("Sales Creation with Stock Deduction", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe("Sale created successfully");
       expect(response.body.data).toHaveProperty("_id");
-      expect(response.body.data.invoiceNo).toBe("INV-TEST-001");
+      expect(response.body.data.invoiceNo).toMatch(/^INV-\d{6}-\d{5}$/);
       expect(response.body.data.grandTotal).toBe(550);
 
       // Verify product lookup was called
@@ -179,13 +217,19 @@ describe("Sales Creation with Stock Deduction", () => {
         _id: productId,
       });
 
+      // Verify invoice number was auto-generated (not using the input)
+      expect(mockCollections.sales.find).toHaveBeenCalled();
+
+      // Verify stock movement was recorded via event-sourced system
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalled();
+      expect(mockRecordMovement).toHaveBeenCalled();
+
       // Verify stock was checked
       expect(mockCollections.stock.findOne).toHaveBeenCalled();
 
       // Verify sale was inserted
       expect(mockCollections.sales.insertOne).toHaveBeenCalledWith(
         expect.objectContaining({
-          invoiceNo: "INV-TEST-001",
           grandTotal: 550,
           items: expect.arrayContaining([
             expect.objectContaining({
@@ -198,19 +242,18 @@ describe("Sales Creation with Stock Deduction", () => {
         })
       );
 
-      // Verify stock was updated (deducted)
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: productId },
+      // Verify stock was deducted via event-sourced system
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalledWith(
+        productId,
+        5,
+        expect.any(String),
+      );
+      expect(mockRecordMovement).toHaveBeenCalledWith(
         expect.objectContaining({
-          $inc: {
-            currentQty: -5,
-            availableQty: -5,
-          },
-          $set: expect.objectContaining({
-            lastSaleDate: expect.any(Date),
-          }),
-        }),
-        expect.any(Object),
+          productId,
+          movementType: 'SALE',
+          quantity: 5,
+        })
       );
     });
 
@@ -268,26 +311,15 @@ describe("Sales Creation with Stock Deduction", () => {
       // Assert
       expect(response.body.success).toBe(true);
       expect(mockCollections.products.findOne).toHaveBeenCalledTimes(2);
-      // Stock update is called twice per item (deduction + low stock flag update)
-      expect(mockCollections.stock.updateOne).toHaveBeenCalled();
+      // Both items get stock allocated and recorded via event-sourced system
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalledTimes(2);
+      expect(mockRecordMovement).toHaveBeenCalledTimes(2);
 
-      // Verify stock deduction for product 1 (first call)
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: product1Id },
-        expect.objectContaining({
-          $inc: { currentQty: -3, availableQty: -3 },
-        }),
-        expect.any(Object),
-      );
+      // Verify stock deduction for product 1
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalledWith(product1Id, 3, expect.any(String));
 
-      // Verify stock deduction for product 2 (third call)
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: product2Id },
-        expect.objectContaining({
-          $inc: { currentQty: -2, availableQty: -2 },
-        }),
-        expect.any(Object),
-      );
+      // Verify stock deduction for product 2
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalledWith(product2Id, 2, expect.any(String));
     });
 
     test("should generate invoice number if not provided", async () => {
@@ -330,7 +362,7 @@ describe("Sales Creation with Stock Deduction", () => {
 
       // Assert
       expect(response.body.success).toBe(true);
-      expect(response.body.data.invoiceNo).toMatch(/^INV-\d+$/);
+      expect(response.body.data.invoiceNo).toMatch(/^INV-\d{6}-\d{5}$/);
     });
 
     test("should handle cash customer (no customer ID)", async () => {
@@ -425,12 +457,9 @@ describe("Sales Creation with Stock Deduction", () => {
 
       // Assert - Sale should still be created
       expect(response.body.success).toBe(true);
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: productId },
-        expect.objectContaining({
-          $inc: { currentQty: -10, availableQty: -10 },
-        }),
-        expect.any(Object),
+      // Stock handled via event-sourced system
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalledWith(
+        productId, 10, expect.any(String)
       );
     });
 
@@ -491,10 +520,8 @@ describe("Sales Creation with Stock Deduction", () => {
 
       // Assert
       expect(response.body.success).toBe(true);
-      // Stock insert is not called because stock.findOne returns null initially,
-      // but then the code path doesn't create new stock in this test scenario
-      // The actual implementation creates stock with insertOne
-      expect(mockCollections.stock.insertOne).toHaveBeenCalled();
+      // Event-sourced system handles stock
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalled();
     });
 
     test("should update low stock flag after sale", async () => {
@@ -546,8 +573,9 @@ describe("Sales Creation with Stock Deduction", () => {
 
       // Assert
       expect(response.body.success).toBe(true);
-      // Stock update is called for deduction, and the low stock flag is updated in the same call
-      expect(mockCollections.stock.updateOne).toHaveBeenCalled();
+      // Event-sourced system handles stock updates
+      expect(mockAllocateBatchesFEFO).toHaveBeenCalled();
+      expect(mockRecordMovement).toHaveBeenCalled();
     });
   });
 

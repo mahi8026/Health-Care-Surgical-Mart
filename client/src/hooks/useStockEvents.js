@@ -25,19 +25,29 @@ const useStockEvents = (onEvent) => {
   const reconnectAttemptsRef = useRef(0);
 
   useEffect(() => {
+    let cancelled = false;
+
     // Don't connect if no callback provided (user not logged in)
     if (!onEvent) {
-      setConnected(false);
-      setError(null);
-      return;
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setConnected(false);
+          setError(null);
+        }
+      });
+      return () => { cancelled = true; };
     }
 
     // Get auth token from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
       console.warn('[SSE] No token found, skipping connection');
-      setError('Authentication required');
-      setConnected(false);
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setError('Authentication required');
+          setConnected(false);
+        }
+      });
       return;
     }
 
@@ -106,6 +116,7 @@ const useStockEvents = (onEvent) => {
 
     // Cleanup on unmount
     return () => {
+      cancelled = true;
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;

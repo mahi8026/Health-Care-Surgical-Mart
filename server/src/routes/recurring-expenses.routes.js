@@ -293,7 +293,7 @@ router.post(
         data: results,
       });
     } catch (error) {
-      throw createError.internalServerError(
+      throw createError.internal(
         `Error processing recurring expenses: ${error.message}`,
       );
     }

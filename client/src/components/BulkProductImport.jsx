@@ -48,7 +48,7 @@ const BulkProductImport = ({ onClose, onSuccess }) => {
       "Syringe 5ml,SY-004,Instruments,,5,10,pcs,500,50,,Disposable syringe 5ml",
     ].join("\n");
 
-    const blob = new Blob([template], { type: "text/csv" });
+    const blob = new window.Blob([template], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -119,7 +119,7 @@ const BulkProductImport = ({ onClose, onSuccess }) => {
       // Add stack trace in development
       if (
         error.response?.data?.error &&
-        process.env.NODE_ENV === "development"
+        import.meta.env.MODE === "development"
       ) {
         console.error("Detailed error:", error.response.data.error);
       }

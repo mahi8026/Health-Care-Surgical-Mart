@@ -16,28 +16,43 @@ const ExpiryAlertsWidget = ({ daysThreshold = 30 }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchExpiryAlerts();
-    
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchExpiryAlerts, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [daysThreshold]);
-
-  const fetchExpiryAlerts = async () => {
-    try {
-      const response = await api.get(`/stock/expiry-alerts?days=${daysThreshold}`);
-      if (response.success) {
-        setAlerts(response.data || []);
-        setError('');
-      } else {
-        setError(response.message || 'Failed to load expiry alerts');
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const response = await api.get(`/stock/expiry-alerts?days=${daysThreshold}`);
+        if (!cancelled && response.success) {
+          setAlerts(response.data || []);
+          setError('');
+        } else if (!cancelled) {
+          setError(response.message || 'Failed to load expiry alerts');
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load expiry alerts');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (err) {
-      setError(err.message || 'Failed to load expiry alerts');
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await api.get(`/stock/expiry-alerts?days=${daysThreshold}`);
+        if (!cancelled && response.success) {
+          setAlerts(response.data || []);
+          setError('');
+        } else if (!cancelled) {
+          setError(response.message || 'Failed to load expiry alerts');
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load expiry alerts');
+      }
+    }, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [daysThreshold]);
 
   const formatDate = (date) => {
     if (!date) return '—';

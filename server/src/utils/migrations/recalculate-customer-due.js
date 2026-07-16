@@ -8,7 +8,7 @@
  */
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') });
-const { MongoClient, ObjectId } = require('mongodb');
+const { MongoClient } = require('mongodb');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.DB_NAME || 'medical_store_system';

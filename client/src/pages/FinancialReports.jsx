@@ -48,73 +48,84 @@ const FinancialReports = () => {
     endDate: new Date().toISOString().split("T")[0],
   });
 
-  // Fetch financial data for active tab only (PERF-002: lazy load tabs)
-  const fetchFinancialData = async (tabToFetch = null) => {
-    try {
-      setLoading(true);
-      setError("");
-
-      // Build query params with date range
-      const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-      });
-
-      // Fetch only the active tab's data, or specific tab if provided
-      const targetTab = tabToFetch || activeTab;
-
-      if (targetTab === "profit-loss" && !profitLossData) {
-        const plData = await api.get(`/financial-reports/profit-loss?${params}`);
-        if (plData?.success) setProfitLossData(plData.data);
-      } else if (targetTab === "daily-summary" && !dailySummary) {
-        const dsData = await api.get(`/financial-reports/daily-summary?${params}`);
-        if (dsData?.success) setDailySummary(dsData.data);
-      } else if (targetTab === "product-analysis" && !productProfitability) {
-        const ppData = await api.get(`/financial-reports/product-profitability?${params}&limit=50`);
-        if (ppData?.success) setProductProfitability(ppData.data);
-      } else if (targetTab === "return-analysis" && !returnAnalysis) {
-        const raData = await api.get(`/financial-reports/return-analysis?${params}`);
-        if (raData?.success) setReturnAnalysis(raData.data);
-      } else if (targetTab === "cash-flow" && !cashFlow) {
-        const cfData = await api.get(`/financial-reports/cash-flow?${params}`);
-        if (cfData?.success) setCashFlow(cfData.data);
-      }
-    } catch (error) {
-      console.error("Financial data fetch error:", error);
-
-      // Handle authentication errors
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        setError("Authentication failed. Please login again.");
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 2000);
-      } else {
-        setError("Failed to fetch financial data");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Initial data load - fetch only active tab
   useEffect(() => {
-    fetchFinancialData();
-  }, [activeTab]);
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const params = new window.URLSearchParams({ startDate: dateRange.startDate, endDate: dateRange.endDate });
+        const targetTab = activeTab;
+        if (targetTab === "profit-loss") {
+          const pl = await api.get(`/financial-reports/profit-loss?${params}`);
+          if (!cancelled && pl?.success) setProfitLossData(pl.data);
+        } else if (targetTab === "daily-summary") {
+          const ds = await api.get(`/financial-reports/daily-summary?${params}`);
+          if (!cancelled && ds?.success) setDailySummary(ds.data);
+        } else if (targetTab === "product-analysis") {
+          const pp = await api.get(`/financial-reports/product-profitability?${params}&limit=50`);
+          if (!cancelled && pp?.success) setProductProfitability(pp.data);
+        } else if (targetTab === "return-analysis") {
+          const ra = await api.get(`/financial-reports/return-analysis?${params}`);
+          if (!cancelled && ra?.success) setReturnAnalysis(ra.data);
+        } else if (targetTab === "cash-flow") {
+          const cf = await api.get(`/financial-reports/cash-flow?${params}`);
+          if (!cancelled && cf?.success) setCashFlow(cf.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Financial data fetch error:", error);
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            setError("Authentication failed. Please login again.");
+            setTimeout(() => { window.location.href = "/login"; }, 2000);
+          } else {
+            setError("Failed to fetch financial data");
+          }
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, dateRange.startDate, dateRange.endDate]);
 
   // Refetch when date range changes (clear data to force refetch)
   useEffect(() => {
-    const delayedFetch = setTimeout(() => {
-      // Clear existing data to force refetch
-      setProfitLossData(null);
-      setDailySummary(null);
-      setProductProfitability(null);
-      setReturnAnalysis(null);
-      setCashFlow(null);
-      fetchFinancialData();
+    const timer = setTimeout(() => {
+      let cancelled = false;
+      (async () => {
+        setProfitLossData(null);
+        setDailySummary(null);
+        setProductProfitability(null);
+        setReturnAnalysis(null);
+        setCashFlow(null);
+        try {
+          setLoading(true);
+          const params = new window.URLSearchParams({ startDate: dateRange.startDate, endDate: dateRange.endDate });
+          const targetTab = activeTab;
+          if (targetTab === "profit-loss") {
+            const pl = await api.get(`/financial-reports/profit-loss?${params}`);
+            if (!cancelled && pl?.success) setProfitLossData(pl.data);
+          } else if (targetTab === "daily-summary") {
+            const ds = await api.get(`/financial-reports/daily-summary?${params}`);
+            if (!cancelled && ds?.success) setDailySummary(ds.data);
+          } else if (targetTab === "product-analysis") {
+            const pp = await api.get(`/financial-reports/product-profitability?${params}&limit=50`);
+            if (!cancelled && pp?.success) setProductProfitability(pp.data);
+          } else if (targetTab === "return-analysis") {
+            const ra = await api.get(`/financial-reports/return-analysis?${params}`);
+            if (!cancelled && ra?.success) setReturnAnalysis(ra.data);
+          } else if (targetTab === "cash-flow") {
+            const cf = await api.get(`/financial-reports/cash-flow?${params}`);
+            if (!cancelled && cf?.success) setCashFlow(cf.data);
+          }
+        } catch { /* ignore */ } finally { if (!cancelled) setLoading(false); }
+      })();
+      return () => { cancelled = true; };
     }, 500);
-
-    return () => clearTimeout(delayedFetch);
-  }, [dateRange.startDate, dateRange.endDate]);
+    return () => clearTimeout(timer);
+  }, [dateRange.startDate, dateRange.endDate, activeTab]);
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -530,6 +541,7 @@ const ProfitLossTab = React.memo(({ data, formatCurrency, formatPercentage }) =>
     </div>
   );
 });
+ProfitLossTab.displayName = 'ProfitLossTab';
 
 // Daily Summary Tab Component (wrapped with React.memo for performance - PERF-004)
 const DailySummaryTab = React.memo(({ data, formatCurrency }) => {
@@ -692,6 +704,7 @@ const DailySummaryTab = React.memo(({ data, formatCurrency }) => {
     </div>
   );
 });
+DailySummaryTab.displayName = 'DailySummaryTab';
 
 // Product Analysis Tab Component (wrapped with React.memo for performance - PERF-004)
 const ProductAnalysisTab = React.memo(({ data, formatCurrency, formatPercentage }) => {
@@ -811,6 +824,7 @@ const ProductAnalysisTab = React.memo(({ data, formatCurrency, formatPercentage 
     </div>
   );
 });
+ProductAnalysisTab.displayName = 'ProductAnalysisTab';
 
 // Return Analysis Tab Component (wrapped with React.memo for performance - PERF-004)
 const ReturnAnalysisTab = React.memo(({ data, formatCurrency, formatPercentage }) => {
@@ -975,6 +989,7 @@ const ReturnAnalysisTab = React.memo(({ data, formatCurrency, formatPercentage }
     </div>
   );
 });
+ReturnAnalysisTab.displayName = 'ReturnAnalysisTab';
 
 // Cash Flow Tab Component (wrapped with React.memo for performance - PERF-004)
 const CashFlowTab = React.memo(({ data, formatCurrency }) => {
@@ -1123,5 +1138,6 @@ const CashFlowTab = React.memo(({ data, formatCurrency }) => {
     </div>
   );
 });
+CashFlowTab.displayName = 'CashFlowTab';
 
 export default FinancialReports;

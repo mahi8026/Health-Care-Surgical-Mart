@@ -17,28 +17,38 @@ const CategorySelector = ({
   const [error, setError] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/expense-categories");
-      if (response.success) {
-        // Only show active categories
-        const activeCategories = response.data.filter((cat) => cat.isActive);
-        setCategories(activeCategories);
-      } else {
-        setError("Failed to load categories");
-      }
-    } catch (error) {
-      setError("Failed to load categories");
-      console.error("Fetch categories error:", error);
-    } finally {
-      setLoading(false);
+  // Handle category selection and "__create_new__" value
+  const handleChange = (e) => {
+    if (e.target.value === "__create_new__") {
+      setShowCreateModal(true);
+      onChange({ target: { name, value: "" } });
+    } else {
+      onChange(e);
     }
   };
 
+  // Fetch categories
   useEffect(() => {
-    fetchCategories();
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/expense-categories");
+        if (!cancelled && response.success) {
+          setCategories(response.data.filter((cat) => cat.isActive));
+        } else if (!cancelled) {
+          setError("Failed to load categories");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setError("Failed to load categories");
+          console.error("Fetch categories error:", error);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Handle category creation
@@ -83,7 +93,7 @@ const CategorySelector = ({
         <select
           name={name}
           value={value || ""}
-          onChange={onChange}
+          onChange={handleChange}
           required={required}
           className={`input-field ${className}`}
         >
@@ -117,13 +127,8 @@ const CategorySelector = ({
         )}
       </div>
 
-      {/* Handle create new selection */}
-      {value === "__create_new__" && (
-        <>
-          {setShowCreateModal(true)}
-          {onChange({ target: { name, value: "" } })}
-        </>
-      )}
+      {/* Handle create new selection via useEffect */}
+      {value === "__create_new__" && null}
 
       {/* Inline Category Creation Modal */}
       {showCreateModal && (

@@ -13,7 +13,7 @@ const { requirePermission } = require('../utils/rbac');
 const { PERMISSIONS } = require('../utils/rbac');
 const productsController = require('../controllers/products.controller');
 const { cacheResponse, queryHash } = require('../middleware/cache.middleware');
-const { cacheService, TTL } = require('../services/cache.service');
+const { TTL } = require('../services/cache.service');
 const { getShopDatabase } = require('../config/database');
 
 // Apply authentication and shop status check to all routes

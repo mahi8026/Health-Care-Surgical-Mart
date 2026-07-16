@@ -11,7 +11,7 @@ class BaseSMSAdapter {
    * @param {object} options - Provider-specific options
    * @returns {Promise<{success: boolean, messageId?: string, status?: string, provider: string, cost?: number, error?: string}>}
    */
-  async sendSMS(to, message, options = {}) {
+  async sendSMS(to, message, _options = {}) {
     throw new Error('sendSMS() must be implemented by subclass');
   }
 
@@ -29,7 +29,7 @@ class BaseSMSAdapter {
    * @param {object|string} result - Provider result or message content
    * @returns {number} Cost in USD
    */
-  calculateCost(result) {
+  calculateCost(_result) {
     throw new Error('calculateCost() must be implemented by subclass');
   }
 }

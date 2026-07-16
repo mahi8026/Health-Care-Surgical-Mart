@@ -19,6 +19,22 @@ jest.mock("../../src/middleware/auth-multi-tenant");
 jest.mock("../../src/utils/rbac");
 jest.mock("../../src/config/error-handling");
 
+// Mock stock-command service (used inside returns routes for Phase 6 event-sourced stock)
+const mockRecordMovement = jest.fn();
+const mockAllocateBatchesFEFO = jest.fn();
+const mockInsufficientStockError = class extends Error {
+  constructor(msg, available, requested) {
+    super(msg); this.available = available; this.requested = requested;
+  }
+};
+jest.mock("../../src/services/stock-command.service", () => {
+  const actual = jest.requireActual("../../src/services/stock-command.service");
+  actual.recordMovement = mockRecordMovement;
+  actual.allocateBatchesFEFO = mockAllocateBatchesFEFO;
+  actual.InsufficientStockError = mockInsufficientStockError;
+  return actual;
+});
+
 // Import after mocking
 const { getShopDatabase } = require("../../src/config/database");
 const { authenticate, checkShopStatus } = require("../../src/middleware/auth-multi-tenant");
@@ -34,6 +50,10 @@ describe("Return Processing with Stock Restoration", () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
+
+    // Re-apply stock-command mocks (jest.clearAllMocks() strips mockResolvedValue)
+    mockRecordMovement.mockResolvedValue({ success: true });
+    mockAllocateBatchesFEFO.mockResolvedValue([]);
 
     // Mock logger
     logger.error = jest.fn();
@@ -62,6 +82,19 @@ describe("Return Processing with Stock Restoration", () => {
       },
       stock_movements: {
         insertOne: jest.fn(),
+      },
+      // Event-sourced stock system collections
+      stock_snapshots: {
+        findOne: jest.fn(),
+        insertOne: jest.fn(),
+        findOneAndUpdate: jest.fn(),
+      },
+      stock_ledger: {
+        insertOne: jest.fn(),
+      },
+      stock_batches: {
+        insertOne: jest.fn(),
+        updateOne: jest.fn(),
       },
     };
 
@@ -206,12 +239,6 @@ describe("Return Processing with Stock Restoration", () => {
         acknowledged: true,
       });
 
-      // Mock stock update
-      mockCollections.stock.updateOne.mockResolvedValue({
-        modifiedCount: 1,
-        acknowledged: true,
-      });
-
       // Mock stock movement insertion
       mockCollections.stock_movements.insertOne.mockResolvedValue({
         insertedId: new ObjectId(),
@@ -250,21 +277,25 @@ describe("Return Processing with Stock Restoration", () => {
         })
       );
 
-      // Verify stock was restored (incremented)
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: productId },
+      // Verify stock was restored via event-sourced system
+      expect(mockRecordMovement).toHaveBeenCalledWith(
         expect.objectContaining({
-          $inc: {
-            currentQty: 3,
-            availableQty: 3,
-          },
-          $set: expect.objectContaining({
-            lastUpdated: expect.any(Date),
-          }),
+          productId: productId,
+          movementType: 'RETURN_IN',
+          quantity: 3,
         })
       );
 
-      // Verify stock movement was logged
+      // Verify return batch was created
+      expect(mockCollections.stock_batches.insertOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productId: productId,
+          quantity: 3,
+          source: 'RETURN',
+        })
+      );
+
+      // Verify stock movement was logged (legacy)
       expect(mockCollections.stock_movements.insertOne).toHaveBeenCalledWith(
         expect.objectContaining({
           productId: productId,
@@ -357,9 +388,6 @@ describe("Return Processing with Stock Restoration", () => {
       mockCollections.returns.insertOne.mockResolvedValue({
         insertedId: new ObjectId(),
       });
-      mockCollections.stock.updateOne.mockResolvedValue({
-        modifiedCount: 1,
-      });
       mockCollections.stock_movements.insertOne.mockResolvedValue({
         insertedId: new ObjectId(),
       });
@@ -375,21 +403,24 @@ describe("Return Processing with Stock Restoration", () => {
 
       // Assert
       expect(response.body.success).toBe(true);
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledTimes(2);
+      // Verify stock was restored via event-sourced system for both items
+      expect(mockRecordMovement).toHaveBeenCalledTimes(2);
 
       // Verify stock restored for product 1
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: product1Id },
+      expect(mockRecordMovement).toHaveBeenCalledWith(
         expect.objectContaining({
-          $inc: { currentQty: 2, availableQty: 2 },
+          productId: product1Id,
+          movementType: 'RETURN_IN',
+          quantity: 2,
         })
       );
 
       // Verify stock restored for product 2
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: product2Id },
+      expect(mockRecordMovement).toHaveBeenCalledWith(
         expect.objectContaining({
-          $inc: { currentQty: 1, availableQty: 1 },
+          productId: product2Id,
+          movementType: 'RETURN_IN',
+          quantity: 1,
         })
       );
     });
@@ -442,9 +473,6 @@ describe("Return Processing with Stock Restoration", () => {
       mockCollections.returns.countDocuments.mockResolvedValue(0);
       mockCollections.returns.insertOne.mockResolvedValue({
         insertedId: new ObjectId(),
-      });
-      mockCollections.stock.updateOne.mockResolvedValue({
-        modifiedCount: 1,
       });
       mockCollections.stock_movements.insertOne.mockResolvedValue({
         insertedId: new ObjectId(),
@@ -754,10 +782,6 @@ describe("Return Processing with Stock Restoration", () => {
         modifiedCount: 1,
       });
 
-      mockCollections.stock.updateOne.mockResolvedValue({
-        modifiedCount: 1,
-      });
-
       // Act
       const response = await request(app)
         .put(`/api/returns/${returnId}/status`)
@@ -771,14 +795,12 @@ describe("Return Processing with Stock Restoration", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe("Return status updated successfully");
 
-      // Verify stock was reversed (decremented)
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: productId },
+      // Verify stock was reversed via event-sourced system
+      expect(mockRecordMovement).toHaveBeenCalledWith(
         expect.objectContaining({
-          $inc: {
-            currentQty: -5,
-            availableQty: -5,
-          },
+          productId: productId,
+          movementType: 'RETURN_OUT',
+          quantity: 5,
         })
       );
 
@@ -813,10 +835,6 @@ describe("Return Processing with Stock Restoration", () => {
         modifiedCount: 1,
       });
 
-      mockCollections.stock.updateOne.mockResolvedValue({
-        modifiedCount: 1,
-      });
-
       // Act
       const response = await request(app)
         .put(`/api/returns/${returnId}/status`)
@@ -828,14 +846,12 @@ describe("Return Processing with Stock Restoration", () => {
       // Assert
       expect(response.body.success).toBe(true);
 
-      // Verify stock was restored (incremented)
-      expect(mockCollections.stock.updateOne).toHaveBeenCalledWith(
-        { productId: productId },
+      // Verify stock was restored via event-sourced system
+      expect(mockRecordMovement).toHaveBeenCalledWith(
         expect.objectContaining({
-          $inc: {
-            currentQty: 3,
-            availableQty: 3,
-          },
+          productId: productId,
+          movementType: 'RETURN_IN',
+          quantity: 3,
         })
       );
     });

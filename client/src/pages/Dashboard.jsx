@@ -11,7 +11,7 @@ import {
   Legend,
   ArcElement,
 } from "chart.js";
-import { Bar, Line, Doughnut } from "react-chartjs-2";
+import { Bar, Doughnut } from "react-chartjs-2";
 import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 
@@ -260,7 +260,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">
-            Welcome back! Here's what's happening with your store today.
+            Welcome back! Here&apos;s what&apos;s happening with your store today.
           </p>
         </div>
         <button
@@ -423,7 +423,7 @@ const Dashboard = () => {
             <h3 className="text-lg font-semibold text-gray-900">
               Top Expense Categories
             </h3>
-            <p className="text-sm text-gray-600">This month's spending</p>
+            <p className="text-sm text-gray-600">This month&apos;s spending</p>
           </div>
           <div className="space-y-3">
             {expenseData?.categories?.length > 0 ? (

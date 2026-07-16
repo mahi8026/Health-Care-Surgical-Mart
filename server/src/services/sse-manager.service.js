@@ -249,7 +249,7 @@ class SSEManager {
   closeAll() {
     logger.info('Closing all SSE connections...');
 
-    for (const [shopId, clients] of this.clients.entries()) {
+    for (const [_shopId, clients] of this.clients.entries()) {
       for (const client of clients) {
         try {
           this.sendEvent(client, {

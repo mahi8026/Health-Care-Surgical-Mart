@@ -651,7 +651,7 @@ router.put(
           error: stockError.message,
           productId: productId.toString(),
         });
-        throw createError.serverError(`Failed to update stock for product ${product.name}`);
+        throw createError.internal(`Failed to update stock for product ${product.name}`);
       }
 
       // Update product's purchase price if provided

@@ -46,7 +46,8 @@ class BaseController {
           path: req.path,
           method: req.method,
         });
-        this.sendError(res, error.message, 500, error);
+        const statusCode = error.statusCode || 500;
+        this.sendError(res, error.message, statusCode, error);
       });
     };
   }
@@ -64,7 +65,10 @@ class BaseController {
     }
 
     if (missing.length > 0) {
-      throw new Error(`Missing required fields: ${missing.join(', ')}`);
+      const err = new Error(`Missing required fields: ${missing.join(', ')}`);
+      err.statusCode = 400;
+      err.isValidation = true;
+      throw err;
     }
   }
 

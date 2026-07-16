@@ -31,6 +31,9 @@ export function usePOSKeyboard({
       const tag = document.activeElement?.tagName?.toLowerCase();
       const isTyping = tag === "input" || tag === "textarea" || tag === "select";
 
+      // Don't fire shortcuts when user is typing in a regular input/textarea
+      if (isTyping) return;
+
       switch (e.key) {
         case "F1":
           e.preventDefault();

@@ -14,7 +14,7 @@ const { logger } = require('./logging');
  * Initialize Sentry for error tracking
  * @param {Express} app - Express application instance
  */
-const initializeSentry = (app) => {
+const initializeSentry = (_app) => {
   // Only initialize if DSN is provided
   if (!process.env.SENTRY_DSN) {
     logger.warn('Sentry DSN not configured - error tracking disabled');

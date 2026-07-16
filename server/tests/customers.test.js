@@ -4,7 +4,6 @@
  */
 
 const request = require('supertest');
-const jwt = require('jsonwebtoken');
 
 describe('Customer Management API', () => {
   let app;
@@ -14,27 +13,19 @@ describe('Customer Management API', () => {
   beforeAll(() => {
     app = require('../src/server');
     
-    adminToken = jwt.sign(
-      { 
-        userId: 'test_admin',
-        email: 'admin@test.com',
-        role: 'SHOP_ADMIN',
-        shopId: 'shop_health_care_01'
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
+    adminToken = global.testUtils.generateTestToken({
+      userId: global.testUtils.ADMIN_ID,
+      email: 'admin@test.com',
+      role: 'SHOP_ADMIN',
+      shopId: global.testUtils.SHOP_ID,
+    });
     
-    staffToken = jwt.sign(
-      { 
-        userId: 'test_staff',
-        email: 'staff@test.com',
-        role: 'STAFF',
-        shopId: 'shop_health_care_01'
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
+    staffToken = global.testUtils.generateTestToken({
+      userId: global.testUtils.STAFF_ID,
+      email: 'staff@test.com',
+      role: 'STAFF',
+      shopId: global.testUtils.SHOP_ID,
+    });
   });
   
   describe('GET /api/customers', () => {

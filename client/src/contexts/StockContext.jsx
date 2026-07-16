@@ -12,6 +12,7 @@ import { useAuth } from './AuthContext';
 
 const StockContext = createContext(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useStock = () => {
   const context = useContext(StockContext);
   if (!context) {
@@ -216,7 +217,11 @@ export const StockProvider = ({ children }) => {
   const { connected, error: sseError } = useStockEvents(user ? handleStockEvent : null);
 
   useEffect(() => {
-    setRealtimeConnected(connected);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) setRealtimeConnected(connected);
+    });
+    return () => { cancelled = true; };
   }, [connected]);
 
   // Don't auto-fetch on mount to prevent rate limiting

@@ -56,7 +56,7 @@ class BulkProductImportService {
 
   // -- Validation ------------------------------------------------------------
 
-  validateRow(row, rowIndex, options = {}) {
+  validateRow(row, rowIndex, _options = {}) {
     const errors = [];
     const warnings = [];
 
@@ -142,7 +142,7 @@ class BulkProductImportService {
     return product;
   }
 
-  // -- Core import logic (uses shopDb — native MongoDB wrapper) -------------
+  // -- Core import logic (uses shopDb ï¿½ native MongoDB wrapper) -------------
 
   /**
    * Process a bulk import job.

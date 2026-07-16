@@ -290,9 +290,9 @@ class SalesController {
       });
     } catch (error) {
       logger.error('Get sales error:', error);
-      res.status(500).json({
+      res.status(error.statusCode || 500).json({
         success: false,
-        message: 'Failed to fetch sales',
+        message: error.message || 'Failed to fetch sales',
       });
     }
   }
@@ -302,6 +302,12 @@ class SalesController {
    */
   async getSaleById(req, res) {
     try {
+      if (!ObjectId.isValid(req.params.id)) {
+        return res.status(404).json({
+          success: false,
+          message: 'Sale not found',
+        });
+      }
       const sale = await req.shopDb.collection('sales').findOne({
         _id: new ObjectId(req.params.id),
       });
@@ -319,9 +325,9 @@ class SalesController {
       });
     } catch (error) {
       logger.error('Get sale error:', error);
-      res.status(500).json({
+      res.status(error.statusCode || 500).json({
         success: false,
-        message: 'Failed to fetch sale',
+        message: error.message || 'Failed to fetch sale',
       });
     }
   }
@@ -403,7 +409,7 @@ class SalesController {
   _buildSaleRecord({
     invoiceNo, customer, customerType, enrichedItems, subtotal, discount,
     vatAmount, vatPercent, grandTotal, cashPaid, bankPaid,
-    paymentMethod, dueAmount, previousDue = 0, notes, user,
+    paymentMethod, _dueAmount, previousDue = 0, notes, user,
   }) {
     const paid = (parseFloat(cashPaid) || 0) + (parseFloat(bankPaid) || 0);
     const due = paymentMethod === 'credit'
@@ -478,9 +484,9 @@ class SalesController {
    * Update stock quantities after sale
    * Phase 6: Event-sourced system with FEFO batch tracking (legacy system retired)
    */
-  async _updateStockForSale(shopDb, enrichedItems, session = null, saleId = null, userId = null, shopId = null) {
+  async _updateStockForSale(shopDb, enrichedItems, _session = null, saleId = null, userId = null, shopId = null) {
     const stockCommand = require('../services/stock-command.service');
-    const { InsufficientStockError } = require('../services/stock-command.service');
+    const { InsufficientStockError } = stockCommand;
 
     for (const item of enrichedItems) {
       // Skip stock updates for custom items (no productId)
@@ -579,7 +585,11 @@ class SalesController {
     }
 
     if (customerId) {
-      filter.customerId = new ObjectId(customerId);
+      if (ObjectId.isValid(customerId)) {
+        filter.customerId = new ObjectId(customerId);
+      } else {
+        filter.customerId = customerId;
+      }
     }
 
     // Search by invoice number or customer name

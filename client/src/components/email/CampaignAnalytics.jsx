@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../../config/api";
 import Pagination from "../ui/Pagination";
 
@@ -21,25 +21,27 @@ const CampaignAnalytics = () => {
   const [filters, setFilters] = useState({ type: "", status: "" });
   const [page, setPage] = useState(1);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filters.type) params.set("type", filters.type);
-      if (filters.status) params.set("status", filters.status);
-      const res = await api.get(`/email/logs?${params.toString()}`);
-      setLogs(res.data || []);
-      setPage(1);
-    } catch {
-      setLogs([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const params = new window.URLSearchParams();
+        if (filters.type) params.set("type", filters.type);
+        if (filters.status) params.set("status", filters.status);
+        const res = await api.get(`/email/logs?${params.toString()}`);
+        if (!cancelled) {
+          setLogs(res.data || []);
+          setPage(1);
+        }
+      } catch {
+        if (!cancelled) setLogs([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [filters]);
 
   const totalPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE));
   const paginated = logs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);

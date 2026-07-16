@@ -144,7 +144,7 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => {
+  skip: (_req) => {
     // Skip rate limiting for development
     return process.env.NODE_ENV === 'development';
   },
@@ -494,7 +494,9 @@ process.on('unhandledRejection', (reason, promise) => {
   gracefulShutdown('unhandledRejection');
 });
 
-// Start the server
-startServer();
+// Start the server (not in test mode — tests import the app directly)
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
 
 module.exports = app;

@@ -3,6 +3,23 @@ import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import SearchableProductSelect from "../components/SearchableProductSelect";
 
+const getDefaultPurchaseData = () => ({
+  invoiceNo: `PO-${Date.now()}`,
+  purchaseDate: new Date().toISOString().split("T")[0],
+  reference: "",
+  supplierName: "",
+  supplierContact: "",
+  supplierAddress: "",
+  selectedProduct: "",
+  unitCost: "",
+  quantity: "",
+  discount: 0,
+  discountPercent: 0,
+  vat: 0,
+  vatPercent: 0,
+  notes: "",
+});
+
 const Purchases = () => {
   // Tab state
   const [activeTab, setActiveTab] = useState("new");
@@ -24,22 +41,7 @@ const Purchases = () => {
   const [receivingLoading, setReceivingLoading] = useState(false);
 
   // Purchase Form State
-  const [purchaseData, setPurchaseData] = useState({
-    invoiceNo: `PO-${Date.now()}`,
-    purchaseDate: new Date().toISOString().split("T")[0],
-    reference: "",
-    supplierName: "",
-    supplierContact: "",
-    supplierAddress: "",
-    selectedProduct: "",
-    unitCost: "",
-    quantity: "",
-    discount: 0,
-    discountPercent: 0,
-    vat: 0,
-    vatPercent: 0,
-    notes: "",
-  });
+  const [purchaseData, setPurchaseData] = useState(getDefaultPurchaseData);
 
   // Fetch products
   const fetchProducts = async () => {
@@ -57,7 +59,7 @@ const Purchases = () => {
     } catch (error) {
       console.error("Fetch products error:", error);
       if (error.message?.includes("401")) {
-        window.location.href = "/login";
+        window.setTimeout(() => { window.location.href = "/login"; }, 0);
       }
       setProducts([]);
     }
@@ -78,15 +80,27 @@ const Purchases = () => {
     } catch (error) {
       console.error("Fetch suppliers error:", error);
       if (error.message?.includes("401")) {
-        window.location.href = "/login";
+        window.setTimeout(() => { window.location.href = "/login"; }, 0);
       }
       setSuppliers([]);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
-    fetchSuppliers();
+    let cancelled = false;
+    (async () => {
+      try {
+        const [prodRes, suppRes] = await Promise.all([
+          api.get("/products?isActive=true"),
+          api.get("/suppliers?isActive=true"),
+        ]);
+        if (!cancelled) {
+          if (prodRes.success) setProducts(prodRes.data);
+          if (suppRes.success) setSuppliers(suppRes.data);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Fetch purchase history
@@ -335,22 +349,7 @@ const Purchases = () => {
   const clearPurchase = () => {
     setCart([]);
     setSelectedSupplier(null);
-    setPurchaseData({
-      invoiceNo: `PO-${Date.now()}`,
-      purchaseDate: new Date().toISOString().split("T")[0],
-      reference: "",
-      supplierName: "",
-      supplierContact: "",
-      supplierAddress: "",
-      selectedProduct: "",
-      unitCost: "",
-      quantity: "",
-      discount: 0,
-      discountPercent: 0,
-      vat: 0,
-      vatPercent: 0,
-      notes: "",
-    });
+    setPurchaseData(getDefaultPurchaseData());
   };
 
   return (

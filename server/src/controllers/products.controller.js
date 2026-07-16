@@ -24,7 +24,7 @@ class ProductsController extends BaseController {
       this.sendSuccess(res, products, 'Products fetched successfully');
     } catch (error) {
       logger.error('Get products error:', error);
-      this.sendError(res, 'Failed to fetch products', 500, error);
+      this.sendError(res, error.message || 'Failed to fetch products', error.statusCode || 500, error);
     }
   }
 
@@ -33,6 +33,9 @@ class ProductsController extends BaseController {
    */
   async getProductById(req, res) {
     try {
+      if (!ObjectId.isValid(req.params.id)) {
+        return this.sendError(res, 'Product not found', 404);
+      }
       const product = await req.shopDb.collection('products').findOne({
         _id: new ObjectId(req.params.id),
       });
@@ -44,7 +47,7 @@ class ProductsController extends BaseController {
       this.sendSuccess(res, product, 'Product fetched successfully');
     } catch (error) {
       logger.error('Get product error:', error);
-      this.sendError(res, 'Failed to fetch product', 500, error);
+      this.sendError(res, error.message || 'Failed to fetch product', error.statusCode || 500, error);
     }
   }
 
@@ -116,6 +119,7 @@ class ProductsController extends BaseController {
       const initialQty = initialQuantity !== undefined ? parseInt(initialQuantity) : 0;
       await this._createInitialStock(
         req.shopDb,
+        req.user.shopId,
         result.insertedId,
         name,
         sku,
@@ -141,7 +145,7 @@ class ProductsController extends BaseController {
       );
     } catch (error) {
       logger.error('Create product error:', error);
-      this.sendError(res, error.message || 'Failed to create product', 500, error);
+      this.sendError(res, error.message || 'Failed to create product', error.statusCode || 500, error);
     }
   }
 
@@ -150,6 +154,10 @@ class ProductsController extends BaseController {
    */
   async updateProduct(req, res) {
     try {
+      if (!ObjectId.isValid(req.params.id)) {
+        return this.sendError(res, 'Product not found', 404);
+      }
+
       const {
         name,
         category,
@@ -236,7 +244,7 @@ class ProductsController extends BaseController {
       this.sendSuccess(res, updatedProduct, 'Product updated successfully');
     } catch (error) {
       logger.error('Update product error:', error);
-      this.sendError(res, 'Failed to update product', 500, error);
+      this.sendError(res, error.message || 'Failed to update product', error.statusCode || 500, error);
     }
   }
 
@@ -246,6 +254,10 @@ class ProductsController extends BaseController {
    */
   async deleteProduct(req, res) {
     try {
+      if (!ObjectId.isValid(req.params.id)) {
+        return this.sendError(res, 'Product not found', 404);
+      }
+
       // Check if product exists
       const product = await req.shopDb.collection('products').findOne({
         _id: new ObjectId(req.params.id),
@@ -313,7 +325,7 @@ class ProductsController extends BaseController {
       this.sendSuccess(res, null, 'Product deleted successfully');
     } catch (error) {
       logger.error('Delete product error:', error);
-      this.sendError(res, 'Failed to delete product', 500, error);
+      this.sendError(res, error.message || 'Failed to delete product', error.statusCode || 500, error);
     }
   }
 
@@ -474,7 +486,7 @@ class ProductsController extends BaseController {
   /**
    * Create initial stock record for new product
    */
-  async _createInitialStock(shopDb, productId, name, sku, minStockLevel, initialQty = 0, costPrice = 0) {
+  async _createInitialStock(shopDb, shopId, productId, name, sku, minStockLevel, initialQty = 0, costPrice = 0) {
     const quantity = parseInt(initialQty) || 0;
     const isLowStock = quantity <= parseInt(minStockLevel);
 

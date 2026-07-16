@@ -138,7 +138,7 @@ const createRateLimiters = () => {
       retryAfter: 900,
     },
     skipSuccessfulRequests: true,
-    skip: (req) => {
+    skip: (_req) => {
       // Skip rate limiting in development
       return process.env.NODE_ENV === 'development';
     },
@@ -168,7 +168,7 @@ const createRateLimiters = () => {
       message: 'Too many password reset attempts, please try again later.',
       retryAfter: 3600,
     },
-    skip: (req) => {
+    skip: (_req) => {
       // Skip rate limiting in development
       return process.env.NODE_ENV === 'development';
     },

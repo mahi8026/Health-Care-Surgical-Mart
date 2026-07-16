@@ -8,6 +8,7 @@ import { hasPermission as checkPermission } from "../utils/permissions";
 
 const AuthContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -101,7 +102,7 @@ export const AuthProvider = ({ children }) => {
             // Verify token is not expired (JWT format: header.payload.signature)
             const tokenParts = storedToken.split('.');
             if (tokenParts.length === 3) {
-              const payload = JSON.parse(atob(tokenParts[1]));
+              const payload = JSON.parse(window.atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/')));
               const expiryTime = payload.exp * 1000; // Convert to milliseconds
               
               if (Date.now() < expiryTime) {

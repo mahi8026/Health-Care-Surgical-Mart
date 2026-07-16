@@ -723,7 +723,7 @@ router.post(
       // If any operation fails, we should ideally rollback
       // For now, log the error and throw
       logger.error('Return processing error:', error);
-      throw createError.internalServerError('Failed to process return');
+      throw createError.internal('Failed to process return');
     }
   }),
 );

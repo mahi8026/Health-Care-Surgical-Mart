@@ -41,9 +41,26 @@ const UserManagement = () => {
     }
   };
 
-  // Initial load
   useEffect(() => {
-    fetchUsers();
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await api.get("/users");
+        if (!cancelled && response.success) {
+          setUsers(response.data || []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Users fetch error:", error);
+          setError(error.response?.data?.message || "Failed to fetch users");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Handle form changes

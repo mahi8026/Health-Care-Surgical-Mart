@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import api from "../config/api";
+import React, { useState } from "react";
 import CategorySelector from "./CategorySelector";
 import LoadingSpinner from "./LoadingSpinner";
 
@@ -129,7 +128,7 @@ const ExpenseForm = ({
     // Validate vendor phone if provided
     if (
       formData.vendor.phone &&
-      !/^[\d\s\-\+\(\)]+$/.test(formData.vendor.phone)
+      !/^[\d\s\-+()]+$/.test(formData.vendor.phone)
     ) {
       newErrors.vendorPhone = "Please enter a valid phone number";
     }

@@ -9,21 +9,33 @@ const SMSSettings = () => {
   const [testPhone, setTestPhone] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  useEffect(() => {
-    checkConfiguration();
-  }, []);
-
   const checkConfiguration = async () => {
     setLoading(true);
     try {
       const response = await api.get("/sms/config-status");
       setConfigStatus(response.data);
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to check SMS configuration status" });
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const response = await api.get("/sms/config-status");
+        if (!cancelled) setConfigStatus(response.data);
+      } catch {
+        if (!cancelled) setMessage({ type: "error", text: "Failed to check SMS configuration status" });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleTest = async () => {
     if (!testPhone.trim()) {
@@ -40,8 +52,8 @@ const SMSSettings = () => {
       });
       setMessage({ type: "success", text: "Test SMS sent successfully!" });
       setTestPhone("");
-    } catch (error) {
-      setMessage({ type: "error", text: error.message || "Failed to send test SMS." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to send test SMS." });
     } finally {
       setTesting(false);
     }

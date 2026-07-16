@@ -5,7 +5,6 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import api from "../config/api";
 import { TOAST_MESSAGES } from "../config/constants";
 
 export const useApi = () => {
@@ -30,7 +29,7 @@ export const useApi = () => {
         toast.success(successMessage);
       }
 
-      return response.data;
+      return response;
     } catch (err) {
       const errorMsg = err.response?.data?.message || errorMessage;
       setError(errorMsg);

@@ -7,7 +7,7 @@
  * Phase 3: FEFO Batch Tracking
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../config/api';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -17,36 +17,7 @@ const BatchSelector = ({ productId, requiredQty, onBatchesSelected, onClose }) =
   const [error, setError] = useState('');
   const [selectedBatches, setSelectedBatches] = useState([]);
 
-  useEffect(() => {
-    fetchBatches();
-  }, [productId]);
-
-  // Auto-select FEFO batches on load
-  useEffect(() => {
-    if (batches.length > 0 && requiredQty > 0) {
-      autoSelectFEFO();
-    }
-  }, [batches, requiredQty]);
-
-  const fetchBatches = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await api.get(`/stock/${productId}/batches`);
-      if (response.success) {
-        // Batches are already FEFO sorted from backend
-        setBatches(response.data || []);
-      } else {
-        setError(response.message || 'Failed to load batches');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to load batches');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const autoSelectFEFO = () => {
+  const autoSelectFEFO = useCallback(() => {
     const selections = [];
     let remaining = requiredQty;
 
@@ -68,7 +39,38 @@ const BatchSelector = ({ productId, requiredQty, onBatchesSelected, onClose }) =
     }
 
     setSelectedBatches(selections);
-  };
+  }, [batches, requiredQty]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const response = await api.get(`/stock/${productId}/batches`);
+        if (!cancelled && response.success) {
+          setBatches(response.data || []);
+        } else if (!cancelled) {
+          setError(response.message || 'Failed to load batches');
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load batches');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [productId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled && batches.length > 0 && requiredQty > 0) {
+        autoSelectFEFO();
+      }
+    });
+    return () => { cancelled = true; };
+  }, [batches, requiredQty, autoSelectFEFO]);
 
   const handleQuantityChange = (batchId, newQty) => {
     const batch = batches.find(b => b._id === batchId);

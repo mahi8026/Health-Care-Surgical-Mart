@@ -44,7 +44,7 @@ const SalesHistory = () => {
     setError("");
     try {
       const f = overrideFilters || filters;
-      const params = new URLSearchParams();
+      const params = new window.URLSearchParams();
       if (f.startDate) params.append("startDate", f.startDate);
       if (f.endDate) params.append("endDate", f.endDate);
       if (f.paymentStatus) params.append("paymentStatus", f.paymentStatus);
@@ -60,7 +60,7 @@ const SalesHistory = () => {
       } else {
         setError(response.message || "Failed to fetch sales history");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to fetch sales history");
     } finally {
       setLoading(false);
@@ -68,8 +68,34 @@ const SalesHistory = () => {
   };
 
   useEffect(() => {
-    fetchSalesHistory();
-  }, [filters.page, filters.limit]);
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const params = new window.URLSearchParams();
+        if (filters.startDate) params.append("startDate", filters.startDate);
+        if (filters.endDate) params.append("endDate", filters.endDate);
+        if (filters.paymentStatus) params.append("paymentStatus", filters.paymentStatus);
+        if (filters.searchTerm) params.append("search", filters.searchTerm);
+        params.append("page", filters.page);
+        params.append("limit", filters.limit);
+        const response = await api.get(`/sales?${params.toString()}`);
+        if (!cancelled && response.success) {
+          setSales(response.data?.sales || response.data || []);
+          if (response.data?.pagination) setPagination(response.data.pagination);
+          else if (response.pagination) setPagination(response.pagination);
+        } else if (!cancelled) {
+          setError(response.message || "Failed to fetch sales history");
+        }
+      } catch {
+        if (!cancelled) setError("Failed to fetch sales history");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [filters.page, filters.limit, filters.startDate, filters.endDate, filters.paymentStatus, filters.searchTerm]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value, page: 1 }));

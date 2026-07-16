@@ -10,7 +10,7 @@ const Sales = () => {
   const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm] = useState("");
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -55,7 +55,7 @@ const Sales = () => {
   // Fetch products for POS
   const fetchProducts = async () => {
     try {
-      const params = new URLSearchParams();
+      const params = new window.URLSearchParams();
       if (searchTerm) params.append("search", searchTerm);
       params.append("isActive", "true");
 
@@ -74,7 +74,7 @@ const Sales = () => {
   // Fetch customers
   const fetchCustomers = async () => {
     try {
-      const params = new URLSearchParams();
+      const params = new window.URLSearchParams();
       if (customerSearchTerm) params.append("search", customerSearchTerm);
       params.append("limit", "20");
 
@@ -107,30 +107,53 @@ const Sales = () => {
     }
   };
 
-  // Fetch shop settings for invoice
-  const fetchShopSettings = async () => {
-    try {
-      const response = await api.get("/settings/shop");
-      if (response.success) {
-        setShopSettings(response.data);
-      }
-    } catch (error) {
-      console.error("Fetch shop settings error:", error);
-      // Fallback to null — invoice will use COMPANY constants
-    }
-  };
-
   useEffect(() => {
-    fetchProducts();
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new window.URLSearchParams();
+        if (searchTerm) params.append("search", searchTerm);
+        params.append("isActive", "true");
+        const response = await api.get(`/products?${params.toString()}`);
+        if (!cancelled && response.success) {
+          setProducts(response.data.filter(p => p.stockQuantity > 0));
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
   }, [searchTerm]);
 
   useEffect(() => {
-    fetchCustomers();
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new window.URLSearchParams();
+        if (customerSearchTerm) params.append("search", customerSearchTerm);
+        params.append("limit", "20");
+        const response = await api.get(`/customers?${params.toString()}`);
+        if (!cancelled && response.success) {
+          setCustomers(response.data);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
   }, [customerSearchTerm]);
 
   useEffect(() => {
-    fetchNextInvoiceNumber();
-    fetchShopSettings();
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await api.get("/sales/next-invoice");
+        if (!cancelled && response.success) {
+          setPosData(prev => ({ ...prev, invoiceNo: response.data?.invoiceNo || "NEW" }));
+        }
+        const settingsRes = await api.get("/settings/pos");
+        if (!cancelled && settingsRes.success) {
+          setShopSettings(settingsRes.data);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Handle form changes

@@ -166,6 +166,8 @@ const createError = {
   conflict: (message = 'Conflict') => new AppError(message, 409),
   validation: (message = 'Validation failed') => new AppError(message, 422),
   internal: (message = 'Internal server error') => new AppError(message, 500),
+  internalServerError: (message = 'Internal server error') => new AppError(message, 500),
+  serverError: (message = 'Internal server error') => new AppError(message, 500),
   database: (message = 'Database error') => new AppError(message, 500),
 };
 

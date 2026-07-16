@@ -27,7 +27,7 @@ const Login = () => {
       if (!result.success) {
         setError(result.message || "Login failed");
       }
-    } catch (error) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -86,7 +86,7 @@ const Login = () => {
                 { key: "super_admin", label: "Super Admin", color: "blue" },
                 { key: "shop_admin", label: "Shop Admin", color: "green" },
                 { key: "staff", label: "Staff", color: "purple" },
-              ].map(({ key, label, color }) => (
+              ].map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"

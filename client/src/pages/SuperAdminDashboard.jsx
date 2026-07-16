@@ -66,15 +66,6 @@ const SuperAdminDashboard = () => {
     setRefreshing(false);
   };
 
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-BD", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   // Get status badge color
   const getStatusColor = (status) => {
     switch (status) {

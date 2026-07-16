@@ -50,6 +50,9 @@ class CustomersController extends BaseController {
    */
   async getCustomerById(req, res) {
     try {
+      if (!ObjectId.isValid(req.params.id)) {
+        return this.sendError(res, 'Customer not found', 404);
+      }
       const shopDb = getShopDatabase(req.user.shopId);
       const customer = await shopDb
         .collection('customers')
@@ -62,7 +65,7 @@ class CustomersController extends BaseController {
       this.sendSuccess(res, customer, 'Customer fetched successfully');
     } catch (error) {
       logger.error('Get customer error:', error);
-      this.sendError(res, 'Failed to fetch customer', 500, error);
+      this.sendError(res, error.message || 'Failed to fetch customer', error.statusCode || 500, error);
     }
   }
 
@@ -119,6 +122,10 @@ class CustomersController extends BaseController {
 
       this.validateRequired(req.body, ['name', 'phone']);
 
+      if (!ObjectId.isValid(req.params.id)) {
+        return this.sendError(res, 'Customer not found', 404);
+      }
+
       const existingCustomer = await shopDb
         .collection('customers')
         .findOne({ _id: new ObjectId(req.params.id) });
@@ -148,7 +155,7 @@ class CustomersController extends BaseController {
       this.sendSuccess(res, null, 'Customer updated successfully');
     } catch (error) {
       logger.error('Update customer error:', error);
-      this.sendError(res, error.message || 'Failed to update customer', 500, error);
+      this.sendError(res, error.message || 'Failed to update customer', error.statusCode || 500, error);
     }
   }
 
@@ -158,6 +165,10 @@ class CustomersController extends BaseController {
   async deleteCustomer(req, res) {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
+
+      if (!ObjectId.isValid(req.params.id)) {
+        return this.sendError(res, 'Customer not found', 404);
+      }
 
       // Check if customer exists
       const customer = await shopDb
@@ -189,7 +200,7 @@ class CustomersController extends BaseController {
       this.sendSuccess(res, null, 'Customer deleted successfully');
     } catch (error) {
       logger.error('Delete customer error:', error);
-      this.sendError(res, 'Failed to delete customer', 500, error);
+      this.sendError(res, error.message || 'Failed to delete customer', error.statusCode || 500, error);
     }
   }
 

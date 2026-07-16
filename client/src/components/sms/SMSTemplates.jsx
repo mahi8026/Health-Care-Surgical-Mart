@@ -24,7 +24,19 @@ const SMSTemplates = () => {
   };
 
   useEffect(() => {
-    fetchTemplates();
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await api.get("/sms/templates");
+        if (!cancelled) setTemplates(res.data || []);
+      } catch {
+        if (!cancelled) setTemplates([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const openModal = () => {

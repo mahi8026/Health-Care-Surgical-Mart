@@ -180,7 +180,7 @@ const parseExcel = (filePath) => {
     const worksheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(worksheet);
     return data;
-  } catch (error) {
+  } catch {
     throw new Error('Failed to parse Excel file');
   }
 };

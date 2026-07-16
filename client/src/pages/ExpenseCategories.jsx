@@ -36,7 +36,31 @@ const ExpenseCategories = () => {
   };
 
   useEffect(() => {
-    fetchCategories();
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/expense-categories");
+        if (!cancelled) {
+          if (response.success) {
+            setCategories(response.data);
+          } else {
+            setError(response.message || "Failed to fetch expense categories");
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          if (error.message?.includes("401")) {
+            window.location.href = "/login";
+          }
+          setError("Failed to fetch expense categories");
+          console.error("Fetch categories error:", error);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Handle delete category
@@ -341,7 +365,7 @@ const ExpenseCategories = () => {
               </h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete "{showDeleteConfirm.name}"? This
+              Are you sure you want to delete &quot;{showDeleteConfirm.name}&quot;? This
               action cannot be undone and may affect existing expenses.
             </p>
             <div className="flex justify-end space-x-3">

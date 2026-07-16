@@ -61,39 +61,6 @@ const Settings = () => {
     paperSize: "80mm",
   });
 
-  // Fetch settings
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-
-      const [shopResponse, taxResponse, systemResponse, receiptResponse] =
-        await Promise.all([
-          api.get("/settings/shop"),
-          api.get("/settings/tax"),
-          api.get("/settings/system"),
-          api.get("/settings/receipt"),
-        ]);
-
-      if (shopResponse.success) {
-        setShopSettings((prev) => ({ ...prev, ...shopResponse.data }));
-      }
-      if (taxResponse.success) {
-        setTaxSettings((prev) => ({ ...prev, ...taxResponse.data }));
-      }
-      if (systemResponse.success) {
-        setSystemSettings((prev) => ({ ...prev, ...systemResponse.data }));
-      }
-      if (receiptResponse.success) {
-        setReceiptSettings((prev) => ({ ...prev, ...receiptResponse.data }));
-      }
-    } catch (error) {
-      console.error("Settings fetch error:", error);
-      setError("Failed to load settings");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Save settings
   const saveSettings = async (settingsType, data) => {
     try {
@@ -118,7 +85,33 @@ const Settings = () => {
 
   // Initial load
   useEffect(() => {
-    fetchSettings();
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const [shopResponse, taxResponse, systemResponse, receiptResponse] =
+          await Promise.all([
+            api.get("/settings/shop"),
+            api.get("/settings/tax"),
+            api.get("/settings/system"),
+            api.get("/settings/receipt"),
+          ]);
+        if (!cancelled) {
+          if (shopResponse.success) setShopSettings((prev) => ({ ...prev, ...shopResponse.data }));
+          if (taxResponse.success) setTaxSettings((prev) => ({ ...prev, ...taxResponse.data }));
+          if (systemResponse.success) setSystemSettings((prev) => ({ ...prev, ...systemResponse.data }));
+          if (receiptResponse.success) setReceiptSettings((prev) => ({ ...prev, ...receiptResponse.data }));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Settings fetch error:", error);
+          setError("Failed to load settings");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Handle input changes
@@ -160,7 +153,7 @@ const Settings = () => {
         setSuccess("Backup test completed successfully!");
         setTimeout(() => setSuccess(""), 3000);
       }
-    } catch (error) {
+    } catch {
       setError("Backup test failed");
     } finally {
       setSaving(false);
@@ -1008,8 +1001,6 @@ const ReceiptSettingsTab = ({ settings, onChange, onSave, saving }) => {
 
 // Backup Settings Tab
 const BackupSettingsTab = ({ onTestBackup, saving, user }) => {
-  const [backupHistory, setBackupHistory] = useState([]);
-
   return (
     <div className="space-y-6">
       <div>

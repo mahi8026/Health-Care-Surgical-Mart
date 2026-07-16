@@ -87,20 +87,46 @@ const Returns = () => {
     }
   };
 
-  // Initial data load
+  // Initial data load & filter changes
   useEffect(() => {
-    fetchReturns();
-    fetchReturnStats();
-  }, []);
-
-  // Refetch when filters change
-  useEffect(() => {
-    const delayedFetch = setTimeout(() => {
-      fetchReturns();
-    }, 500);
-
-    return () => clearTimeout(delayedFetch);
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const params = new window.URLSearchParams();
+        if (filters.search) params.append("search", filters.search);
+        if (filters.status) params.append("status", filters.status);
+        params.append("page", filters.page);
+        params.append("limit", 20);
+        const response = await api.get(`/returns?${params.toString()}`);
+        if (!cancelled && response.success) {
+          setReturns(response.data?.returns || response.data || []);
+          if (response.pagination) setPagination(response.pagination);
+        }
+      } catch {
+        if (!cancelled) setError("Failed to fetch returns");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [filters.search, filters.status, filters.page]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await api.get("/returns/stats/summary");
+        if (!cancelled && response.success) {
+          setReturnStats(response.data || {});
+        }
+      } catch (error) {
+        if (!cancelled) console.error("Return stats error:", error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Format currency
   const formatCurrency = (amount) => {

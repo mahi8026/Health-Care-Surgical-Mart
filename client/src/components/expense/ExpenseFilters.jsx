@@ -5,15 +5,11 @@
 
 import React, { useState, useEffect } from "react";
 import { Input, Select, Button, Modal } from "../ui";
-import { PAYMENT_METHODS, RECURRING_FREQUENCIES } from "../../config/constants";
+import { PAYMENT_METHODS } from "../../config/constants";
 import {
   Search,
   Filter,
   X,
-  Calendar,
-  DollarSign,
-  Tag,
-  User,
 } from "lucide-react";
 
 const ExpenseFilters = ({
@@ -30,12 +26,16 @@ const ExpenseFilters = ({
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [filterName, setFilterName] = useState("");
 
-  // Load saved filters from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("expenseFilters");
-    if (saved) {
-      setSavedFilters(JSON.parse(saved));
-    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      const saved = localStorage.getItem("expenseFilters");
+      if (saved) {
+        setSavedFilters(JSON.parse(saved));
+      }
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const handleFilterChange = (key, value) => {

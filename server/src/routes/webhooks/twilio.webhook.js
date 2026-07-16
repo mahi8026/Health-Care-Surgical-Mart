@@ -72,8 +72,8 @@ router.post(
     const {
       MessageSid,
       MessageStatus,
-      To,
-      From,
+      _To,
+      _From,
       ErrorCode,
       ErrorMessage,
     } = req.body;

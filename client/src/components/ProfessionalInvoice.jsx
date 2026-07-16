@@ -1,66 +1,37 @@
 import React from "react";
 import { COMPANY } from "../config/constants";
 
-const ProfessionalInvoice = ({ sale, onClose, onDownload, shopSettings }) => {
-  const handlePrint = () => {
-    // Trigger browser print dialog
-    // Note: Browser will show "Save as PDF" if no printer is set as default
-    // Users should select their printer from the destination dropdown
-    window.print();
-  };
+const formatDateTime = (date) => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }) + " " + d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
 
-  const handleDownload = async () => {
-    if (onDownload) {
-      await onDownload(sale._id, sale.invoiceNo);
-    }
-  };
+const formatCurrency = (amount) => {
+  if (amount === undefined || amount === null) return "0.00";
+  return Number(amount).toFixed(2);
+};
 
-  // Helper function to format date
-  const formatDate = (date) => {
-    if (!date) return "N/A";
-    const d = new Date(date);
-    return d.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  // Helper function to format date + time
-  const formatDateTime = (date) => {
-    if (!date) return "N/A";
-    const d = new Date(date);
-    return d.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }) + " " + d.toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  // Helper function to format currency
-  const formatCurrency = (amount) => {
-    if (amount === undefined || amount === null) return "0.00";
-    return Number(amount).toFixed(2);
-  };
-
-  // Calculate totals
-  const subtotal =
-    sale?.items?.reduce(
-      (sum, item) =>
-        sum + (item.qty || item.quantity || 0) * (item.saleRate || item.sellingPrice || item.rate || 0),
-      0,
-    ) || 0;
+const InvoiceContent = ({ sale, shopSettings }) => {
+  const subtotal = sale?.items?.reduce(
+    (sum, item) =>
+      sum + (item.qty || item.quantity || 0) * (item.saleRate || item.sellingPrice || item.rate || 0),
+    0,
+  ) || 0;
   const vat = sale?.vat || 0;
   const grandTotal = sale?.grandTotal || subtotal + vat;
   const paid = (sale?.cashPaid || 0) + (sale?.bankPaid || 0);
   const returnAmount = paid - grandTotal;
 
-  // Invoice content component
-  const InvoiceContent = () => (
+  return (
     <div className="invoice-content bg-white p-6 max-w-4xl mx-auto">
       {/* Header */}
       <header className="mb-4">
@@ -412,6 +383,18 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload, shopSettings }) => {
       </footer>
     </div>
   );
+};
+
+const ProfessionalInvoice = ({ sale, onClose, onDownload, shopSettings }) => {
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownload = async () => {
+    if (onDownload) {
+      await onDownload(sale._id, sale.invoiceNo);
+    }
+  };
 
   return (
     <>
@@ -628,14 +611,14 @@ const ProfessionalInvoice = ({ sale, onClose, onDownload, shopSettings }) => {
 
           {/* Invoice Preview in Modal */}
           <div className="p-6">
-            <InvoiceContent />
+            <InvoiceContent sale={sale} shopSettings={shopSettings} />
           </div>
         </div>
       </div>
 
       {/* Hidden Invoice for Print - Outside Modal */}
       <div className="hidden print:block">
-        <InvoiceContent />
+        <InvoiceContent sale={sale} shopSettings={shopSettings} />
       </div>
     </>
   );

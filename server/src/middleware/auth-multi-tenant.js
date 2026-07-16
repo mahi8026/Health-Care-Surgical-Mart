@@ -100,7 +100,7 @@ async function authenticate(req, res, next) {
       token = req.headers.authorization.substring(7);
     }
     // Fallback: Query parameter (for SSE EventSource which can't send custom headers)
-    else if (req.query.token) {
+    else if (req.query?.token) {
       token = req.query.token;
     }
 
@@ -152,6 +152,12 @@ async function authenticate(req, res, next) {
     // Get user from appropriate database with nested try-catch for database errors
     let user;
     try {
+      if (!ObjectId.isValid(decoded.userId)) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
       if (decoded.role === 'SUPER_ADMIN') {
         const systemDb = getSystemDatabase();
         user = await systemDb.collection('system_users').findOne({
@@ -198,7 +204,7 @@ async function authenticate(req, res, next) {
       name: user.name,
       email: user.email,
       role: user.role,
-      shopId: (user.shopId || decoded.shopId)?.toString(), // Convert ObjectId to string
+      shopId: (user.shopId || decoded.shopId)?.toString() ?? null, // Convert ObjectId to string
       permissions: user.permissions || [],
     };
 
@@ -206,7 +212,7 @@ async function authenticate(req, res, next) {
     // SUPER_ADMIN can access ALL shops or a specific shop
     if (req.user.role === 'SUPER_ADMIN') {
       const requestedShopId =
-        req.query.shopId ||
+        req.query?.shopId ||
         req.body?.shopId ||
         req.headers['x-shop-id'] ||
         null;
@@ -268,7 +274,7 @@ async function authenticate(req, res, next) {
     if (req.user.shopId) {
       try {
         req.shopDb = getShopDatabase(req.user.shopId);
-        
+
         // Ensure shop indexes exist (fire-and-forget, non-blocking)
         const { createShopIndexes } = require('../config/database');
         setImmediate(() => {
@@ -330,7 +336,7 @@ function generateToken(user) {
  */
 function verifyShopAccess(req, res, next) {
   const shopIdFromParams =
-    req.params.shopId || req.body.shopId || req.query.shopId;
+    req.params.shopId || req.body.shopId || req.query?.shopId;
 
   // Super admin can access any shop
   if (req.user.role === 'SUPER_ADMIN') {
@@ -359,9 +365,10 @@ async function checkShopStatus(req, res, next) {
     }
 
     const systemDb = getSystemDatabase();
-    const shop = await systemDb.collection('shops').findOne({
-      _id: new ObjectId(req.user.shopId), // Convert string to ObjectId
-    });
+    const shopQuery = ObjectId.isValid(req.user.shopId)
+      ? { _id: new ObjectId(req.user.shopId) }
+      : { shopId: req.user.shopId };
+    const shop = await systemDb.collection('shops').findOne(shopQuery);
 
     if (!shop) {
       return res.status(404).json({

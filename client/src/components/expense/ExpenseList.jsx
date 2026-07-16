@@ -14,10 +14,8 @@ import {
   Trash2,
   Edit,
   Eye,
-  MoreHorizontal,
   CheckSquare,
   Square,
-  ArrowUpDown,
   Filter,
 } from "lucide-react";
 

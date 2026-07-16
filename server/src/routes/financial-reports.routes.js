@@ -12,7 +12,7 @@ const {
 const { requirePermission } = require('../utils/rbac');
 const { PERMISSIONS } = require('../utils/rbac');
 const { getShopDatabase } = require('../config/database');
-const { asyncHandler, createError } = require('../config/error-handling');
+const { asyncHandler } = require('../config/error-handling');
 const { cacheResponse, queryHash } = require('../middleware/cache.middleware');
 const { TTL } = require('../services/cache.service');
 
@@ -730,10 +730,10 @@ router.get(
   cacheResponse(TTL.FINANCIAL_REPORTS, (req) => `reports:${req.user.shopId}:product-profitability:${queryHash(req.query)}`),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    let { startDate, endDate, limit = 20 } = req.query;
+    const { startDate, endDate, limit: queryLimit = 20 } = req.query;
 
     // Enforce max limit of 100 to prevent excessive data return
-    limit = Math.min(parseInt(limit) || 20, 100);
+    const limit = Math.min(parseInt(queryLimit) || 20, 100);
 
     const today = new Date();
     const defaultStartDate = startDate

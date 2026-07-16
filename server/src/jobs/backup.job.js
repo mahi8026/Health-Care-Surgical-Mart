@@ -227,7 +227,7 @@ async function emailBackup(ownerEmail, shopName, result) {
  * Prune old backup files from /tmp/backups/, keeping only the most recent MAX_BACKUPS.
  */
 function pruneOldBackups() {
-  if (!fs.existsSync(BACKUP_DIR)) return;
+  if (!fs.existsSync(BACKUP_DIR)) {return;}
 
   const files = fs.readdirSync(BACKUP_DIR)
     .filter(f => f.endsWith('.json.gz'))
@@ -246,7 +246,7 @@ function pruneOldBackups() {
  * Returns null if not found — caller should generate a fresh backup.
  */
 function getLatestBackupPath(shopId) {
-  if (!fs.existsSync(BACKUP_DIR)) return null;
+  if (!fs.existsSync(BACKUP_DIR)) {return null;}
 
   const files = fs.readdirSync(BACKUP_DIR)
     .filter(f => f.includes(shopId) && f.endsWith('.json.gz'))

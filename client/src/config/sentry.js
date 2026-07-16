@@ -6,6 +6,7 @@
  */
 
 import * as Sentry from "@sentry/react";
+import { useEffect } from "react";
 import {
   useLocation,
   useNavigationType,
@@ -39,7 +40,7 @@ export const initializeSentry = () => {
       integrations: [
         // React Router v6 integration for route-based tracing
         Sentry.reactRouterV6BrowserTracingIntegration({
-          useEffect: Sentry.reactRouterV6BrowserTracingIntegration,
+          useEffect,
           useLocation,
           useNavigationType,
           createRoutesFromChildren,
@@ -61,7 +62,7 @@ export const initializeSentry = () => {
       replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
       
       // Filter out sensitive data
-      beforeSend(event, hint) {
+      beforeSend(event, _hint) {
         // Remove sensitive data from request
         if (event.request) {
           // Remove authorization headers

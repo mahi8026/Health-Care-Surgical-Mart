@@ -100,7 +100,7 @@ class SMSService {
   }
 
   /**
-   * Core send method — selects provider, dispatches SMS, and logs result.
+   * Core send method ï¿½ selects provider, dispatches SMS, and logs result.
    * @param {string} to - E.164 phone number
    * @param {string} message - SMS body
    * @param {object} options
@@ -145,11 +145,11 @@ class SMSService {
 
   /**
    * Check whether a number is on the DND (Do Not Disturb) registry.
-   * Stub — always returns false until TRAI DND API integration is added.
+   * Stub ï¿½ always returns false until TRAI DND API integration is added.
    * @param {string} phoneNumber
    * @returns {Promise<boolean>}
    */
-  async isDND(phoneNumber) {
+  async isDND(_phoneNumber) {
     // TODO: integrate with TRAI DND API for India
     return false;
   }

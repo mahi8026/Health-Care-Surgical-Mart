@@ -117,7 +117,7 @@ class StockCommandService {
       // AUTO-FIX: If no snapshot exists, create one initialized to zero
       if (!snapshot) {
         logger.warn(`No stock snapshot found for product ${productId}, initializing to zero`);
-        
+
         const productObjId = ObjectId.isValid(productId) ? new ObjectId(productId) : productId;
         snapshot = {
           productId: productObjId,
@@ -131,7 +131,7 @@ class StockCommandService {
           createdAt: new Date(),
           updatedAt: new Date()
         };
-        
+
         await shopDb.collection('stock_snapshots').insertOne(snapshot);
         logger.info(`Created missing stock snapshot for product ${productId}`);
       }

@@ -7,7 +7,6 @@ import { useStock } from "../contexts/StockContext";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n) => new Intl.NumberFormat("en-BD", { style: "currency", currency: "BDT", minimumFractionDigits: 0 }).format(n || 0);
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" }) : "—";
 const fmtDateTime = (d) => d ? new Date(d).toLocaleString("en-BD", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 
 const todayMidnight = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
@@ -51,7 +50,7 @@ const exportToExcel = (stockData) => {
     ];
   });
   const csv = [headers, ...rows].map((r) => r.map((f) => `"${f}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new window.Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -82,31 +81,27 @@ const StockMovementModal = ({ isOpen, onClose, product }) => {
 
   useEffect(() => {
     if (isOpen && product) {
-      fetchMovements();
+      (async () => {
+        if (!product?._id && !product?.productId) return;
+        setLoading(true);
+        try {
+          const productId = product._id || product.productId;
+          let url = `/stock/${productId}/ledger?page=${page}&limit=50`;
+          if (dateRange.start) url += `&startDate=${dateRange.start}`;
+          if (dateRange.end) url += `&endDate=${dateRange.end}`;
+          const response = await api.get(url);
+          if (response.success) {
+            setMovements(response.data || []);
+            setPagination(response.pagination);
+          }
+        } catch (error) {
+          console.error("Failed to fetch movement history:", error);
+        } finally {
+          setLoading(false);
+        }
+      })();
     }
   }, [isOpen, product, dateRange, page]);
-
-  const fetchMovements = async () => {
-    if (!product?._id && !product?.productId) return;
-    setLoading(true);
-    try {
-      const productId = product._id || product.productId;
-      // Updated to use new event-sourced ledger endpoint
-      let url = `/stock/${productId}/ledger?page=${page}&limit=50`;
-      if (dateRange.start) url += `&startDate=${dateRange.start}`;
-      if (dateRange.end) url += `&endDate=${dateRange.end}`;
-      
-      const response = await api.get(url);
-      if (response.success) {
-        setMovements(response.data || []);
-        setPagination(response.pagination);
-      }
-    } catch (error) {
-      console.error("Failed to fetch movement history:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const resetDateRange = () => {
     setDateRange({ start: "", end: "" });
@@ -227,15 +222,18 @@ const StockAdjustmentModal = ({ isOpen, onClose, product, onSuccess }) => {
 
   useEffect(() => {
     if (isOpen && product) {
-      setFormData({
+      const data = {
         adjustmentType: "add",
         quantity: "",
         reason: "Count Correction",
         batchNo: product.batchNo || "",
         expiryDate: product.expiryDate ? new Date(product.expiryDate).toISOString().split("T")[0] : "",
         note: "",
+      };
+      Promise.resolve().then(() => {
+        setFormData(data);
+        setError("");
       });
-      setError("");
     }
   }, [isOpen, product]);
 
@@ -422,7 +420,7 @@ const StockReport = () => {
   const [error, setError] = useState("");
   
   // Get real-time connection status from StockContext
-  const { realtimeConnected, fetchSnapshots: contextFetchSnapshots } = useStock();
+  const { realtimeConnected } = useStock();
   
   // Summary stats
   const [summary, setSummary] = useState({

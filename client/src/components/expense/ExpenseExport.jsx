@@ -5,14 +5,14 @@
 
 import React, { useState } from "react";
 import { Button, Modal, Select } from "../ui";
-import { Download, FileText, Table, Calendar } from "lucide-react";
+import { Download } from "lucide-react";
 import { formatCurrency, formatDate } from "../../utils";
 
 const ExpenseExport = ({
   isOpen,
   onClose,
   expenses = [],
-  filters = {},
+  _filters = {},
   onExport,
 }) => {
   const [exportFormat, setExportFormat] = useState("csv");
@@ -139,7 +139,7 @@ const ExpenseExport = ({
     }
 
     // Create and download file
-    const blob = new Blob([exportData], { type: mimeType });
+    const blob = new window.Blob([exportData], { type: mimeType });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;

@@ -18,22 +18,9 @@ const Products = () => {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [adjustingStock, setAdjustingStock] = useState(null);
-  const [initializingSnapshots, setInitializingSnapshots] = useState(false);
-
   // Load categories from API instead of hardcoding
   const [categories, setCategories] = useState([]);
   const units = ["pcs", "box", "pack", "bottle", "strip", "vial", "ml", "kg", "gm", "ltr", "tablet", "capsule", "sachet", "ampoule", "tube", "roll", "pair"];
-
-  const fetchCategories = async () => {
-    try {
-      const res = await api.get("/categories");
-      if (res.success && res.data?.length > 0) {
-        setCategories(res.data.map((c) => typeof c === "object" ? c.name : c));
-      }
-    } catch (err) {
-      console.warn("Could not load categories:", err.message);
-    }
-  };
 
   // Fetch products from real database
   const fetchProducts = async () => {
@@ -103,15 +90,39 @@ const Products = () => {
 
   // Initial fetch only
   useEffect(() => {
-    fetchCategories();
-    fetchProducts();
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get("/categories");
+        if (!cancelled && res.success && res.data?.length > 0) {
+          setCategories(res.data.map((c) => typeof c === "object" ? c.name : c));
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Apply filters when they change
   useEffect(() => {
-    if (products.length > 0) {
-      fetchProducts();
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        let url = "/products?isActive=true";
+        if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+        if (selectedCategory) url += `&category=${encodeURIComponent(selectedCategory)}`;
+        if (stockFilter) url += `&stockFilter=${encodeURIComponent(stockFilter)}`;
+        const response = await api.get(url);
+        if (!cancelled && response.success) {
+          setProducts(response.data || []);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to fetch products");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [searchTerm, selectedCategory, stockFilter]);
 
   // Handle bulk selection
@@ -164,7 +175,7 @@ const Products = () => {
       .map((row) => row.map((field) => `"${field}"`).join(","))
       .join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new window.Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
@@ -178,27 +189,6 @@ const Products = () => {
     document.body.removeChild(link);
   };
 
-  // Initialize missing stock snapshots
-  const initializeMissingSnapshots = async () => {
-    if (!window.confirm("This will create stock snapshots for products that don't have them. Continue?")) {
-      return;
-    }
-
-    setInitializingSnapshots(true);
-    try {
-      const response = await api.post("/stock/init-missing-snapshots");
-      if (response.success) {
-        alert(`Success! Created ${response.data.snapshotsCreated} snapshots. ${response.data.snapshotsSkipped} already existed.`);
-        fetchProducts(); // Refresh the list
-      } else {
-        setError(response.message || "Failed to initialize snapshots");
-      }
-    } catch (error) {
-      setError(error.response?.data?.message || "Failed to initialize snapshots");
-    } finally {
-      setInitializingSnapshots(false);
-    }
-  };
   const handleBulkDelete = async () => {
     try {
       const promises = selectedProducts.map((id) =>
@@ -666,7 +656,7 @@ const Products = () => {
               </h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete "{showDeleteConfirm.name}"? This
+              Are you sure you want to delete &ldquo;{showDeleteConfirm.name}&rdquo;? This
               action cannot be undone.
             </p>
             <div className="flex justify-end space-x-3">
@@ -965,7 +955,7 @@ const ProductModal = ({
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Click "Generate" to auto-create SKU from product details
+                Click &ldquo;Generate&rdquo; to auto-create SKU from product details
               </p>
             </div>
 

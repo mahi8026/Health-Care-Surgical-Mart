@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import api from "../../config/api";
 import LoadingSpinner from "../LoadingSpinner";
 
 const STORAGE_KEY = "email_provider_settings";
@@ -23,14 +24,19 @@ const EmailSettings = () => {
   const [message, setMessage] = useState({ type: "", text: "" });
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
-      } catch {
-        // ignore parse errors
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
+        } catch {
+          // ignore parse errors
+        }
       }
-    }
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const handleChange = (e) => {
@@ -42,18 +48,8 @@ const EmailSettings = () => {
     setSaving(true);
     setMessage({ type: "", text: "" });
     try {
-      const res = await fetch("/api/settings/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      }).catch(() => null);
-
-      if (res && res.ok) {
-        setMessage({ type: "success", text: "Email settings saved successfully!" });
-      } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        setMessage({ type: "success", text: "Email settings saved locally." });
-      }
+      await api.post("/settings/email", settings);
+      setMessage({ type: "success", text: "Email settings saved successfully!" });
     } catch {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       setMessage({ type: "success", text: "Email settings saved locally." });
@@ -70,20 +66,15 @@ const EmailSettings = () => {
     setTesting(true);
     setMessage({ type: "", text: "" });
     try {
-      const res = await fetch("/api/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: testEmail,
-          subject: "Test Email from Notification System",
-          html: "<p>This is a test email from your notification system.</p>",
-        }),
+      const testRes = await api.post("/email/send", {
+        to: testEmail,
+        subject: "Test Email from Notification System",
+        html: "<p>This is a test email from your notification system.</p>",
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success !== false) {
+      if (testRes.success !== false) {
         setMessage({ type: "success", text: "Test email sent successfully!" });
       } else {
-        setMessage({ type: "error", text: data.message || "Failed to send test email." });
+        setMessage({ type: "error", text: testRes.message || "Failed to send test email." });
       }
     } catch {
       setMessage({ type: "error", text: "Could not reach email API. Check your server." });

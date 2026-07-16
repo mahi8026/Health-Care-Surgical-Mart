@@ -3,7 +3,7 @@
  * Provides a React hook interface for localStorage with JSON serialization
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export const useLocalStorage = (key, initialValue) => {
   // Get value from localStorage or use initial value
