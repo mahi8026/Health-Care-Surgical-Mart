@@ -4,7 +4,7 @@
  * All DB operations use the shopDb wrapper passed in from the route.
  */
 
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { ObjectId } = require('mongodb');
@@ -25,7 +25,7 @@ class BulkProductImportService {
   async parseFile(filePath, fileType) {
     try {
       if (fileType === 'csv') {return await this.parseCSV(filePath);}
-      if (fileType === 'xlsx' || fileType === 'xls') {return this.parseExcel(filePath);}
+      if (fileType === 'xlsx' || fileType === 'xls') {return await this.parseExcel(filePath);}
       throw new Error('Unsupported file type');
     } catch (error) {
       throw new Error(`File parsing error: ${error.message}`);
@@ -43,12 +43,43 @@ class BulkProductImportService {
     });
   }
 
-  parseExcel(filePath) {
+  async parseExcel(filePath) {
     try {
-      const workbook = XLSX.readFile(filePath);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      return XLSX.utils.sheet_to_json(worksheet);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      const worksheet = workbook.worksheets[0];
+      
+      if (!worksheet) {
+        throw new Error('No worksheets found in Excel file');
+      }
+      
+      const data = [];
+      const headers = [];
+      
+      // Get headers from first row
+      worksheet.getRow(1).eachCell((cell, colNumber) => {
+        headers[colNumber] = cell.value?.toString() || `column_${colNumber}`;
+      });
+      
+      // Get data rows
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Skip header row
+        
+        const rowData = {};
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber];
+          if (header) {
+            rowData[header] = cell.value;
+          }
+        });
+        
+        // Only add non-empty rows
+        if (Object.keys(rowData).length > 0) {
+          data.push(rowData);
+        }
+      });
+      
+      return data;
     } catch (error) {
       throw new Error(`Excel parsing error: ${error.message}`);
     }
@@ -321,18 +352,33 @@ class BulkProductImportService {
     ];
   }
 
-  generateExcelTemplate() {
+  async generateExcelTemplate() {
     const template = this.getSampleTemplate();
-    const worksheet = XLSX.utils.json_to_sheet(template);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Products');
+    
+    // Add headers
+    const headers = Object.keys(template[0]);
+    worksheet.addRow(headers);
+    
+    // Add sample data
+    template.forEach(item => {
+      worksheet.addRow(Object.values(item));
+    });
+    
+    // Auto-fit columns
+    worksheet.columns.forEach(column => {
+      column.width = 15;
+    });
+    
     return workbook;
   }
 
-  generateCSVTemplate() {
+  async generateCSVTemplate() {
     const template = this.getSampleTemplate();
-    const worksheet = XLSX.utils.json_to_sheet(template);
-    return XLSX.utils.sheet_to_csv(worksheet);
+    const headers = Object.keys(template[0]).join(',');
+    const rows = template.map(item => Object.values(item).join(',')).join('\n');
+    return `${headers}\n${rows}`;
   }
 }
 

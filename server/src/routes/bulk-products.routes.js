@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { logger } = require('../config/logging');
 const csv = require('csv-parser');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 const { ObjectId: _ObjectId } = require('mongodb');
@@ -173,15 +173,45 @@ const parseCSV = (filePath) => {
 };
 
 // Parse Excel file
-const parseExcel = (filePath) => {
+const parseExcel = async (filePath) => {
   try {
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.worksheets[0];
+    
+    if (!worksheet) {
+      throw new Error('No worksheets found in Excel file');
+    }
+    
+    const data = [];
+    const headers = [];
+    
+    // Get headers from first row
+    worksheet.getRow(1).eachCell((cell, colNumber) => {
+      headers[colNumber] = cell.value?.toString() || `column_${colNumber}`;
+    });
+    
+    // Get data rows
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip header row
+      
+      const rowData = {};
+      row.eachCell((cell, colNumber) => {
+        const header = headers[colNumber];
+        if (header) {
+          rowData[header] = cell.value;
+        }
+      });
+      
+      // Only add non-empty rows
+      if (Object.keys(rowData).length > 0) {
+        data.push(rowData);
+      }
+    });
+    
     return data;
-  } catch {
-    throw new Error('Failed to parse Excel file');
+  } catch (error) {
+    throw new Error(`Failed to parse Excel file: ${error.message}`);
   }
 };
 
@@ -366,7 +396,7 @@ router.post(
         if (fileExtension === '.csv') {
           products = await parseCSV(filePath);
         } else if (fileExtension === '.xlsx' || fileExtension === '.xls') {
-          products = parseExcel(filePath);
+          products = await parseExcel(filePath);
         } else {
           throw new Error('Unsupported file format');
         }
