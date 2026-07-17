@@ -143,9 +143,9 @@ const Sales = () => {
     let cancelled = false;
     (async () => {
       try {
-        const response = await api.get("/sales/next-invoice");
+        const response = await api.get("/sales/next-invoice-number");
         if (!cancelled && response.success) {
-          setPosData(prev => ({ ...prev, invoiceNo: response.data?.invoiceNo || "NEW" }));
+          setPosData(prev => ({ ...prev, invoiceNo: response.data?.invoiceNumber || "NEW" }));
         }
         const settingsRes = await api.get("/settings/pos");
         if (!cancelled && settingsRes.success) {
