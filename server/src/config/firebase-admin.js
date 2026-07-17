@@ -1,13 +1,17 @@
 /**
  * Firebase Admin SDK Configuration
  * Used for server-side Firebase token verification
+ * Updated for Firebase Admin SDK v14 compatibility
  */
 
 const admin = require('firebase-admin');
 const { logger } = require('./logging');
 
+let isInitialized = false;
+
 // Initialize Firebase Admin with service account credentials
-if (!admin.apps.length) {
+// Check using admin.apps array (v14 compatible)
+if (!admin.apps || admin.apps.length === 0) {
   try {
     // Try base64-encoded service account first (recommended for Render)
     const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
@@ -20,6 +24,7 @@ if (!admin.apps.length) {
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
         });
+        isInitialized = true;
         logger.info('Firebase Admin SDK initialized successfully (base64 method)');
       } catch (parseError) {
         logger.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_BASE64:', parseError.message);
@@ -43,6 +48,7 @@ if (!admin.apps.length) {
             privateKey,
           }),
         });
+        isInitialized = true;
         logger.info('Firebase Admin SDK initialized successfully (individual vars method)');
       }
     }
@@ -52,4 +58,8 @@ if (!admin.apps.length) {
   }
 }
 
+// Export admin instance and initialization status
 module.exports = admin;
+module.exports.isFirebaseInitialized = () => {
+  return isInitialized || (admin.apps && admin.apps.length > 0);
+};

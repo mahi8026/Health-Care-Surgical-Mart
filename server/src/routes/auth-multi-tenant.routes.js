@@ -821,7 +821,7 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
     const admin = require('../config/firebase-admin');
 
     // SECURITY FIX: Remove Firebase token bypass in production
-    const firebaseAdminConfigured = admin.apps && admin.apps.length > 0;
+    const firebaseAdminConfigured = admin.isFirebaseInitialized();
 
     if (!firebaseAdminConfigured) {
       // In production, Firebase Admin MUST be configured
