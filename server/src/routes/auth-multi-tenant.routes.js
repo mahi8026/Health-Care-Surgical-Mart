@@ -400,16 +400,9 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     }
 
     // Update last login
-    if (userDb === 'system') {
-      await systemDb
-        .collection('system_users')
-        .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
-    } else {
-      const shopDb = getShopDatabase(userDb);
-      await shopDb
-        .collection('users')
-        .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
-    }
+    await shopDb
+      .collection('users')
+      .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
 
     // Generate token
     const token = generateToken(user);
@@ -482,30 +475,17 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
-    let user;
-    let collection;
-
-    // Determine if super admin or shop user
-    const systemDb = getSystemDatabase();
-    const superAdmin = await systemDb
-      .collection('system_users')
-      .findOne({ email });
-
-    if (superAdmin && superAdmin.role === 'SUPER_ADMIN') {
-      user = superAdmin;
-      collection = systemDb.collection('system_users');
-    } else {
-      if (!shopId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Shop ID is required',
-        });
-      }
-
-      const shopDb = getShopDatabase(shopId);
-      user = await shopDb.collection('users').findOne({ email });
-      collection = shopDb.collection('users');
+    // Get user from shop database
+    if (!shopId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shop ID is required',
+      });
     }
+
+    const shopDb = getShopDatabase(shopId);
+    const user = await shopDb.collection('users').findOne({ email });
+    const collection = shopDb.collection('users');
 
     if (!user) {
       return res.status(404).json({
@@ -589,19 +569,10 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
 
     let user;
     let targetShopId = shopId;
-
-    // Determine if super admin or shop user
     const systemDb = getSystemDatabase();
-    const superAdmin = await systemDb
-      .collection('system_users')
-      .findOne({ email });
 
-    if (superAdmin && superAdmin.role === 'SUPER_ADMIN') {
-      user = superAdmin;
-      targetShopId = null;
-    } else {
-      // Auto-detect shopId if not provided
-      if (!targetShopId) {
+    // Auto-detect shopId if not provided
+    if (!targetShopId) {
         // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
         try {
           const userShopMapping = await systemDb
@@ -663,9 +634,8 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
         }
       }
 
-      const shopDb = getShopDatabase(targetShopId);
-      user = await shopDb.collection('users').findOne({ email });
-    }
+    const shopDb = getShopDatabase(targetShopId);
+    user = await shopDb.collection('users').findOne({ email });
 
     if (!user) {
       // Return success even if user not found (prevent email enumeration)
@@ -681,9 +651,7 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
     const resetCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Store reset code in database
-    const collection = user.role === 'SUPER_ADMIN'
-      ? systemDb.collection('system_users')
-      : getShopDatabase(targetShopId).collection('users');
+    const collection = getShopDatabase(targetShopId).collection('users');
 
     await collection.updateOne(
       { _id: user._id },
@@ -747,30 +715,17 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    let user;
-    let collection;
-
-    // Determine if super admin or shop user
-    const systemDb = getSystemDatabase();
-    const superAdmin = await systemDb
-      .collection('system_users')
-      .findOne({ email });
-
-    if (superAdmin && superAdmin.role === 'SUPER_ADMIN') {
-      user = superAdmin;
-      collection = systemDb.collection('system_users');
-    } else {
-      if (!shopId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Shop ID is required',
-        });
-      }
-
-      const shopDb = getShopDatabase(shopId);
-      user = await shopDb.collection('users').findOne({ email });
-      collection = shopDb.collection('users');
+    // Get user from shop database
+    if (!shopId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shop ID is required',
+      });
     }
+
+    const shopDb = getShopDatabase(shopId);
+    const user = await shopDb.collection('users').findOne({ email });
+    const collection = shopDb.collection('users');
 
     if (!user) {
       return res.status(404).json({
@@ -919,18 +874,10 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
     let user;
     let userDb;
 
-    // Check if super admin login
     const systemDb = getSystemDatabase();
-    const superAdmin = await systemDb
-      .collection('system_users')
-      .findOne({ email });
-
-    if (superAdmin && superAdmin.role === 'SUPER_ADMIN') {
-      user = superAdmin;
-      userDb = 'system';
-    } else {
-      // Shop user login - try to find shopId automatically
-      let targetShopId = shopId;
+    
+    // Shop user login - try to find shopId automatically
+    let targetShopId = shopId;
 
       if (!targetShopId) {
         // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
@@ -1028,11 +975,10 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
         });
       }
 
-      // Get user from shop database
-      const shopDb = getShopDatabase(targetShopId);
-      user = await shopDb.collection('users').findOne({ email });
-      userDb = targetShopId;
-    }
+    // Get user from shop database
+    const shopDb = getShopDatabase(targetShopId);
+    user = await shopDb.collection('users').findOne({ email });
+    userDb = targetShopId;
 
     if (!user) {
       // Increment login attempts on failure
@@ -1064,16 +1010,9 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
     }
 
     // Update last login
-    if (userDb === 'system') {
-      await systemDb
-        .collection('system_users')
-        .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
-    } else {
-      const shopDb = getShopDatabase(userDb);
-      await shopDb
-        .collection('users')
-        .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
-    }
+    await shopDb
+      .collection('users')
+      .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
 
     // Generate token
     const token = generateToken(user);
@@ -1091,7 +1030,7 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
     logger.info('[LOGIN] Firebase login successful', {
       email: user.email,
       role: user.role,
-      shopId: user.shopId || 'N/A (SUPER_ADMIN)',
+      shopId: user.shopId,
       userId: user._id.toString()
     });
 
@@ -1222,26 +1161,17 @@ router.get('/me', async (req, res) => {
     }
 
     // Get fresh user data from database
-    let user;
-    const systemDb = getSystemDatabase();
-
-    if (decoded.role === 'SUPER_ADMIN') {
-      user = await systemDb
-        .collection('system_users')
-        .findOne({ _id: require('mongodb').ObjectId(decoded.userId) });
-    } else {
-      if (!decoded.shopId) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid token: missing shopId',
-        });
-      }
-
-      const shopDb = getShopDatabase(decoded.shopId);
-      user = await shopDb
-        .collection('users')
-        .findOne({ _id: require('mongodb').ObjectId(decoded.userId) });
+    if (!decoded.shopId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token: missing shopId',
+      });
     }
+
+    const shopDb = getShopDatabase(decoded.shopId);
+    const user = await shopDb
+      .collection('users')
+      .findOne({ _id: require('mongodb').ObjectId(decoded.userId) });
 
     if (!user || !user.isActive) {
       res.clearCookie('jwt', {
