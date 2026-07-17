@@ -565,7 +565,7 @@ router.post(
     const admins = await shopDb
       .collection('users')
       .find({
-        role: { $in: ['admin', 'super_admin'] },
+        role: 'SHOP_ADMIN',
         isActive: true,
       })
       .toArray();

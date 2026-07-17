@@ -1,7 +1,7 @@
 /**
  * Audit Logs Routes
  * Read-only access to the audit trail.
- * SUPER_ADMIN: all shops. SHOP_ADMIN: own shop only.
+ * SHOP_ADMIN: own shop only.
  */
 
 const express = require('express');
@@ -19,17 +19,17 @@ router.use(authenticate);
  *   get:
  *     summary: Query audit logs
  *     description: |
- *       Retrieve paginated audit log entries. SUPER_ADMIN can query all shops.
+ *       Retrieve paginated audit log entries.
  *       SHOP_ADMIN is automatically scoped to their own shop.
- *       Requires SUPER_ADMIN or SHOP_ADMIN role.
- *     tags: [Super Admin]
+ *       Requires SHOP_ADMIN role.
+ *     tags: [Audit Logs]
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: query
  *         name: shopId
  *         schema: { type: string }
- *         description: Filter by shop (SUPER_ADMIN only; ignored for SHOP_ADMIN)
+ *         description: Filter by shop (auto-scoped to user's shop)
  *       - in: query
  *         name: userId
  *         schema: { type: string }
@@ -105,8 +105,8 @@ router.get('/', async (req, res) => {
   try {
     const { role, shopId: userShopId } = req.user;
 
-    // Only SUPER_ADMIN and SHOP_ADMIN can access audit logs
-    if (role !== ROLES.SUPER_ADMIN && role !== 'SHOP_ADMIN') {
+    // Only SHOP_ADMIN can access audit logs
+    if (role !== 'SHOP_ADMIN') {
       return res.status(403).json({
         success: false,
         message: 'Insufficient permissions to view audit logs',
@@ -114,7 +114,6 @@ router.get('/', async (req, res) => {
     }
 
     const {
-      shopId: queryShopId,
       userId,
       action,
       resource,
@@ -125,8 +124,7 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     // SHOP_ADMIN is always scoped to their own shop
-    const effectiveShopId =
-      role === ROLES.SUPER_ADMIN ? queryShopId : userShopId;
+    const effectiveShopId = userShopId;
 
     const result = await auditLogService.query({
       shopId: effectiveShopId,

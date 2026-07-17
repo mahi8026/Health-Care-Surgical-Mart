@@ -83,7 +83,7 @@ router.get(
     }
 
     // Verify user has access to this shop's files
-    if (req.user.role !== 'SUPER_ADMIN' && req.user.shopId !== shopId) {
+    if (req.user.shopId !== shopId) {
       throw createError.forbidden("Access denied to this shop's files");
     }
 

@@ -274,7 +274,7 @@ router.post(
 router.post(
   '/campaign',
   authenticate,
-  requireRole([ROLES.SUPER_ADMIN, ROLES.SHOP_ADMIN]),
+  requireRole([ROLES.SHOP_ADMIN]),
   asyncHandler(async (req, res) => {
     const { title, subject, content, segment, fromName, replyTo, scheduledAt } =
       req.body;
@@ -307,7 +307,7 @@ router.post(
 router.post(
   '/sync-customers',
   authenticate,
-  requireRole([ROLES.SUPER_ADMIN, ROLES.SHOP_ADMIN]),
+  requireRole([ROLES.SHOP_ADMIN]),
   asyncHandler(async (req, res) => {
     const shopId = req.user.shopId;
 

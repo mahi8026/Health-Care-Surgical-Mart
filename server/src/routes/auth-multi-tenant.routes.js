@@ -253,120 +253,109 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     let user;
     let userDb;
 
-    // Check if super admin login
     const systemDb = getSystemDatabase();
-    const superAdmin = await systemDb
-      .collection('system_users')
-      .findOne({ email });
 
-    if (superAdmin && superAdmin.role === 'SUPER_ADMIN') {
-      user = superAdmin;
-      userDb = 'system';
-    } else {
-      // Shop user login - try to find shopId automatically
-      let targetShopId = shopId;
+    // Shop user login - try to find shopId automatically
+    let targetShopId = shopId;
 
-      if (!targetShopId) {
-        // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
-        // Instead of O(n) loop through all shops
-        try {
-          const userShopMapping = await systemDb
-            .collection('user_shop_index')
-            .findOne({ email, isActive: true });
+    if (!targetShopId) {
+      // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
+      // Instead of O(n) loop through all shops
+      try {
+        const userShopMapping = await systemDb
+          .collection('user_shop_index')
+          .findOne({ email, isActive: true });
 
-          if (userShopMapping) {
-            targetShopId = userShopMapping.shopId;
-            logger.debug('Login: Found shop via index lookup', { email, shopId: targetShopId });
-          }
-        } catch (indexError) {
-          logger.warn('Failed to query user_shop_index, falling back to shop loop', {
-            email,
-            error: indexError.message
-          });
+        if (userShopMapping) {
+          targetShopId = userShopMapping.shopId;
+          logger.debug('Login: Found shop via index lookup', { email, shopId: targetShopId });
         }
+      } catch (indexError) {
+        logger.warn('Failed to query user_shop_index, falling back to shop loop', {
+          email,
+          error: indexError.message
+        });
+      }
 
-        // FALLBACK: If index lookup failed, use legacy method (loop through shops)
-        if (!targetShopId) {
+      // FALLBACK: If index lookup failed, use legacy method (loop through shops)
+      if (!targetShopId) {
           logger.info('Login: Index lookup failed, using legacy shop loop', { email });
 
-          const shops = await systemDb
-            .collection('shops')
-            .find({ status: 'Active' })
-            .toArray();
+        const shops = await systemDb
+          .collection('shops')
+          .find({ status: 'Active' })
+          .toArray();
 
-          // First check if email matches shop owner email
-          for (const shop of shops) {
-            if (shop.ownerEmail === email) {
-              targetShopId = shop._id.toString(); // Use _id, not shopId
-              break;
-            }
-          }
-
-          // If not found as owner, search in each shop's users collection
-          if (!targetShopId) {
-            for (const shop of shops) {
-              try {
-                const shopDb = getShopDatabase(shop._id.toString()); // Use _id, not shopId
-                const shopUser = await shopDb
-                  .collection('users')
-                  .findOne({ email });
-                if (shopUser) {
-                  targetShopId = shop._id.toString(); // Use _id, not shopId
-                  break;
-                }
-              } catch (error) {
-                logger.warn('Failed to query shop database during legacy login auto-detect', {
-                  shopId: shop._id.toString(),
-                  error: error.message
-                });
-              }
-            }
+        // First check if email matches shop owner email
+        for (const shop of shops) {
+          if (shop.ownerEmail === email) {
+            targetShopId = shop._id.toString(); // Use _id, not shopId
+            break;
           }
         }
 
+        // If not found as owner, search in each shop's users collection
         if (!targetShopId) {
-          return res.status(400).json({
-            success: false,
-            message: 'Shop not found for this email. Please contact support.',
-          });
+          for (const shop of shops) {
+            try {
+              const shopDb = getShopDatabase(shop._id.toString()); // Use _id, not shopId
+              const shopUser = await shopDb
+                .collection('users')
+                .findOne({ email });
+              if (shopUser) {
+                targetShopId = shop._id.toString(); // Use _id, not shopId
+                break;
+              }
+            } catch (error) {
+              logger.warn('Failed to query shop database during legacy login auto-detect', {
+                shopId: shop._id.toString(),
+                error: error.message
+              });
+            }
+          }
         }
       }
 
-      // Verify shop exists (find by _id as ObjectId or shopId as string)
-      let shop;
-      try {
-        shop = await systemDb.collection('shops').findOne({
-          $or: [
-            { shopId: targetShopId },
-            { _id: new ObjectId(targetShopId) }
-          ]
-        });
-      } catch {
-        // If targetShopId is not a valid ObjectId, try shopId only
-        shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
-      }
-
-      if (!shop) {
-        return res.status(404).json({
+      if (!targetShopId) {
+        return res.status(400).json({
           success: false,
-          message: 'Shop not found',
+          message: 'Shop not found for this email. Please contact support.',
         });
       }
-
-      if (shop.status !== 'Active') {
-        return res.status(403).json({
-          success: false,
-          message: `Shop is ${shop.status.toLowerCase()}. Please contact support.`,
-        });
-      }
-
-      // Get user from shop database
-      const shopDb = getShopDatabase(targetShopId);
-      user = await shopDb.collection('users').findOne({ email });
-      if (user) {
-      }
-      userDb = targetShopId;
     }
+
+    // Verify shop exists (find by _id as ObjectId or shopId as string)
+    let shop;
+    try {
+      shop = await systemDb.collection('shops').findOne({
+        $or: [
+          { shopId: targetShopId },
+          { _id: new ObjectId(targetShopId) }
+        ]
+      });
+    } catch {
+      // If targetShopId is not a valid ObjectId, try shopId only
+      shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
+    }
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shop not found',
+      });
+    }
+
+    if (shop.status !== 'Active') {
+      return res.status(403).json({
+        success: false,
+        message: `Shop is ${shop.status.toLowerCase()}. Please contact support.`,
+      });
+    }
+
+    // Get user from shop database
+    const shopDb = getShopDatabase(targetShopId);
+    user = await shopDb.collection('users').findOne({ email });
+    userDb = targetShopId;
 
     if (!user) {
       return res.status(401).json({

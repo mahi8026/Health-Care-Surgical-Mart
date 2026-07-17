@@ -479,7 +479,7 @@ router.post(
 router.get(
   '/queue/stats',
   authenticate,
-  requireRole([ROLES.SUPER_ADMIN, ROLES.SHOP_ADMIN]),
+  requireRole([ROLES.SHOP_ADMIN]),
   asyncHandler(async (req, res) => {
     const stats = await SMSService.queue.getStats();
 
