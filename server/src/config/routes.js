@@ -15,10 +15,6 @@ const setupRoutes = (app) => {
     logger.info('Loading authentication routes...');
     app.use('/api/auth', require('../routes/auth-multi-tenant.routes'));
 
-    // Super admin routes (super admin auth required)
-    logger.info('Loading super admin routes...');
-    app.use('/api/super-admin', require('../routes/super-admin.routes'));
-
     // Protected routes (shop-level auth required)
     logger.info('Loading protected routes...');
 

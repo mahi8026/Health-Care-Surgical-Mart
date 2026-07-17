@@ -141,15 +141,15 @@ async function authenticate(req, res, next) {
       throw jwtError;
     }
 
-    // Validate shopId for non-super-admin users
-    if (decoded.role !== 'SUPER_ADMIN' && !decoded.shopId) {
+    // Validate shopId - all users must have shop context
+    if (!decoded.shopId) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token: missing shop context',
       });
     }
 
-    // Get user from appropriate database with nested try-catch for database errors
+    // Get user from shop database with nested try-catch for database errors
     let user;
     try {
       if (!ObjectId.isValid(decoded.userId)) {
@@ -158,17 +158,10 @@ async function authenticate(req, res, next) {
           message: 'User not found',
         });
       }
-      if (decoded.role === 'SUPER_ADMIN') {
-        const systemDb = getSystemDatabase();
-        user = await systemDb.collection('system_users').findOne({
-          _id: new ObjectId(decoded.userId),
-        });
-      } else {
-        const shopDb = getShopDatabase(decoded.shopId);
-        user = await shopDb.collection('users').findOne({
-          _id: new ObjectId(decoded.userId),
-        });
-      }
+      const shopDb = getShopDatabase(decoded.shopId);
+      user = await shopDb.collection('users').findOne({
+        _id: new ObjectId(decoded.userId),
+      });
     } catch (dbError) {
       logger.error('Database error in authenticate middleware:', {
         error: dbError.message,
@@ -207,68 +200,6 @@ async function authenticate(req, res, next) {
       shopId: (user.shopId || decoded.shopId)?.toString() ?? null, // Convert ObjectId to string
       permissions: user.permissions || [],
     };
-
-    // For SUPER_ADMIN: optionally resolve shopId from request if provided
-    // SUPER_ADMIN can access ALL shops or a specific shop
-    if (req.user.role === 'SUPER_ADMIN') {
-      const requestedShopId =
-        req.query?.shopId ||
-        req.body?.shopId ||
-        req.headers['x-shop-id'] ||
-        null;
-
-      if (requestedShopId) {
-        // If SUPER_ADMIN specifies a shopId, validate it
-        try {
-          const systemDb = getSystemDatabase();
-          const shop = await systemDb.collection('shops').findOne({
-            shopId: requestedShopId
-          });
-
-          if (!shop) {
-            logger.warn('SUPER_ADMIN attempted to access non-existent shop', {
-              userId: req.user._id,
-              email: req.user.email,
-              shopId: requestedShopId,
-              path: req.path,
-            });
-            return res.status(400).json({
-              success: false,
-              message: `Shop '${requestedShopId}' not found`,
-            });
-          }
-
-          if (shop.status !== 'Active') {
-            logger.warn('SUPER_ADMIN attempted to access inactive shop', {
-              userId: req.user._id,
-              email: req.user.email,
-              shopId: requestedShopId,
-              status: shop.status,
-              path: req.path,
-            });
-            return res.status(403).json({
-              success: false,
-              message: `Shop '${requestedShopId}' is ${shop.status}. Cannot access data.`,
-            });
-          }
-
-          req.user.shopId = requestedShopId;
-        } catch (shopErr) {
-          logger.error('Shop validation error:', {
-            error: shopErr.message,
-            stack: shopErr.stack,
-            shopId: requestedShopId,
-            userId: req.user._id,
-          });
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to validate shop',
-          });
-        }
-      }
-      // If no shopId specified, SUPER_ADMIN accesses platform-level data
-      // req.user.shopId remains null
-    }
 
     // Attach shop database to request for convenience
     if (req.user.shopId) {
@@ -338,12 +269,7 @@ function verifyShopAccess(req, res, next) {
   const shopIdFromParams =
     req.params.shopId || req.body.shopId || req.query?.shopId;
 
-  // Super admin can access any shop
-  if (req.user.role === 'SUPER_ADMIN') {
-    return next();
-  }
-
-  // Other users must match shop context
+  // All users must match shop context
   if (shopIdFromParams && shopIdFromParams !== req.user.shopId) {
     return res.status(403).json({
       success: false,
@@ -359,11 +285,6 @@ function verifyShopAccess(req, res, next) {
  */
 async function checkShopStatus(req, res, next) {
   try {
-    // Skip for super admin
-    if (req.user.role === 'SUPER_ADMIN') {
-      return next();
-    }
-
     const systemDb = getSystemDatabase();
     const shopQuery = ObjectId.isValid(req.user.shopId)
       ? { _id: new ObjectId(req.user.shopId) }

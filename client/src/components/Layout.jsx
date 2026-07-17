@@ -27,8 +27,6 @@ const Layout = () => {
   // Role badge color
   const getRoleBadgeColor = (role) => {
     switch (role) {
-      case "SUPER_ADMIN":
-        return "bg-purple-100 text-purple-800";
       case "SHOP_ADMIN":
         return "bg-blue-100 text-blue-800";
       default:

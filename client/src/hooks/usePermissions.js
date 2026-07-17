@@ -11,7 +11,6 @@ import {
   hasRole,
   getUserPermissions,
   isAdmin,
-  isSuperAdmin,
 } from "../utils/permissions";
 
 /**
@@ -57,16 +56,10 @@ export const usePermissions = () => {
     getUserPermissions: () => getUserPermissions(user),
 
     /**
-     * Check if user is admin (SUPER_ADMIN or SHOP_ADMIN)
+     * Check if user is admin (SHOP_ADMIN)
      * @returns {boolean}
      */
     isAdmin: () => isAdmin(user),
-
-    /**
-     * Check if user is super admin
-     * @returns {boolean}
-     */
-    isSuperAdmin: () => isSuperAdmin(user),
 
     /**
      * Current user object

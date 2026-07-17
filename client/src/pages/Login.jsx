@@ -21,7 +21,7 @@ const Login = () => {
       const result = await login(
         email,
         password,
-        userType !== "super_admin" && shopId.trim() ? shopId : null,
+        shopId.trim() ? shopId : null,
       );
 
       if (!result.success) {
@@ -81,9 +81,8 @@ const Login = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Login As
             </label>
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="grid grid-cols-1 gap-2 mb-4">
               {[
-                { key: "super_admin", label: "Super Admin", color: "blue" },
                 { key: "shop_admin", label: "Shop Admin", color: "green" },
               ].map(({ key, label }) => (
                 <button
@@ -102,24 +101,22 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Shop ID Field (only for non-super admin) */}
-          {userType !== "super_admin" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Shop ID <span className="text-gray-400">(Optional)</span>
-              </label>
-              <input
-                type="text"
-                value={shopId}
-                onChange={(e) => setShopId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                placeholder="Leave empty for auto-detection"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Leave empty to auto-detect from your email address
-              </p>
-            </div>
-          )}
+          {/* Shop ID Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Shop ID <span className="text-gray-400">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={shopId}
+              onChange={(e) => setShopId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              placeholder="Leave empty for auto-detection"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Leave empty to auto-detect from your email address
+            </p>
+          </div>
 
           {/* Email Field */}
           <div>

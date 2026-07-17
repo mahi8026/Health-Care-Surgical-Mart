@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import api from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "./LoadingSpinner";
-import { isSuperAdmin } from "../utils/permissions";
 
 const UserManagement = () => {
   const { user } = useAuth();
@@ -213,7 +212,6 @@ const UserManagement = () => {
   // Get role badge
   const getRoleBadge = (role) => {
     const badges = {
-      SUPER_ADMIN: "bg-purple-100 text-purple-800",
       SHOP_ADMIN: "bg-blue-100 text-blue-800",
     };
     return badges[role] || "bg-gray-100 text-gray-800";
@@ -248,18 +246,16 @@ const UserManagement = () => {
             Manage shop admin accounts and permissions
           </p>
         </div>
-        {isSuperAdmin(user) && (
-          <button
-            onClick={() => {
-              resetForm();
-              setShowCreateModal(true);
-            }}
-            className="btn-primary flex items-center gap-2"
-          >
-            <i className="fas fa-plus"></i>
-            Add User
-          </button>
-        )}
+        <button
+          onClick={() => {
+            resetForm();
+            setShowCreateModal(true);
+          }}
+          className="btn-primary flex items-center gap-2"
+        >
+          <i className="fas fa-plus"></i>
+          Add User
+        </button>
       </div>
 
       {/* Messages */}
@@ -355,7 +351,7 @@ const UserManagement = () => {
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center space-x-2">
-                        {isSuperAdmin(user) && userItem._id !== user?.id && (
+                        {userItem._id !== user?.id && (
                           <>
                             <button
                               onClick={() => openEditModal(userItem)}
@@ -393,9 +389,9 @@ const UserManagement = () => {
                             </button>
                           </>
                         )}
-                        {!isSuperAdmin(user) && (
+                        {userItem._id === user?.id && (
                           <span className="text-gray-400 text-sm">
-                            No actions
+                            (Current user)
                           </span>
                         )}
                       </div>

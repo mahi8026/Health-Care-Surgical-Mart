@@ -5,21 +5,12 @@
 
 // Role definitions
 export const ROLES = {
-  SUPER_ADMIN: "SUPER_ADMIN",
   SHOP_ADMIN: "SHOP_ADMIN",
 };
 
 // Permission definitions
 export const PERMISSIONS = {
-  // Shop Management (SUPER_ADMIN only)
-  CREATE_SHOP: "create_shop",
-  VIEW_ALL_SHOPS: "view_all_shops",
-  SUSPEND_SHOP: "suspend_shop",
-  DELETE_SHOP: "delete_shop",
-  VIEW_USAGE_STATS: "view_usage_stats",
-
-  // User Management (SUPER_ADMIN only)
-  CREATE_SHOP_ADMIN: "create_shop_admin",
+  // User Management (SHOP_ADMIN)
   CREATE_USER: "create_user",
   EDIT_USER: "edit_user",
   DELETE_USER: "delete_user",
@@ -94,29 +85,12 @@ export const PERMISSIONS = {
 
 // Role-Permission Mapping
 const ROLE_PERMISSIONS = {
-  // SUPER_ADMIN: Platform management only (no shop operations)
-  [ROLES.SUPER_ADMIN]: [
-    // Shop Management
-    PERMISSIONS.CREATE_SHOP,
-    PERMISSIONS.VIEW_ALL_SHOPS,
-    PERMISSIONS.SUSPEND_SHOP,
-    PERMISSIONS.DELETE_SHOP,
-    PERMISSIONS.VIEW_USAGE_STATS,
-
-    // User Management
-    PERMISSIONS.CREATE_SHOP_ADMIN,
+  [ROLES.SHOP_ADMIN]: [
+    // User management
     PERMISSIONS.CREATE_USER,
     PERMISSIONS.EDIT_USER,
     PERMISSIONS.DELETE_USER,
     PERMISSIONS.VIEW_USERS,
-
-    // Settings (system-level)
-    PERMISSIONS.VIEW_SETTINGS,
-    PERMISSIONS.EDIT_SETTINGS,
-  ],
-
-  [ROLES.SHOP_ADMIN]: [
-    // NO user management - SUPER_ADMIN only
 
     // Full product management
     PERMISSIONS.CREATE_PRODUCT,
@@ -277,21 +251,12 @@ export const getUserPermissions = (user) => {
 };
 
 /**
- * Check if user is admin (SUPER_ADMIN or SHOP_ADMIN)
+ * Check if user is admin (SHOP_ADMIN)
  * @param {Object} user - User object with role
  * @returns {boolean}
  */
 export const isAdmin = (user) => {
-  return hasRole(user, [ROLES.SUPER_ADMIN, ROLES.SHOP_ADMIN]);
-};
-
-/**
- * Check if user is super admin
- * @param {Object} user - User object with role
- * @returns {boolean}
- */
-export const isSuperAdmin = (user) => {
-  return hasRole(user, ROLES.SUPER_ADMIN);
+  return hasRole(user, ROLES.SHOP_ADMIN);
 };
 
 

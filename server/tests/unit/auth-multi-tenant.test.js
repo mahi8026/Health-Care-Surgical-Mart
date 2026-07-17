@@ -144,50 +144,6 @@ describe("Firebase Token Verification Flow", () => {
       expect(getShopDatabase).toHaveBeenCalledWith(shopId);
     });
 
-    test("should authenticate valid JWT token for super admin", async () => {
-      // Arrange
-      const userId = new ObjectId();
-
-      const user = {
-        _id: userId,
-        name: "Super Admin",
-        email: "admin@example.com",
-        role: "SUPER_ADMIN",
-        isActive: true,
-        permissions: [],
-      };
-
-      const token = jwt.sign(
-        {
-          userId: userId.toString(),
-          email: user.email,
-          role: "SUPER_ADMIN",
-          shopId: null,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: "24h" }
-      );
-
-      mockReq.headers.authorization = `Bearer ${token}`;
-      mockCollections.system_users.findOne.mockResolvedValue(user);
-
-      // Act
-      await authenticate(mockReq, mockRes, mockNext);
-
-      // Assert
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockReq.user).toEqual({
-        _id: userId,
-        name: "Super Admin",
-        email: "admin@example.com",
-        role: "SUPER_ADMIN",
-        shopId: null,
-        permissions: [],
-      });
-      expect(getSystemDatabase).toHaveBeenCalled();
-      expect(mockReq.shopDb).toBeUndefined();
-    });
-
     test("should handle user with no permissions array", async () => {
       // Arrange
       const userId = new ObjectId();
@@ -301,7 +257,7 @@ describe("Firebase Token Verification Flow", () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    test("should return 401 if token missing shopId for non-super-admin", async () => {
+    test("should return 401 if token missing shopId", async () => {
       // Arrange
       const userId = new ObjectId();
       const token = jwt.sign(
@@ -495,24 +451,6 @@ describe("Firebase Token Verification Flow", () => {
       expect(decoded.shopId).toBe(user.shopId);
     });
 
-    test("should generate valid JWT token for super admin", () => {
-      // Arrange
-      const user = {
-        _id: new ObjectId(),
-        email: "admin@example.com",
-        role: "SUPER_ADMIN",
-      };
-
-      // Act
-      const token = generateToken(user);
-
-      // Assert
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      expect(decoded.userId).toBe(user._id.toString());
-      expect(decoded.role).toBe("SUPER_ADMIN");
-      expect(decoded.shopId).toBeNull();
-    });
-
     test("should set token expiration to 24 hours", () => {
       // Arrange
       const user = {
@@ -533,22 +471,6 @@ describe("Firebase Token Verification Flow", () => {
   });
 
   describe("verifyShopAccess", () => {
-    test("should allow super admin to access any shop", () => {
-      // Arrange
-      mockReq.user = {
-        role: "SUPER_ADMIN",
-        shopId: null,
-      };
-      mockReq.params = { shopId: "any_shop" };
-
-      // Act
-      verifyShopAccess(mockReq, mockRes, mockNext);
-
-      // Assert
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockRes.status).not.toHaveBeenCalled();
-    });
-
     test("should allow user to access their own shop", () => {
       // Arrange
       mockReq.user = {
@@ -604,20 +526,6 @@ describe("Firebase Token Verification Flow", () => {
   });
 
   describe("checkShopStatus", () => {
-    test("should allow super admin to bypass shop status check", async () => {
-      // Arrange
-      mockReq.user = {
-        role: "SUPER_ADMIN",
-      };
-
-      // Act
-      await checkShopStatus(mockReq, mockRes, mockNext);
-
-      // Assert
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockCollections.shops.findOne).not.toHaveBeenCalled();
-    });
-
     test("should allow access if shop is active", async () => {
       // Arrange
       mockReq.user = {

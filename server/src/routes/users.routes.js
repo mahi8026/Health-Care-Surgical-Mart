@@ -325,17 +325,12 @@ router.get(
 
 /**
  * POST /api/users
- * Create new user (SUPER_ADMIN only)
+ * Create new user (SHOP_ADMIN only)
  */
 router.post(
   '/',
   requirePermission(PERMISSIONS.CREATE_USER),
   asyncHandler(async (req, res) => {
-    // ── CRITICAL: Only SUPER_ADMIN can create users ──
-    if (req.user.role !== 'SUPER_ADMIN') {
-      throw createError.forbidden('Only SUPER_ADMIN can create users');
-    }
-
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, email, password, role = 'SHOP_ADMIN', isActive = true } = req.body;
 
@@ -348,12 +343,7 @@ router.post(
       throw createError.badRequest('Password must be at least 6 characters');
     }
 
-    // Only SUPER_ADMIN can create SUPER_ADMIN (though this should never happen in shop context)
-    if (role === 'SUPER_ADMIN') {
-      throw createError.forbidden('Cannot create SUPER_ADMIN users through this endpoint');
-    }
-
-    // Validate role is one of the allowed values
+    // Validate role is one of the allowed values (only SHOP_ADMIN exists)
     const validRoles = ['SHOP_ADMIN'];
     if (!validRoles.includes(role)) {
       throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
@@ -431,17 +421,12 @@ router.post(
 
 /**
  * PUT /api/users/:id
- * Update user (SUPER_ADMIN only)
+ * Update user (SHOP_ADMIN only)
  */
 router.put(
   '/:id',
   requirePermission(PERMISSIONS.EDIT_USER),
   asyncHandler(async (req, res) => {
-    // ── CRITICAL: Only SUPER_ADMIN can edit users ──
-    if (req.user.role !== 'SUPER_ADMIN') {
-      throw createError.forbidden('Only SUPER_ADMIN can edit users');
-    }
-
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, email, password, role, isActive } = req.body;
 
@@ -459,12 +444,7 @@ router.put(
       throw createError.forbidden('You cannot change your own role or status');
     }
 
-    // Nobody can assign SUPER_ADMIN through this endpoint
-    if (role === 'SUPER_ADMIN') {
-      throw createError.forbidden('Cannot assign SUPER_ADMIN role through this endpoint');
-    }
-
-    // Validate role if provided
+    // Validate role if provided (only SHOP_ADMIN exists)
     if (role) {
       const validRoles = ['SHOP_ADMIN'];
       if (!validRoles.includes(role)) {
@@ -529,17 +509,12 @@ router.put(
 
 /**
  * DELETE /api/users/:id
- * Delete user (SUPER_ADMIN only)
+ * Delete user (SHOP_ADMIN only)
  */
 router.delete(
   '/:id',
   requirePermission(PERMISSIONS.DELETE_USER),
   asyncHandler(async (req, res) => {
-    // ── CRITICAL: Only SUPER_ADMIN can delete users ──
-    if (req.user.role !== 'SUPER_ADMIN') {
-      throw createError.forbidden('Only SUPER_ADMIN can delete users');
-    }
-
     const shopDb = getShopDatabase(req.user.shopId);
 
     if (req.params.id === req.user.id) {

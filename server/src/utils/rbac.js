@@ -4,20 +4,11 @@
  */
 
 const ROLES = {
-  SUPER_ADMIN: 'SUPER_ADMIN',
   SHOP_ADMIN: 'SHOP_ADMIN',
 };
 
 const PERMISSIONS = {
-  // Shop Management (SUPER_ADMIN only)
-  CREATE_SHOP: 'create_shop',
-  VIEW_ALL_SHOPS: 'view_all_shops',
-  SUSPEND_SHOP: 'suspend_shop',
-  DELETE_SHOP: 'delete_shop',
-  VIEW_USAGE_STATS: 'view_usage_stats',
-
-  // User Management (SUPER_ADMIN only)
-  CREATE_SHOP_ADMIN: 'create_shop_admin',
+  // User Management
   CREATE_USER: 'create_user',
   EDIT_USER: 'edit_user',
   DELETE_USER: 'delete_user',
@@ -105,21 +96,12 @@ const PERMISSIONS = {
 
 // Role-Permission Mapping
 const ROLE_PERMISSIONS = {
-  [ROLES.SUPER_ADMIN]: [
-    // All shop management permissions
-    PERMISSIONS.CREATE_SHOP,
-    PERMISSIONS.VIEW_ALL_SHOPS,
-    PERMISSIONS.SUSPEND_SHOP,
-    PERMISSIONS.DELETE_SHOP,
-    PERMISSIONS.VIEW_USAGE_STATS,
-    PERMISSIONS.CREATE_SHOP_ADMIN,
-
-    // All other permissions (full access)
-    ...Object.values(PERMISSIONS),
-  ],
-
   [ROLES.SHOP_ADMIN]: [
-    // NO user management - SUPER_ADMIN only
+    // Full user management within own shop
+    PERMISSIONS.CREATE_USER,
+    PERMISSIONS.EDIT_USER,
+    PERMISSIONS.DELETE_USER,
+    PERMISSIONS.VIEW_USERS,
 
     // Full product management
     PERMISSIONS.CREATE_PRODUCT,
