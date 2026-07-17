@@ -7,7 +7,6 @@
 export const ROLES = {
   SUPER_ADMIN: "SUPER_ADMIN",
   SHOP_ADMIN: "SHOP_ADMIN",
-  STAFF: "STAFF",
 };
 
 // Permission definitions
@@ -22,7 +21,6 @@ export const PERMISSIONS = {
   // User Management (SUPER_ADMIN only)
   CREATE_SHOP_ADMIN: "create_shop_admin",
   CREATE_USER: "create_user",
-  CREATE_STAFF: "create_staff",
   EDIT_USER: "edit_user",
   DELETE_USER: "delete_user",
   VIEW_USERS: "view_users",
@@ -108,7 +106,6 @@ const ROLE_PERMISSIONS = {
     // User Management
     PERMISSIONS.CREATE_SHOP_ADMIN,
     PERMISSIONS.CREATE_USER,
-    PERMISSIONS.CREATE_STAFF,
     PERMISSIONS.EDIT_USER,
     PERMISSIONS.DELETE_USER,
     PERMISSIONS.VIEW_USERS,
@@ -188,36 +185,6 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.EDIT_SETTINGS,
   ],
 
-  [ROLES.STAFF]: [
-    // Limited product access
-    PERMISSIONS.VIEW_PRODUCTS,
-
-    // View stock only
-    PERMISSIONS.VIEW_STOCK,
-
-    // Create and view sales (POS only - no edit/delete)
-    PERMISSIONS.CREATE_SALE,
-    PERMISSIONS.VIEW_SALES,
-
-    // View returns only
-    PERMISSIONS.VIEW_RETURNS,
-
-    // View purchases only
-    PERMISSIONS.VIEW_PURCHASES,
-
-    // View suppliers only
-    PERMISSIONS.VIEW_SUPPLIERS,
-
-    // View customers only
-    PERMISSIONS.VIEW_CUSTOMERS,
-
-    // Limited reports — sales and stock only, NO profit/financial reports
-    PERMISSIONS.VIEW_SALES_REPORT,
-    PERMISSIONS.VIEW_STOCK_REPORT,
-
-    // NOTE: No VIEW_EXPENSES, VIEW_EXPENSE_CATEGORIES, VIEW_SETTINGS, VIEW_PROFIT_REPORT
-    // Staff cannot access: Financial Reports, Expenses, Settings
-  ],
 };
 
 /**
@@ -327,11 +294,4 @@ export const isSuperAdmin = (user) => {
   return hasRole(user, ROLES.SUPER_ADMIN);
 };
 
-/**
- * Check if user is staff
- * @param {Object} user - User object with role
- * @returns {boolean}
- */
-export const isStaff = (user) => {
-  return hasRole(user, ROLES.STAFF);
-};
+

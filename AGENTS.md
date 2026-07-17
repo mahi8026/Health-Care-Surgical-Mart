@@ -24,7 +24,7 @@ npm run test:watch           # watch mode
 npm run test:coverage        # coverage only
 ```
 - Tests use `MONGODB_URI` from `server/.env` (Atlas) falling back to `mongodb://localhost:27017/health_care_test`. **Integration tests require a real MongoDB** (mocking is not used for DB in products/sales/customers suites).
-- `tests/setup.js` loads `.env` first, seeds test users (`global.testUtils.ADMIN_ID`, `STAFF_ID`) and a test shop (`SHOP_ID`) via `beforeAll`. All 7 test suites must pass before commit.
+- `tests/setup.js` loads `.env` first, seeds test users (`global.testUtils.ADMIN_ID`) and a test shop (`SHOP_ID`) via `beforeAll`. All 7 test suites must pass before commit.
 - Integration test files use `global.testUtils.generateTestToken()` for JWT creation — never `jwt.sign()` inline.
 - Root `jest.config.js` watches `server/src/` and `server/tests/`.
 

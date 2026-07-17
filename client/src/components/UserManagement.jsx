@@ -20,7 +20,7 @@ const UserManagement = () => {
     name: "",
     email: "",
     password: "",
-    role: "STAFF",
+    role: "SHOP_ADMIN",
     isActive: true,
   });
 
@@ -78,7 +78,7 @@ const UserManagement = () => {
       name: "",
       email: "",
       password: "",
-      role: "STAFF",
+      role: "SHOP_ADMIN",
       isActive: true,
     });
   };
@@ -215,7 +215,6 @@ const UserManagement = () => {
     const badges = {
       SUPER_ADMIN: "bg-purple-100 text-purple-800",
       SHOP_ADMIN: "bg-blue-100 text-blue-800",
-      STAFF: "bg-green-100 text-green-800",
     };
     return badges[role] || "bg-gray-100 text-gray-800";
   };
@@ -246,7 +245,7 @@ const UserManagement = () => {
             User Management
           </h3>
           <p className="text-sm text-gray-600">
-            Manage staff accounts and permissions
+            Manage shop admin accounts and permissions
           </p>
         </div>
         {isSuperAdmin(user) && (
@@ -527,7 +526,6 @@ const UserFormModal = ({
               className="input-field"
               required
             >
-              <option value="STAFF">Staff</option>
               <option value="SHOP_ADMIN">Shop Admin</option>
             </select>
           </div>

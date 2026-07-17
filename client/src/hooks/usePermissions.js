@@ -12,7 +12,6 @@ import {
   getUserPermissions,
   isAdmin,
   isSuperAdmin,
-  isStaff,
 } from "../utils/permissions";
 
 /**
@@ -68,12 +67,6 @@ export const usePermissions = () => {
      * @returns {boolean}
      */
     isSuperAdmin: () => isSuperAdmin(user),
-
-    /**
-     * Check if user is staff
-     * @returns {boolean}
-     */
-    isStaff: () => isStaff(user),
 
     /**
      * Current user object

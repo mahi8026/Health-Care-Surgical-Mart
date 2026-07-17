@@ -337,7 +337,7 @@ router.post(
     }
 
     const shopDb = getShopDatabase(req.user.shopId);
-    const { name, email, password, role = 'STAFF', isActive = true } = req.body;
+    const { name, email, password, role = 'SHOP_ADMIN', isActive = true } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -354,7 +354,7 @@ router.post(
     }
 
     // Validate role is one of the allowed values
-    const validRoles = ['STAFF', 'SHOP_ADMIN'];
+    const validRoles = ['SHOP_ADMIN'];
     if (!validRoles.includes(role)) {
       throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
     }
@@ -466,7 +466,7 @@ router.put(
 
     // Validate role if provided
     if (role) {
-      const validRoles = ['STAFF', 'SHOP_ADMIN'];
+      const validRoles = ['SHOP_ADMIN'];
       if (!validRoles.includes(role)) {
         throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
       }

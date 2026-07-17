@@ -8,7 +8,6 @@ const request = require('supertest');
 describe('Sales Management API', () => {
   let app;
   let adminToken;
-  let staffToken;
   
   beforeAll(() => {
     app = require('../src/server');
@@ -17,13 +16,6 @@ describe('Sales Management API', () => {
       userId: global.testUtils.ADMIN_ID,
       email: 'admin@test.com',
       role: 'SHOP_ADMIN',
-      shopId: global.testUtils.SHOP_ID,
-    });
-    
-    staffToken = global.testUtils.generateTestToken({
-      userId: global.testUtils.STAFF_ID,
-      email: 'staff@test.com',
-      role: 'STAFF',
       shopId: global.testUtils.SHOP_ID,
     });
   });
@@ -43,15 +35,6 @@ describe('Sales Management API', () => {
       if (res.statusCode === 200) {
         expect(res.body.success).toBe(true);
       }
-    });
-    
-    it('should allow STAFF to view sales', async () => {
-      const res = await request(app)
-        .get('/api/sales')
-        .set('Authorization', `Bearer ${staffToken}`);
-      
-      // STAFF should be able to read sales
-      expect([200, 404]).toContain(res.statusCode);
     });
     
     it('should support date range filtering', async () => {
@@ -112,16 +95,6 @@ describe('Sales Management API', () => {
         .send(validSale);
       
       expect(res.statusCode).toBe(401);
-    });
-    
-    it('should allow STAFF to create sales', async () => {
-      const res = await request(app)
-        .post('/api/sales')
-        .set('Authorization', `Bearer ${staffToken}`)
-        .send(validSale);
-      
-      // STAFF should be able to create sales (main function)
-      expect([200, 201, 400, 404]).toContain(res.statusCode);
     });
     
     it('should reject sale without items', async () => {
@@ -246,10 +219,10 @@ describe('Sales Management API', () => {
   });
   
   describe('Role-Based Access Control', () => {
-    it('should allow STAFF to create sales (main POS function)', async () => {
+    it('should allow SHOP_ADMIN to create sales', async () => {
       const res = await request(app)
         .post('/api/sales')
-        .set('Authorization', `Bearer ${staffToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           customerId: 'test_customer',
           items: [{
@@ -263,21 +236,7 @@ describe('Sales Management API', () => {
           paymentStatus: 'paid'
         });
       
-      // STAFF primary function is to create sales
       expect([200, 201, 400, 404]).toContain(res.statusCode);
-    });
-    
-    it('should allow both roles to view sales reports', async () => {
-      const adminRes = await request(app)
-        .get('/api/sales')
-        .set('Authorization', `Bearer ${adminToken}`);
-      
-      const staffRes = await request(app)
-        .get('/api/sales')
-        .set('Authorization', `Bearer ${staffToken}`);
-      
-      expect([200, 404]).toContain(adminRes.statusCode);
-      expect([200, 404]).toContain(staffRes.statusCode);
     });
   });
 });

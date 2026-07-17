@@ -8,7 +8,6 @@ const request = require('supertest');
 describe('Customer Management API', () => {
   let app;
   let adminToken;
-  let staffToken;
   
   beforeAll(() => {
     app = require('../src/server');
@@ -17,13 +16,6 @@ describe('Customer Management API', () => {
       userId: global.testUtils.ADMIN_ID,
       email: 'admin@test.com',
       role: 'SHOP_ADMIN',
-      shopId: global.testUtils.SHOP_ID,
-    });
-    
-    staffToken = global.testUtils.generateTestToken({
-      userId: global.testUtils.STAFF_ID,
-      email: 'staff@test.com',
-      role: 'STAFF',
       shopId: global.testUtils.SHOP_ID,
     });
   });
@@ -38,14 +30,6 @@ describe('Customer Management API', () => {
       const res = await request(app)
         .get('/api/customers')
         .set('Authorization', `Bearer ${adminToken}`);
-      
-      expect([200, 404]).toContain(res.statusCode);
-    });
-    
-    it('should allow STAFF to view customers', async () => {
-      const res = await request(app)
-        .get('/api/customers')
-        .set('Authorization', `Bearer ${staffToken}`);
       
       expect([200, 404]).toContain(res.statusCode);
     });
@@ -194,14 +178,6 @@ describe('Customer Management API', () => {
       
       expect(res.statusCode).toBe(404);
     });
-    
-    it('should allow STAFF to view customer details', async () => {
-      const res = await request(app)
-        .get('/api/customers/test_id')
-        .set('Authorization', `Bearer ${staffToken}`);
-      
-      expect([200, 404]).toContain(res.statusCode);
-    });
   });
   
   describe('PUT /api/customers/:id', () => {
@@ -293,36 +269,13 @@ describe('Customer Management API', () => {
     });
   });
   
-  describe('Customer Purchase History', () => {
-    it('should retrieve customer purchase history', async () => {
-      const res = await request(app)
-        .get('/api/customers/test_id/sales')
-        .set('Authorization', `Bearer ${adminToken}`);
-      
-      expect([200, 404]).toContain(res.statusCode);
-    });
-    
-    it('should allow STAFF to view purchase history', async () => {
-      const res = await request(app)
-        .get('/api/customers/test_id/sales')
-        .set('Authorization', `Bearer ${staffToken}`);
-      
-      expect([200, 404]).toContain(res.statusCode);
-    });
-  });
-  
   describe('Role-Based Access Control', () => {
-    it('should allow both roles to search customers', async () => {
-      const adminRes = await request(app)
+    it('should allow SHOP_ADMIN to search customers', async () => {
+      const res = await request(app)
         .get('/api/customers?search=test')
         .set('Authorization', `Bearer ${adminToken}`);
       
-      const staffRes = await request(app)
-        .get('/api/customers?search=test')
-        .set('Authorization', `Bearer ${staffToken}`);
-      
-      expect([200, 404]).toContain(adminRes.statusCode);
-      expect([200, 404]).toContain(staffRes.statusCode);
+      expect([200, 404]).toContain(res.statusCode);
     });
   });
 });

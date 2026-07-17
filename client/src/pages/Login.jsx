@@ -85,7 +85,6 @@ const Login = () => {
               {[
                 { key: "super_admin", label: "Super Admin", color: "blue" },
                 { key: "shop_admin", label: "Shop Admin", color: "green" },
-                { key: "staff", label: "Staff", color: "purple" },
               ].map(({ key, label }) => (
                 <button
                   key={key}

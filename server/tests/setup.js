@@ -21,7 +21,6 @@ jest.setTimeout(30000);
 
 // Known test IDs (valid MongoDB ObjectId hex strings)
 const TEST_ADMIN_ID = '507f191e810c19729de860ea';
-const TEST_STAFF_ID = '507f191e810c19729de860eb';
 const TEST_SHOP_ID = 'shop_health_care_01';
 
 // Connect to database for integration tests
@@ -78,23 +77,6 @@ beforeAll(async () => {
         { upsert: true },
       );
 
-      // Create test STAFF user
-      await shopDb.collection('users').updateOne(
-        { _id: new ObjectId(TEST_STAFF_ID) },
-        {
-          $setOnInsert: {
-            _id: new ObjectId(TEST_STAFF_ID),
-            name: 'Test Staff',
-            email: 'staff@test.com',
-            role: 'STAFF',
-            shopId: TEST_SHOP_ID,
-            isActive: true,
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true },
-      );
-
       seedDone = true;
     } catch (err) {
       console.warn('Test data seeding failed:', err.message);
@@ -106,7 +88,6 @@ beforeAll(async () => {
 global.testUtils = {
   // Well-known IDs
   ADMIN_ID: TEST_ADMIN_ID,
-  STAFF_ID: TEST_STAFF_ID,
   SHOP_ID: TEST_SHOP_ID,
 
   // Generate a test user token

@@ -195,9 +195,9 @@ describe("Firebase Token Verification Flow", () => {
 
       const user = {
         _id: userId,
-        name: "Staff User",
-        email: "staff@example.com",
-        role: "STAFF",
+        name: "Shop Admin User",
+        email: "admin@example.com",
+        role: "SHOP_ADMIN",
         shopId: shopId,
         isActive: true,
         // No permissions array
