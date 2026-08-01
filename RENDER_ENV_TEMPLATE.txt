@@ -13,8 +13,9 @@
 # 1. SENTRY - ERROR TRACKING
 # ============================================================
 # ✅ CONFIGURED - Copy this exact value to Render Dashboard
+# (Replace with your actual DSN — this is a placeholder)
 
-SENTRY_DSN=https://29e52d27ea1bb0b011b8414e0976bc5b@o4511383549837312.ingest.de.sentry.io/4511383552131152
+SENTRY_DSN=https://[your-public-key]@o[org-id].ingest.sentry.io/[project-id]
 
 # Example:
 # SENTRY_DSN=https://abc123def456@o123456.ingest.sentry.io/7890123
