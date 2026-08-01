@@ -22,7 +22,7 @@ if (!admin.apps || admin.apps.length === 0) {
         const serviceAccount = JSON.parse(serviceAccountJson);
 
         admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
+          credential: admin.cert(serviceAccount),
         });
         isInitialized = true;
         logger.info('Firebase Admin SDK initialized successfully (base64 method)');
@@ -42,7 +42,7 @@ if (!admin.apps || admin.apps.length === 0) {
         );
       } else {
         admin.initializeApp({
-          credential: admin.credential.cert({
+          credential: admin.cert({
             projectId,
             clientEmail,
             privateKey,
