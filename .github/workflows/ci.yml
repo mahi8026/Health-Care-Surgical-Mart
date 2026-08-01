@@ -24,9 +24,19 @@ jobs:
 
     services:
       mongodb:
-        image: mongo:8
+        # NOTE: mongo:8 / mongo:latest (8.0.5+) crash on startup on Linux
+        # kernel >= 6.19 (GH ubuntu-latest) due to the TCMalloc/rseq
+        # incompatibility (see docker-library/mongo discussion #748).
+        # 8.0.4 is the last release before the bad TCMalloc bump.
+        image: mongo:8.0.4
         ports:
           - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
 
     env:
       NODE_ENV: test
