@@ -6,6 +6,14 @@
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const { logger } = require('./logging');
 
+// TLS is required for Atlas (mongodb+srv:// or ?ssl=true) but not for local/CI MongoDB
+function requiresTls(uri) {
+  return Boolean(
+    uri &&
+      (uri.startsWith('mongodb+srv://') || /\?.*ssl=true(&|$)/.test(uri)),
+  );
+}
+
 // Connection configuration
 const config = {
   uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
@@ -31,8 +39,8 @@ const config = {
     retryWrites: true,
     retryReads: true,
 
-    // SSL/TLS settings for compatibility
-    ssl: true,
+    // SSL/TLS settings — only for Atlas URIs (mongodb+srv:// or ?ssl=true)
+    ssl: requiresTls(process.env.MONGODB_URI),
     tlsAllowInvalidCertificates: true,
     tlsAllowInvalidHostnames: true,
 
