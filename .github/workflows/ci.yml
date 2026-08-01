@@ -19,12 +19,12 @@ jobs:
   # JOB 1: Backend Tests
   # ──────────────────────────────────────────────────────────
   test:
-    name: Backend Tests (51 tests)
+    name: Backend Tests (118 tests)
     runs-on: ubuntu-latest
 
     services:
       mongodb:
-        image: mongo:7
+        image: mongo:8
         ports:
           - 27017:27017
 
@@ -52,7 +52,7 @@ jobs:
 
       - name: Run backend tests
         working-directory: server
-        run: npm test
+        run: npm run test:ci
 
       - name: Upload coverage reports
         if: success()

@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.js",
     "build": "echo 'No build step required for Node.js'",
     "test": "jest --coverage --verbose --forceExit",
+    "test:ci": "jest --verbose --forceExit",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint src/ --ext .js",
