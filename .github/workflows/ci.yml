@@ -60,6 +60,28 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Verify MongoDB reachable from runner
+        working-directory: server
+        run: |
+          node -e "
+            const { MongoClient } = require('mongodb');
+            (async () => {
+              const t0 = Date.now();
+              const client = new MongoClient(process.env.MONGODB_URI, {
+                serverSelectionTimeoutMS: 8000,
+              });
+              try {
+                await client.connect();
+                console.log('MONGO_OK', 'connected in', Date.now() - t0, 'ms');
+              } catch (err) {
+                console.log('MONGO_FAIL', err.message);
+                process.exit(1);
+              } finally {
+                await client.close().catch(() => {});
+              }
+            })();
+          "
+
       - name: Run backend tests
         working-directory: server
         run: npm run test:ci
