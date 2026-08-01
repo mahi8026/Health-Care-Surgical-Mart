@@ -21,7 +21,9 @@ const config = {
   options: {
     serverApi: {
       version: ServerApiVersion.v1,
-      strict: true,
+      // Non-strict: Atlas still gets the Stable API handshake, but commands like
+      // serverStatus and text-index creation remain allowed on any deployment
+      strict: false,
       deprecationErrors: true,
     },
     // Connection pool settings (optimized for multi-tenant workload)
@@ -65,7 +67,7 @@ async function connectToDatabase() {
   }
 
   try {
-    logger.info(`Connecting to MongoDB Atlas database: ${config.dbName}...`);
+    logger.info(`Connecting to MongoDB database: ${config.dbName}...`);
 
     client = new MongoClient(config.uri, config.options);
 
@@ -96,10 +98,14 @@ async function connectToDatabase() {
       `✅ Successfully connected to MongoDB database: ${config.dbName}`,
     );
 
-    // Log connection details
-    const admin = client.db().admin();
-    const serverStatus = await admin.serverStatus();
-    logger.info(`MongoDB version: ${serverStatus.version}`);
+    // Log connection details (best-effort — serverStatus is not in Stable API v1, so it can fail on some deployments)
+    try {
+      const admin = client.db().admin();
+      const serverStatus = await admin.serverStatus();
+      logger.info(`MongoDB version: ${serverStatus.version}`);
+    } catch (statusError) {
+      logger.debug('MongoDB serverStatus unavailable:', statusError.message);
+    }
     logger.info(`Connection pool size: ${config.options.maxPoolSize}`);
 
     return client;
