@@ -45,7 +45,7 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    sourcemap: false, // prod: no .map files shipped (saves ~5MB deploy, no source exposure); dev server keeps its own
     chunkSizeWarningLimit: 600, // Increased from default 500kB
     rollupOptions: {
       output: {

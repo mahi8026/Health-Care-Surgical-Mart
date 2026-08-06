@@ -418,6 +418,15 @@ const startServer = async () => {
       logger.warn('Failed to create system indexes (non-fatal):', indexError.message);
     }
 
+    // Verify shop indexes up front (memoized — runs at most once per process)
+    const { ensureShopIndexes } = require('./config/database');
+    try {
+      await ensureShopIndexes();
+      logger.info('Shop indexes verified');
+    } catch (indexError) {
+      logger.warn('Failed to create shop indexes (non-fatal):', indexError.message);
+    }
+
     // Initialize Redis (optional, non-blocking)
     let redisClient = null;
     try {

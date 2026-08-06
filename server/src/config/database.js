@@ -331,6 +331,54 @@ async function createShopIndexes(shopId) {
 }
 
 /**
+ * Track which shops already had their indexes verified in this process,
+ * so we don't re-run ~11 createIndexes commands on every request.
+ */
+const shopIndexesEnsured = new Set();
+const shopIndexesInFlight = new Map();
+
+/**
+ * Ensure shop indexes exist, at most once per shop per process.
+ *
+ * Resolves the target shop key the same way getShopDatabase() does
+ * (SHOP_DB_NAME → SHOP_ID → shopId arg → default app DB), then creates
+ * indexes only if this process hasn't verified them yet. Concurrent
+ * callers share a single in-flight promise, and failures are retried on
+ * the next call instead of being cached.
+ *
+ * @param {string} [shopId] - Legacy shop identifier (ignored when SHOP_DB_NAME/SHOP_ID are set)
+ * @returns {Promise<void>}
+ */
+function ensureShopIndexes(shopId) {
+  const key =
+    process.env.SHOP_DB_NAME ||
+    process.env.SHOP_ID ||
+    shopId ||
+    DEFAULT_APP_DB_NAME;
+
+  if (shopIndexesEnsured.has(key)) {
+    return Promise.resolve();
+  }
+
+  if (shopIndexesInFlight.has(key)) {
+    return shopIndexesInFlight.get(key);
+  }
+
+  const pending = createShopIndexes(key)
+    .then(() => {
+      shopIndexesEnsured.add(key);
+      shopIndexesInFlight.delete(key);
+    })
+    .catch((error) => {
+      shopIndexesInFlight.delete(key);
+      throw error;
+    });
+
+  shopIndexesInFlight.set(key, pending);
+  return pending;
+}
+
+/**
  * Create system-level indexes
  */
 async function createSystemIndexes() {
@@ -438,6 +486,7 @@ module.exports = {
   getDatabaseStats,
   listAllShops,
   createShopIndexes,
+  ensureShopIndexes,
   createSystemIndexes,
   healthCheck,
   migrateToSingleDatabase,

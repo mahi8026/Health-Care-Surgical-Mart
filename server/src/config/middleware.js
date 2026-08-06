@@ -3,7 +3,6 @@
  * Centralized middleware setup for the Medical Store POS System
  */
 
-const { requestLogger } = require('./logging');
 const { authenticate } = require('../middleware/auth-multi-tenant');
 const {
   createRateLimiters,
@@ -23,8 +22,8 @@ const setupMiddleware = (app) => {
   // Session fixation prevention
   app.use(preventSessionFixation);
 
-  // Request logging
-  app.use(requestLogger);
+  // NOTE: per-request logging is opt-in (ENABLE_REQUEST_LOGGING=true in
+  // server.js) — it writes 4+ winston log lines to disk per request in prod.
 
   // Security middleware
   app.use(xssProtection);

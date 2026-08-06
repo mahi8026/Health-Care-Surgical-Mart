@@ -221,9 +221,10 @@ async function authenticate(req, res, next) {
         req.shopDb = getShopDatabase(req.user.shopId);
 
         // Ensure shop indexes exist (fire-and-forget, non-blocking)
-        const { createShopIndexes } = require('../config/database');
+        // Memoized in database.js — runs once per shop per process
+        const { ensureShopIndexes } = require('../config/database');
         setImmediate(() => {
-          createShopIndexes(req.user.shopId).catch((err) => {
+          ensureShopIndexes(req.user.shopId).catch((err) => {
             logger.warn(`Failed to verify shop indexes for ${req.user.shopId}:`, err.message);
           });
         });

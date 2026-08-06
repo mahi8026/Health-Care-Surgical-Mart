@@ -77,8 +77,9 @@ describe("Firebase Token Verification Flow", () => {
     getSystemDatabase.mockReturnValue(mockSystemDb);
 
     // Fix lazy-required database functions to return promises (prevents worker crashes)
-    const { createShopIndexes, createSystemIndexes, healthCheck } = require("../../src/config/database");
+    const { createShopIndexes, ensureShopIndexes, createSystemIndexes, healthCheck } = require("../../src/config/database");
     createShopIndexes.mockResolvedValue();
+    ensureShopIndexes.mockResolvedValue();
     createSystemIndexes.mockResolvedValue();
     healthCheck.mockResolvedValue({ ok: 1 });
 
