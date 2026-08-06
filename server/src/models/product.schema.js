@@ -36,6 +36,10 @@ const productSchema = {
           bsonType: 'string',
           description: 'Stock Keeping Unit - unique identifier - required',
         },
+        barcode: {
+          bsonType: 'string',
+          description: 'Universal barcode (EAN/UPC) - optional but unique when set',
+        },
         purchasePrice: {
           bsonType: 'double',
           minimum: 0,
@@ -100,6 +104,7 @@ const productSchema = {
 
 const productIndexes = [
   { key: { sku: 1 }, unique: true, name: 'sku_unique' },
+  { key: { barcode: 1 }, unique: true, sparse: true, name: 'barcode_unique' },
   { key: { name: 1 }, name: 'name_index' },
   { key: { category: 1 }, name: 'category_index' },
   { key: { brand: 1 }, name: 'brand_index' },

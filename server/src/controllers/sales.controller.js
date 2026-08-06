@@ -341,8 +341,8 @@ class SalesController {
     const enrichedItems = [];
 
     for (const item of items) {
-      // Handle custom items (no productId)
-      if (!item.productId || item.productId === null) {
+      // Handle custom items (no productId, no barcode, no sku)
+      if (!item.productId && !item.barcode && !item.sku) {
         if (!item.customName) {
           throw new Error('Custom items must have a customName');
         }
@@ -360,17 +360,33 @@ class SalesController {
       }
 
       // Handle regular products
-      const product = await shopDb.collection('products').findOne({
-        _id: new ObjectId(item.productId),
-      });
+      // Resolve by productId first, then by barcode/SKU (for POS scanners where
+      // the client may only have the scanned code).
+      let product = null;
+
+      if (item.productId && ObjectId.isValid(item.productId)) {
+        product = await shopDb.collection('products').findOne({
+          _id: new ObjectId(item.productId),
+        });
+      } else if (item.productId && !ObjectId.isValid(item.productId)) {
+        const code = String(item.productId).trim();
+        if (code) {
+          product = await this._findProductByCode(shopDb, code);
+        }
+      } else if (item.barcode || item.sku) {
+        const code = String(item.barcode || item.sku).trim();
+        if (code) {
+          product = await this._findProductByCode(shopDb, code);
+        }
+      }
 
       if (!product) {
-        throw new Error(`Product not found: ${item.productId}`);
+        throw new Error(`Product not found: ${item.productId || item.barcode || item.sku}`);
       }
 
       // Check stock availability - WARNING ONLY
       const stock = await shopDb.collection('stock').findOne({
-        productId: new ObjectId(item.productId),
+        productId: product._id,
       });
 
       if (!stock || stock.currentQty < item.quantity) {
@@ -389,7 +405,7 @@ class SalesController {
       }
 
       enrichedItems.push({
-        productId: new ObjectId(item.productId),
+        productId: product._id,
         name: product.name,
         rate: parseFloat(item.sellingPrice || product.sellingPrice),
         costPrice: parseFloat(product.purchasePrice || 0),
@@ -401,6 +417,20 @@ class SalesController {
     }
 
     return enrichedItems;
+  }
+
+  /**
+   * Find a product by exact barcode or SKU match (POS scanner support).
+   */
+  async _findProductByCode(shopDb, code) {
+    const normalized = String(code).trim();
+    if (!normalized) {
+      return null;
+    }
+    const candidates = [...new Set([normalized, normalized.toLowerCase(), normalized.toUpperCase()])];
+    return await shopDb.collection('products').findOne({
+      $or: candidates.flatMap((value) => [{ barcode: value }, { sku: value }]),
+    });
   }
 
   /**

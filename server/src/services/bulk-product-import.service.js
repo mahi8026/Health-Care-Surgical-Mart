@@ -165,6 +165,9 @@ class BulkProductImportService {
 
     if (row.expiryDate) {product.expiryDate = new Date(row.expiryDate);}
     if (row.batchNumber) {product.batchNo = row.batchNumber;}
+    if (row.barcode !== undefined && row.barcode !== null && String(row.barcode).trim() !== '') {
+      product.barcode = String(row.barcode).trim();
+    }
 
     product.sku = (options.autoGenerateSKU || !row.sku)
       ? this.generateSKU(product.name, product.category)

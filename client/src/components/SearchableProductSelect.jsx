@@ -42,6 +42,7 @@ const SearchableProductSelect = ({
           return (
             product.name?.toLowerCase().includes(term) ||
             product.sku?.toLowerCase().includes(term) ||
+            product.barcode?.toLowerCase().includes(term) ||
             product.brand?.toLowerCase().includes(term) ||
             categoryName?.toLowerCase().includes(term)
           );

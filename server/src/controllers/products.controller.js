@@ -61,6 +61,7 @@ class ProductsController extends BaseController {
         category,
         brand,
         sku,
+        barcode,
         purchasePrice,
         sellingPrice,
         unit,
@@ -94,12 +95,26 @@ class ProductsController extends BaseController {
         return this.sendError(res, 'SKU already exists', 400);
       }
 
+      // Check if barcode already exists (barcodes are unique when provided)
+      const normalizedBarcode =
+        barcode !== undefined && barcode !== null ? String(barcode).trim() : '';
+      if (normalizedBarcode) {
+        const existingBarcode = await req.shopDb
+          .collection('products')
+          .findOne({ barcode: normalizedBarcode });
+
+        if (existingBarcode) {
+          return this.sendError(res, `Barcode ${normalizedBarcode} is already used by "${existingBarcode.name}"`, 400);
+        }
+      }
+
       // Build product object
       const product = this._buildProductObject({
         name,
         category,
         brand,
         sku,
+        barcode: normalizedBarcode,
         purchasePrice,
         sellingPrice,
         unit,
@@ -163,6 +178,7 @@ class ProductsController extends BaseController {
         category,
         brand,
         sku,
+        barcode,
         purchasePrice,
         sellingPrice,
         unit,
@@ -197,12 +213,27 @@ class ProductsController extends BaseController {
         }
       }
 
+      // Check if barcode is being changed and if it already exists on another product
+      const normalizedBarcode =
+        barcode !== undefined && barcode !== null ? String(barcode).trim() : undefined;
+      if (normalizedBarcode !== undefined && normalizedBarcode !== (existingProduct.barcode || '')) {
+        const barcodeExists = await req.shopDb.collection('products').findOne({
+          barcode: normalizedBarcode,
+          _id: { $ne: new ObjectId(req.params.id) },
+        });
+
+        if (barcodeExists) {
+          return this.sendError(res, `Barcode ${normalizedBarcode} is already used by "${barcodeExists.name}"`, 400);
+        }
+      }
+
       // Build update data
       const updateData = this._buildUpdateData({
         name,
         category,
         brand,
         sku,
+        barcode: normalizedBarcode,
         purchasePrice,
         sellingPrice,
         unit,
@@ -332,6 +363,40 @@ class ProductsController extends BaseController {
   // ==================== Private Helper Methods ====================
 
   /**
+   * Get product by barcode or SKU (exact match)
+   * Used by the POS barcode scanner.
+   */
+  async lookupProductByCode(req, res) {
+    try {
+      const { code } = req.params;
+      const includeInactive = req.query.includeInactive === 'true';
+
+      if (!code || !String(code).trim()) {
+        return this.sendError(res, 'Scan code is required', 400);
+      }
+
+      const normalized = String(code).trim();
+      const candidates = [...new Set([normalized, normalized.toLowerCase(), normalized.toUpperCase()])];
+
+      const matchStage = {
+        isActive: includeInactive ? { $exists: true } : true,
+        $or: candidates.flatMap((value) => [{ barcode: value }, { sku: value }]),
+      };
+
+      const products = await this._fetchProductsWithStock(req.shopDb, matchStage);
+
+      if (!products || products.length === 0) {
+        return this.sendError(res, `No product found for code "${normalized}"`, 404);
+      }
+
+      this.sendSuccess(res, products[0], 'Product found');
+    } catch (error) {
+      logger.error('Product code lookup error:', error);
+      this.sendError(res, error.message || 'Failed to look up product', error.statusCode || 500, error);
+    }
+  }
+
+  /**
    * Build product filter for queries
    */
   _buildProductFilter({ category, search, isActive }) {
@@ -349,6 +414,7 @@ class ProductsController extends BaseController {
       matchStage.$or = [
         { name: { $regex: search, $options: 'i' } },
         { sku: { $regex: search, $options: 'i' } },
+        { barcode: { $regex: search, $options: 'i' } },
         { brand: { $regex: search, $options: 'i' } },
       ];
     }
@@ -431,7 +497,7 @@ class ProductsController extends BaseController {
    * Build product object for creation
    */
   _buildProductObject({
-    name, category, brand, sku, purchasePrice, sellingPrice,
+    name, category, brand, sku, barcode, purchasePrice, sellingPrice,
     unit, minStockLevel, description, batchNo, lotNo, expiryDate,
     reorderPoint, maxStock,
   }) {
@@ -440,6 +506,7 @@ class ProductsController extends BaseController {
       category,
       brand: brand || '',
       sku,
+      barcode: barcode ? String(barcode).trim() : undefined,
       purchasePrice: parseFloat(purchasePrice),
       sellingPrice: parseFloat(sellingPrice),
       unit,
@@ -460,7 +527,7 @@ class ProductsController extends BaseController {
    * Build update data object
    */
   _buildUpdateData({
-    name, category, brand, sku, purchasePrice, sellingPrice,
+    name, category, brand, sku, barcode, purchasePrice, sellingPrice,
     unit, minStockLevel, description, batchNo, lotNo, expiryDate,
     reorderPoint, maxStock, isActive,
   }) {
@@ -469,6 +536,10 @@ class ProductsController extends BaseController {
     if (category !== undefined) {updateData.category = category;}
     if (brand !== undefined) {updateData.brand = brand;}
     if (sku !== undefined) {updateData.sku = sku;}
+    if (barcode !== undefined) {
+      // '' clears the barcode; a value is trimmed
+      updateData.barcode = barcode ? String(barcode).trim() : '';
+    }
     if (purchasePrice !== undefined) {updateData.purchasePrice = parseFloat(purchasePrice);}
     if (sellingPrice !== undefined) {updateData.sellingPrice = parseFloat(sellingPrice);}
     if (unit !== undefined) {updateData.unit = unit;}

@@ -315,6 +315,17 @@ router.get(
 );
 
 /**
+ * GET /api/products/lookup/:code
+ * Look up a product by barcode or SKU (exact match) — POS scanner endpoint.
+ * Defined before /:id so "lookup" is not captured as an id.
+ */
+router.get(
+  '/lookup/:code',
+  requirePermission(PERMISSIONS.VIEW_PRODUCTS),
+  productsController.lookupProductByCode.bind(productsController),
+);
+
+/**
  * GET /api/products/:id
  * Get single product by ID
  */

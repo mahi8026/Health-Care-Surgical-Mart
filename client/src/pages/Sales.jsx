@@ -3,6 +3,7 @@ import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ProfessionalInvoice from "../components/ProfessionalInvoice";
 import SearchableProductSelect from "../components/SearchableProductSelect";
+import ScannerPanel from "../components/ScannerPanel";
 
 const Sales = () => {
   // State management
@@ -259,6 +260,94 @@ const Sales = () => {
           : item,
       ),
     );
+  };
+
+  // Resolve a scanned/typed code against the loaded products or via the
+  // server lookup (barcode → SKU fallback). Returns the product object.
+  const findScannedProduct = async (code) => {
+    const normalized = String(code).trim().toLowerCase();
+
+    let product = products.find(
+      (p) =>
+        (p.barcode && String(p.barcode).trim().toLowerCase() === normalized) ||
+        (p.sku && String(p.sku).trim().toLowerCase() === normalized),
+    );
+
+    if (!product) {
+      const response = await api.get(
+        `/products/lookup/${encodeURIComponent(String(code).trim())}`,
+      );
+      if (!response.success || !response.data) {
+        throw new Error(response.message || `No product found for "${code}"`);
+      }
+      product = response.data;
+    }
+
+    if (product.isActive === false) {
+      throw new Error(`"${product.name}" is inactive`);
+    }
+    return product;
+  };
+
+  // Handle a barcode/SKU scan: resolve, validate stock, and add qty 1 to cart.
+  // Throws to let the ScannerPanel show error feedback.
+  const handleScan = async (code) => {
+    const normalized = String(code).trim();
+    if (!normalized) {
+      throw new Error("Empty scan code");
+    }
+
+    const product = await findScannedProduct(normalized);
+    const stockQty = Number(product.stockQuantity) || 0;
+    if (stockQty <= 0) {
+      throw new Error(`"${product.name}" is out of stock`);
+    }
+
+    const rate = parseFloat(product.sellingPrice);
+    const quantity = 1;
+
+    // Merge with an existing cart line if present.
+    const existingItemIndex = cart.findIndex(
+      (item) => item.productId === product._id,
+    );
+    if (existingItemIndex >= 0) {
+      const newQuantity = cart[existingItemIndex].quantity + quantity;
+      if (newQuantity > stockQty) {
+        throw new Error(
+          `Total quantity of "${product.name}" cannot exceed ${stockQty}`,
+        );
+      }
+      const updatedCart = [...cart];
+      updatedCart[existingItemIndex] = {
+        ...updatedCart[existingItemIndex],
+        quantity: newQuantity,
+        total: newQuantity * rate,
+      };
+      setCart(updatedCart);
+    } else {
+      setCart([
+        ...cart,
+        {
+          productId: product._id,
+          name: product.name,
+          category: product.category,
+          rate,
+          quantity,
+          total: quantity * rate,
+          unit: product.unit,
+          maxStock: stockQty,
+        },
+      ]);
+    }
+
+    // Ensure the scanned product is in the picker for follow-up scans.
+    setProducts((prev) =>
+      prev.some((p) => p._id === product._id)
+        ? prev
+        : [...prev, product],
+    );
+
+    return { name: product.name, rate, quantity };
   };
 
   // Calculate totals
@@ -776,6 +865,9 @@ const Sales = () => {
             </h3>
           </div>
           <div className="p-4 space-y-4">
+            {/* Barcode scanner panel */}
+            <ScannerPanel onScan={handleScan} />
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product

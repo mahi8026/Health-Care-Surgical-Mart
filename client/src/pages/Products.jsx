@@ -39,6 +39,8 @@ const Products = () => {
             (product) =>
               product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
               product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (product.barcode &&
+                product.barcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
               (product.brand &&
                 product.brand.toLowerCase().includes(searchTerm.toLowerCase())),
           );
@@ -389,7 +391,7 @@ const Products = () => {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by name, SKU, or brand..."
+                placeholder="Search by name, SKU, barcode, or brand..."
                 className="input-field pl-10"
               />
               <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
@@ -465,6 +467,7 @@ const Products = () => {
               <th className="table-header-cell">Product</th>
               <th className="table-header-cell">Category</th>
               <th className="table-header-cell">SKU</th>
+              <th className="table-header-cell">Barcode</th>
               <th className="table-header-cell">Stock</th>
               <th className="table-header-cell">Purchase Price</th>
               <th className="table-header-cell">Selling Price</th>
@@ -475,7 +478,7 @@ const Products = () => {
           <tbody className="divide-y divide-gray-200">
             {products.length === 0 ? (
               <tr>
-                <td colSpan="9" className="table-cell text-center py-8">
+                <td colSpan="10" className="table-cell text-center py-8">
                   <div className="text-gray-500">
                     <i className="fas fa-box-open text-4xl mb-4"></i>
                     <p className="text-lg">No products found</p>
@@ -523,6 +526,13 @@ const Products = () => {
                     </td>
                     <td className="table-cell font-mono text-sm">
                       {product.sku}
+                    </td>
+                    <td className="table-cell font-mono text-sm text-gray-600">
+                      {product.barcode ? (
+                        product.barcode
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="table-cell">
                       <div>
@@ -754,6 +764,7 @@ const ProductModal = ({
     category: "",
     brand: "",
     sku: "",
+    barcode: "",
     purchasePrice: "",
     sellingPrice: "",
     unit: "",
@@ -771,6 +782,7 @@ const ProductModal = ({
         typeof product.category === "object"
           ? product.category.name
           : product.category,
+      barcode: product.barcode || "",
       expiryDate: product.expiryDate
         ? typeof product.expiryDate === "string"
           ? product.expiryDate
@@ -793,6 +805,7 @@ const ProductModal = ({
       category: formData.category,
       brand: formData.brand,
       sku: formData.sku,
+      barcode: formData.barcode || null,
       purchasePrice: formData.purchasePrice,
       sellingPrice: formData.sellingPrice,
       unit: formData.unit,
@@ -956,6 +969,24 @@ const ProductModal = ({
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Click &ldquo;Generate&rdquo; to auto-create SKU from product details
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Barcode
+              </label>
+              <input
+                type="text"
+                name="barcode"
+                value={formData.barcode}
+                onChange={handleChange}
+                className="input-field font-mono"
+                placeholder="Scan barcode or enter EAN/UPC (optional)"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Scannable code for the POS barcode scanner. Must be unique
+                across products.
               </p>
             </div>
 

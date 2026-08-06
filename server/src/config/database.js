@@ -281,6 +281,7 @@ async function createShopIndexes(shopId) {
     // Product indexes
     await shopDb.collection('products').createIndexes([
       { key: { sku: 1 }, unique: true, name: 'sku_unique' },
+      { key: { barcode: 1 }, unique: true, sparse: true, name: 'barcode_unique' },
       { key: { name: 1 }, name: 'name_index' },
       { key: { category: 1 }, name: 'category_index' },
       { key: { isActive: 1 }, name: 'active_status_index' },
