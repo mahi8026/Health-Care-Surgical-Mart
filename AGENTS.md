@@ -65,6 +65,11 @@ npm run format              # uses root .prettierrc
 - Server sets `app.set('trust proxy', 1)` (required for Render behind reverse proxy).
 - Root-level `*.md` files matching many patterns (e.g. `*_FIX*.md`, `*_SUMMARY.md`) are gitignored — don't commit ephemeral docs there.
 
+## Performance notes
+- Shop index creation is memoized in `server/src/config/database.js` (`ensureShopIndexes`) — runs once per shop per process (verified once at boot in `server.js`, then lazily via auth middleware). Don't call `createShopIndexes` directly per-request.
+- Per-request winston logging is opt-in: set `ENABLE_REQUEST_LOGGING=true` (see `server/src/config/logging.js` & `middleware.js`). Default = no per-request disk I/O; `morgan combined` still logs each request in production.
+- Client production builds ship **no sourcemaps** (`sourcemap: false` in `client/vite.config.js`) — don't re-enable for prod deploys (added ~5MB to Firebase hosting + exposed source). Dev server provides its own sourcemaps.
+
 ## Notable
 - Firebase project: `health-care-60ee6` (from `.firebaserc`).
 - CI runs on Node 24 for main, Node 20 for PR previews.
