@@ -16,7 +16,7 @@ cd client && npm run dev     # Vite on localhost:3000, proxies /api → :5001
 - **Server**: CommonJS (`require`/`module.exports`). Entry: `src/server.js`.
 - **Client**: ESM (`import`/`export`). Entry: `src/main.jsx`. No tsconfig exists — `npm run type-check` fails.
 - **Multi-tenant → Single-tenant**: the app now serves ONE shop only. All data lives in a single pinned database — `getShopDatabase()` resolves to `SHOP_DB_NAME` (e.g. `shop_6a020466789ca874348b2557`; production) or to `client.db('shop_<SHOP_ID>')` (tests/dev). JWT still carries `shopId` but it is ignored for DB selection. Super-admin platform ops (monitoring only) still use `system_users` in `Health_Care_Shop_DB` via `/api/super-admin`.
-- Server auth routes (`auth-multi-tenant.routes.js`) call `getShopDatabase()` with no args — **`SHOP_DB_NAME` (prod) or `SHOP_ID` (dev/test) MUST be set or login throws** "No shop database configured".
+- Server auth routes (`auth-multi-tenant.routes.js`) call `getShopDatabase()` with no args — **`SHOP_DB_NAME` (prod) or `SHOP_ID` (dev/test) selects the database**. If neither is set, `getShopDatabase()` falls back to `DEFAULT_APP_DB_NAME` (`shop_6a020466789ca874348b2557` — the production shop DB) so a host that forgot to set the env still serves the single shop; prefer setting the env explicitly. `tests/setup.js` pins `SHOP_ID`.
 
 ## Testing
 ```bash

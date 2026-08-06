@@ -116,17 +116,31 @@ async function connectToDatabase() {
 }
 
 /**
+ * Default application database (single-tenant production data).
+ * Used as a last-resort fallback so the app keeps working even if the
+ * SHOP_DB_NAME / SHOP_ID env vars are missing on a host (e.g. Render before
+ * the dashboard env is set). Precedence is:
+ *   1. SHOP_DB_NAME  (exact database name)
+ *   2. SHOP_ID env (or the legacy shopId argument)  → client.db(`shop_<id>`)
+ *   3. This constant
+ */
+const DEFAULT_APP_DB_NAME =
+  process.env.DEFAULT_SHOP_DB_NAME || 'shop_6a020466789ca874348b2557';
+
+/**
  * Get the application database.
  *
  * Single-tenant mode: the whole application serves ONE shop, so every caller
  * resolves to the same database.
  *   - SHOP_DB_NAME (e.g. "shop_6a020466789ca874348b2557") pins the exact
  *     database name (production).
- *   - Otherwise SHOP_ID (e.g. "shop_health_care_01") selects the DB using the
- *     legacy shop_<id> naming (tests / local single-shop dev).
+ *   - Otherwise SHOP_ID (e.g. "shop_6a020466789ca874348b2557") selects the DB
+ *     using the legacy shop_<id> naming (tests / local single-shop dev).
+ *   - Otherwise falls back to the DEFAULT_APP_DB_NAME pin so deployments that
+ *     forgot to set the env still serve the single production shop.
  *
  * @param {string} shopId - Ignored in single-tenant mode; kept only for
- *   backward-compatible call sites. Must be provided when neither env is set.
+ *   backward-compatible call sites.
  * @returns {Object} The application database instance
  */
 function getShopDatabase(shopId) {
@@ -140,13 +154,15 @@ function getShopDatabase(shopId) {
   }
 
   const effectiveShopId = process.env.SHOP_ID || shopId;
-  if (!effectiveShopId || typeof effectiveShopId !== 'string') {
-    throw new Error(
-      'No shop database configured. Set SHOP_DB_NAME (production) or SHOP_ID.'
-    );
+  if (effectiveShopId && typeof effectiveShopId === 'string') {
+    return client.db(`shop_${effectiveShopId}`);
   }
 
-  return client.db(`shop_${effectiveShopId}`);
+  logger.warn(
+    'SHOP_DB_NAME / SHOP_ID not set — falling back to default app database',
+    { dbName: DEFAULT_APP_DB_NAME }
+  );
+  return client.db(DEFAULT_APP_DB_NAME);
 }
 
 /**
