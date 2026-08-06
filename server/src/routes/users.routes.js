@@ -19,10 +19,6 @@ const { logger } = require('../config/logging');
 const auditLog = require('../services/audit-log.service');
 const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
 const { cacheService } = require('../services/cache.service');
-const {
-  updateUserShopIndex,
-  removeUserFromIndex,
-} = require('../utils/user-shop-index-helper');
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -336,7 +332,7 @@ router.post(
   requirePermission(PERMISSIONS.CREATE_USER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { name, email, password, role = 'SHOP_ADMIN', isActive = true } = req.body;
+    const { name, email, password, isActive = true } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -347,11 +343,8 @@ router.post(
       throw createError.badRequest('Password must be at least 6 characters');
     }
 
-    // Validate role is one of the allowed values (only SHOP_ADMIN exists)
-    const validRoles = ['SHOP_ADMIN'];
-    if (!validRoles.includes(role)) {
-      throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
-    }
+    // Single-tenant app: every account is a shop admin
+    const role = 'SHOP_ADMIN';
 
     // Check if email already exists in MongoDB
     const existingUser = await shopDb
@@ -404,15 +397,6 @@ router.post(
 
     const result = await shopDb.collection('users').insertOne(userData);
 
-    // Keep user_shop_index in sync so login auto-detect can find this user
-    await updateUserShopIndex({
-      email: userData.email,
-      shopId: req.user.shopId,
-      userId: result.insertedId.toString(),
-      role,
-      isActive: Boolean(isActive),
-    });
-
     // Return user data without password
     const { password: _, ...userResponse } = userData;
     userResponse._id = result.insertedId;
@@ -441,7 +425,7 @@ router.put(
   requirePermission(PERMISSIONS.EDIT_USER),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
-    const { name, email, password, role, isActive } = req.body;
+    const { name, email, password, isActive } = req.body;
 
     // Check if user exists
     const existingUser = await shopDb
@@ -453,16 +437,8 @@ router.put(
     }
 
     // Prevent users from editing themselves (except password through dedicated endpoint)
-    if (req.params.id === req.user._id?.toString() && (role || isActive !== undefined)) {
-      throw createError.forbidden('You cannot change your own role or status');
-    }
-
-    // Validate role if provided (only SHOP_ADMIN exists)
-    if (role) {
-      const validRoles = ['SHOP_ADMIN'];
-      if (!validRoles.includes(role)) {
-        throw createError.badRequest(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
-      }
+    if (req.params.id === req.user._id?.toString() && isActive !== undefined) {
+      throw createError.forbidden('You cannot change your own status');
     }
 
     // Check if email is taken by another user
@@ -484,7 +460,6 @@ router.put(
 
     if (name) {updateData.name = name.trim();}
     if (email) {updateData.email = email.toLowerCase().trim();}
-    if (role) {updateData.role = role;}
     if (isActive !== undefined) {updateData.isActive = Boolean(isActive);}
 
     // Hash new password if provided
@@ -496,25 +471,11 @@ router.put(
       .collection('users')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
-    // Keep user_shop_index in sync (email/role/isActive may have changed)
-    await updateUserShopIndex({
-      email: (email || existingUser.email).toLowerCase(),
-      shopId: req.user.shopId,
-      userId: req.params.id,
-      role: role || existingUser.role,
-      isActive: isActive !== undefined ? Boolean(isActive) : existingUser.isActive,
-    });
-
-    // Audit: user updated (role change gets its own action)
-    const action = role && role !== existingUser.role
-      ? AUDIT_ACTIONS.ROLE_CHANGED
-      : AUDIT_ACTIONS.USER_UPDATED;
-    auditLog.log(req, action, 'user', req.params.id,
-      action === AUDIT_ACTIONS.ROLE_CHANGED
-        ? `Changed role of ${existingUser.email} from ${existingUser.role} to ${role}`
-        : `Updated user ${existingUser.email}`,
+    // Audit: user updated
+    auditLog.log(req, AUDIT_ACTIONS.USER_UPDATED, 'user', req.params.id,
+      `Updated user ${existingUser.email}`,
       {
-        before: { name: existingUser.name, email: existingUser.email, role: existingUser.role, isActive: existingUser.isActive },
+        before: { name: existingUser.name, email: existingUser.email, isActive: existingUser.isActive },
         after: updateData,
       }
     );
@@ -574,9 +535,6 @@ router.delete(
     }
 
     await shopDb.collection('users').deleteOne({ _id: new ObjectId(req.params.id) });
-
-    // Remove from user_shop_index
-    await removeUserFromIndex(user.email);
 
     auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, 'user', req.params.id,
       `Deleted user ${user.email}`,

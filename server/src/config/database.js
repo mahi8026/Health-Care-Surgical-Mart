@@ -116,26 +116,37 @@ async function connectToDatabase() {
 }
 
 /**
- * Get database instance for a specific shop
- * Returns the same database but with shop-prefixed collection names
- * @param {string} shopId - Unique shop identifier
- * @returns {Object} Database wrapper with shop-specific collection access
+ * Get the application database.
+ *
+ * Single-tenant mode: the whole application serves ONE shop, so every caller
+ * resolves to the same database.
+ *   - SHOP_DB_NAME (e.g. "shop_6a020466789ca874348b2557") pins the exact
+ *     database name (production).
+ *   - Otherwise SHOP_ID (e.g. "shop_health_care_01") selects the DB using the
+ *     legacy shop_<id> naming (tests / local single-shop dev).
+ *
+ * @param {string} shopId - Ignored in single-tenant mode; kept only for
+ *   backward-compatible call sites. Must be provided when neither env is set.
+ * @returns {Object} The application database instance
  */
 function getShopDatabase(shopId) {
   if (!isConnected || !client) {
     throw new Error('Database not connected. Call connectToDatabase() first.');
   }
 
-  if (!shopId || typeof shopId !== 'string') {
-    throw new Error('Invalid shopId provided');
+  const pinnedDbName = process.env.SHOP_DB_NAME;
+  if (pinnedDbName) {
+    return client.db(pinnedDbName);
   }
 
-  // Return shop-specific database (Phase 5A architecture)
-  // Each shop has its own database: shop_6a020466789ca874348b2557
-  const shopDbName = `shop_${shopId}`;
-  const shopDatabase = client.db(shopDbName);
+  const effectiveShopId = process.env.SHOP_ID || shopId;
+  if (!effectiveShopId || typeof effectiveShopId !== 'string') {
+    throw new Error(
+      'No shop database configured. Set SHOP_DB_NAME (production) or SHOP_ID.'
+    );
+  }
 
-  return shopDatabase;
+  return client.db(`shop_${effectiveShopId}`);
 }
 
 /**

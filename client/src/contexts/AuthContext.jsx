@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  const login = async (email, password, shopId = null) => {
+  const login = async (email, password) => {
     try {
       setLoading(true);
       setError(null);
@@ -174,10 +174,6 @@ export const AuthProvider = ({ children }) => {
         firebaseToken: idToken,
         email: email,
       };
-
-      if (shopId) {
-        body.shopId = shopId;
-      }
 
       const response = await api.post("/auth/firebase-login", body);
 

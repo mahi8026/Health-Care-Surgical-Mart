@@ -15,4 +15,8 @@ services:
         value: 10000
       - key: HOST
         value: 0.0.0.0
-      # Add other environment variables in Render Dashboard
+      - key: SHOP_DB_NAME
+        value: shop_6a020466789ca874348b2557
+      # SHOP_DB_NAME pins the single-tenant app database. Without it, every
+      # auth/route call throws "No shop database configured" (see AGENTS.md).
+      # Other environment variables are set in the Render Dashboard.

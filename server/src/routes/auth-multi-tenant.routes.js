@@ -261,7 +261,7 @@ function clearJwtCookie(res) {
  */
 router.post('/login', bruteForceProtection, async (req, res) => {
   try {
-    const { email: rawEmail, password, shopId } = req.body;
+    const { email: rawEmail, password } = req.body;
     const email = rawEmail?.trim().toLowerCase();
 
     if (!email || !password) {
@@ -271,18 +271,9 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       });
     }
 
-    // Resolve shop + user (index → ownerEmail → shop scan)
-    const { resolveShopUser } = require('../utils/shop-user-resolver');
-    const resolved = await resolveShopUser(email, shopId, {
-      noShopMessage: 'Shop not found for this email. Please contact support.',
-    });
-    if (resolved.error) {
-      return res
-        .status(resolved.error.statusCode)
-        .json({ success: false, message: resolved.error.message });
-    }
-
-    const { user, shopDb } = resolved;
+    // Single-tenant app: the shop database is configured at the app level.
+    const shopDb = getShopDatabase();
+    const user = await shopDb.collection('users').findOne({ email });
 
     if (!user) {
       return res.status(401).json({
@@ -380,7 +371,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
  */
 router.post('/change-password', bruteForceProtection, async (req, res) => {
   try {
-    const { email: rawEmail, oldPassword, newPassword, shopId } = req.body;
+    const { email: rawEmail, oldPassword, newPassword } = req.body;
     const email = rawEmail?.trim().toLowerCase();
 
     if (!email || !oldPassword || !newPassword) {
@@ -397,18 +388,9 @@ router.post('/change-password', bruteForceProtection, async (req, res) => {
       });
     }
 
-    // Resolve shop + user (shopId is auto-detected when omitted)
-    const { resolveShopUser } = require('../utils/shop-user-resolver');
-    const resolved = await resolveShopUser(email, shopId, {
-      noShopMessage: 'User not found. Please contact support.',
-    });
-    if (resolved.error) {
-      return res
-        .status(resolved.error.statusCode)
-        .json({ success: false, message: resolved.error.message });
-    }
-
-    const { user, shopDb } = resolved;
+    // Single-tenant app: the shop is configured at the app level.
+    const shopDb = getShopDatabase();
+    const user = await shopDb.collection('users').findOne({ email });
     const collection = shopDb.collection('users');
 
     if (!user) {
@@ -491,7 +473,7 @@ router.post('/change-password', bruteForceProtection, async (req, res) => {
  */
 router.post('/request-password-reset', bruteForceProtection, async (req, res) => {
   try {
-    const { email: rawEmail, shopId } = req.body;
+    const { email: rawEmail } = req.body;
     const email = rawEmail?.trim().toLowerCase();
 
     if (!email) {
@@ -501,21 +483,9 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
       });
     }
 
-    // Auto-detect shopId if not provided (index → ownerEmail → shop scan)
-    const { resolveShopUser } = require('../utils/shop-user-resolver');
-    const resolved = await resolveShopUser(email, shopId, {
-      noShopMessage: 'not-found',
-    });
-
-    // Anti-enumeration: return success whether or not the user exists
-    if (resolved.error) {
-      return res.json({
-        success: true,
-        message: 'If an account with that email exists, a password reset code has been sent.',
-      });
-    }
-
-    const { user, shopDb } = resolved;
+    // Single-tenant app: the shop is configured at the app level.
+    const shopDb = getShopDatabase();
+    const user = await shopDb.collection('users').findOne({ email });
 
     if (!user) {
       // Return success even if user not found (prevent email enumeration)
@@ -579,7 +549,7 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
  */
 router.post('/reset-password', async (req, res) => {
   try {
-    const { email: rawEmail, resetCode, newPassword, shopId } = req.body;
+    const { email: rawEmail, resetCode, newPassword } = req.body;
     const email = rawEmail?.trim().toLowerCase();
 
     if (!email || !resetCode || !newPassword) {
@@ -596,18 +566,9 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    // Get user from shop database (shopId auto-detected when omitted)
-    const { resolveShopUser } = require('../utils/shop-user-resolver');
-    const resolved = await resolveShopUser(email, shopId, {
-      noShopMessage: 'Invalid or expired reset code',
-    });
-    if (resolved.error) {
-      return res
-        .status(resolved.error.statusCode)
-        .json({ success: false, message: resolved.error.message });
-    }
-
-    const { user, shopDb } = resolved;
+    // Single-tenant app: the shop is configured at the app level.
+    const shopDb = getShopDatabase();
+    const user = await shopDb.collection('users').findOne({ email });
     const collection = shopDb.collection('users');
 
     if (!user) {
@@ -687,7 +648,7 @@ router.post('/reset-password', async (req, res) => {
  */
 router.post('/firebase-login', bruteForceProtection, async (req, res) => {
   try {
-    const { email: rawEmail, shopId, idToken, firebaseToken } = req.body;
+    const { email: rawEmail, idToken, firebaseToken } = req.body;
     const email = rawEmail?.trim().toLowerCase();
 
     // Accept both 'idToken' and 'firebaseToken' for backward compatibility
@@ -755,19 +716,15 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
       }
     }
 
-    // Resolve shop + user (index → ownerEmail → shop scan)
-    const { resolveShopUser } = require('../utils/shop-user-resolver');
-    const resolved = await resolveShopUser(email, shopId, {
-      noShopMessage:
-        'User not found in system. Please contact administrator to add your account.',
-    });
+    // Single-tenant app: look up the user directly in the app database.
+    // Super admins (platform ops) are checked separately in system_users.
+    const shopDb = getShopDatabase();
+    let user = await shopDb.collection('users').findOne({ email });
 
-    let user;
-    let shopDb = null;
-
-    if (resolved.error || !resolved.user) {
+    if (!user) {
       // Not a shop user — check for a super admin (stored in system_users,
-      // outside any shop database)
+      // outside the shop database; used only for platform operations, not
+      // the single-admin app UI)
       const systemDb = getSystemDatabase();
       const superAdmin = await systemDb.collection('system_users').findOne({
         email,
@@ -776,11 +733,6 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
       });
 
       if (!superAdmin) {
-        if (resolved.error) {
-          return res
-            .status(resolved.error.statusCode)
-            .json({ success: false, message: resolved.error.message });
-        }
         // Increment login attempts on failure
         if (req.incrementLoginAttempts) {
           req.incrementLoginAttempts();
@@ -794,9 +746,6 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
 
       user = superAdmin;
       logger.info('[LOGIN] Super admin authenticated', { email });
-    } else {
-      user = resolved.user;
-      shopDb = resolved.shopDb;
     }
 
     // Check if user is active

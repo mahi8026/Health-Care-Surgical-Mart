@@ -6,8 +6,6 @@ import LoadingSpinner from "../components/LoadingSpinner";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [shopId, setShopId] = useState("");
-  const [userType, setUserType] = useState("shop_admin");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -18,11 +16,7 @@ const Login = () => {
     setError("");
 
     try {
-      const result = await login(
-        email,
-        password,
-        shopId.trim() ? shopId : null,
-      );
+      const result = await login(email, password);
 
       if (!result.success) {
         setError(result.message || "Login failed");
@@ -32,15 +26,6 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleUserTypeChange = (type) => {
-    setUserType(type);
-    setError("");
-    // Clear fields when switching user type
-    setEmail("");
-    setPassword("");
-    setShopId("");
   };
 
   return (
@@ -76,48 +61,6 @@ const Login = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* User Type Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Login As
-            </label>
-            <div className="grid grid-cols-1 gap-2 mb-4">
-              {[
-                { key: "shop_admin", label: "Shop Admin", color: "green" },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleUserTypeChange(key)}
-                  className={`py-2 px-3 text-xs font-medium rounded-md transition-colors ${
-                    userType === key
-                      ? `bg-blue-600 text-white`
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Shop ID Field */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Shop ID <span className="text-gray-400">(Optional)</span>
-            </label>
-            <input
-              type="text"
-              value={shopId}
-              onChange={(e) => setShopId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              placeholder="Leave empty for auto-detection"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Leave empty to auto-detect from your email address
-            </p>
-          </div>
-
           {/* Email Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

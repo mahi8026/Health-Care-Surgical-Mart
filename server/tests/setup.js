@@ -23,6 +23,11 @@ jest.setTimeout(30000);
 const TEST_ADMIN_ID = '507f191e810c19729de860ea';
 const TEST_SHOP_ID = 'shop_health_care_01';
 
+// Single-tenant mode: pin the shop database the routes resolve to.
+// getShopDatabase() with no argument uses SHOP_ID → client.db(`shop_${SHOP_ID}`),
+// which is exactly the DB seeded below.
+process.env.SHOP_ID = process.env.SHOP_ID || TEST_SHOP_ID;
+
 // Connect to database for integration tests
 let connected = false;
 let seedDone = false;

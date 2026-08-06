@@ -13,10 +13,8 @@ export * from "./expense";
 export { default as Layout } from "./Layout";
 export { default as LoadingSpinner } from "./LoadingSpinner";
 export { default as ProtectedRoute } from "./ProtectedRoute";
-export { default as PermissionGate } from "./PermissionGate";
 
 // Other Components
 export { default as ProfessionalInvoice } from "./ProfessionalInvoice";
-export { default as UserManagement } from "./UserManagement";
 export { default as BatchSelector } from "./BatchSelector";
 export { default as ExpiryAlertsWidget } from "./ExpiryAlertsWidget";

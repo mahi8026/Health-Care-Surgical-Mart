@@ -11,7 +11,6 @@ const {
   client,
 } = require('../config/database');
 const { initializeShopDatabase } = require('./database-initializer');
-const { updateUserShopIndex } = require('./user-shop-index-helper');
 const bcrypt = require('bcryptjs');
 const { ObjectId } = require('mongodb');
 
@@ -88,15 +87,6 @@ async function createShop(shopData, adminData, createdBy) {
     };
 
     const adminResult = await usersCollection.insertOne(adminUser);
-
-    // Index the admin so login auto-detect finds this shop via user_shop_index
-    await updateUserShopIndex({
-      email: adminUser.email,
-      shopId: shopId,
-      userId: adminResult.insertedId.toString(),
-      role: 'SHOP_ADMIN',
-      isActive: true,
-    });
 
     return {
       success: true,

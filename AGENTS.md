@@ -15,7 +15,8 @@ cd client && npm run dev     # Vite on localhost:3000, proxies /api → :5001
 - **Monorepo** with two independent packages: `client/` (React 18 + Vite + Tailwind) and `server/` (Express + MongoDB + Redis + Firebase Admin).
 - **Server**: CommonJS (`require`/`module.exports`). Entry: `src/server.js`.
 - **Client**: ESM (`import`/`export`). Entry: `src/main.jsx`. No tsconfig exists — `npm run type-check` fails.
-- **Multi-tenant**: shop-scoped data via `shopId` on every document.
+- **Multi-tenant → Single-tenant**: the app now serves ONE shop only. All data lives in a single pinned database — `getShopDatabase()` resolves to `SHOP_DB_NAME` (e.g. `shop_6a020466789ca874348b2557`; production) or to `client.db('shop_<SHOP_ID>')` (tests/dev). JWT still carries `shopId` but it is ignored for DB selection. Super-admin platform ops (monitoring only) still use `system_users` in `Health_Care_Shop_DB` via `/api/super-admin`.
+- Server auth routes (`auth-multi-tenant.routes.js`) call `getShopDatabase()` with no args — **`SHOP_DB_NAME` (prod) or `SHOP_ID` (dev/test) MUST be set or login throws** "No shop database configured".
 
 ## Testing
 ```bash
@@ -24,7 +25,7 @@ npm run test:watch           # watch mode
 npm run test:coverage        # coverage only
 ```
 - Tests use `MONGODB_URI` from `server/.env` (Atlas) falling back to `mongodb://localhost:27017/health_care_test`. **Integration tests require a real MongoDB** (mocking is not used for DB in products/sales/customers suites).
-- `tests/setup.js` loads `.env` first, seeds test users (`global.testUtils.ADMIN_ID`) and a test shop (`SHOP_ID`) via `beforeAll`. All 7 test suites must pass before commit.
+- `tests/setup.js` loads `.env` first, seeds test users (`global.testUtils.ADMIN_ID`) and a test shop (`SHOP_ID`) via `beforeAll`, and pins `process.env.SHOP_ID` so single-tenant routes resolve to the seeded DB. All 7 test suites must pass before commit.
 - Integration test files use `global.testUtils.generateTestToken()` for JWT creation — never `jwt.sign()` inline.
 - Root `jest.config.js` watches `server/src/` and `server/tests/`.
 
@@ -57,6 +58,7 @@ npm run format              # uses root .prettierrc
 
 ## Key constraints
 - `JWT_SECRET` must be ≥ 32 characters — server exits on startup if not.
+- `SHOP_DB_NAME` (production) or `SHOP_ID` (dev/test) selects the single app database. Set `SHOP_DB_NAME` in the Render dashboard (see `render.yaml`) or auth/DB routes fail.
 - Server requires `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL` (or base64 service account).
 - Redis is optional — falls back to MongoDB for token blacklist.
 - Client build output: `client/dist/` (must exist for production mode to serve static files).

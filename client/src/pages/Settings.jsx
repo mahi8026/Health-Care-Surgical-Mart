@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import api from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
-import UserManagement from "../components/UserManagement";
-import { hasPermission, PERMISSIONS } from "../utils/permissions";
 
 const Settings = () => {
   const { user } = useAuth();
@@ -224,19 +222,11 @@ const Settings = () => {
                 icon: "fas fa-receipt",
               },
               {
-                id: "users",
-                name: "User Management",
-                icon: "fas fa-users",
-                requirePermission: PERMISSIONS.VIEW_USERS, // SUPER_ADMIN only
-              },
-              {
                 id: "backup",
                 name: "Backup & Security",
                 icon: "fas fa-shield-alt",
               },
-            ]
-              .filter((tab) => !tab.requirePermission || hasPermission(user, tab.requirePermission))
-              .map((tab) => (
+            ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -288,10 +278,6 @@ const Settings = () => {
               onSave={() => saveSettings("receipt", receiptSettings)}
               saving={saving}
             />
-          )}
-
-          {activeTab === "users" && hasPermission(user, PERMISSIONS.VIEW_USERS) && (
-            <UserManagement />
           )}
 
           {activeTab === "backup" && (
@@ -1062,7 +1048,7 @@ const BackupSettingsTab = ({ onTestBackup, saving, user }) => {
               <div>
                 <span className="font-medium text-gray-700">Current User:</span>
                 <span className="ml-2 text-gray-600">
-                  {user?.name} ({user?.role})
+                  {user?.name}
                 </span>
               </div>
               <div>

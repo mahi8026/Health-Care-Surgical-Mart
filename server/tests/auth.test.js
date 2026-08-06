@@ -44,39 +44,18 @@ describe('Authentication API', () => {
     });
   });
 
-  describe('POST /api/auth/firebase-login — shop auto-detection', () => {
-    const { getShopDatabase, getSystemDatabase } = require('../src/config/database');
-    const { ObjectId } = require('mongodb');
+  describe('POST /api/auth/firebase-login — single configured shop database', () => {
+    const { getShopDatabase } = require('../src/config/database');
     const admin = require('../src/config/firebase-admin');
 
     let verifySpy;
     const unique = Date.now().toString(36);
     const indexEmail = `auto.${unique}@test.com`;
-    const fallbackShopId = `shop_fallback_${unique}`;
-    const fallbackEmail = `owner.${unique}@test.com`;
 
     beforeAll(async () => {
-      const systemDb = getSystemDatabase();
-
-      // Seed a user_shop_index entry (the path that should always be used first)
-      await systemDb.collection('user_shop_index').updateOne(
-        { email: indexEmail },
-        {
-          $set: {
-            email: indexEmail,
-            shopId: global.testUtils.SHOP_ID,
-            userId: global.testUtils.ADMIN_ID,
-            role: 'SHOP_ADMIN',
-            isActive: true,
-            updatedAt: new Date(),
-          },
-          $setOnInsert: { createdAt: new Date() },
-        },
-        { upsert: true },
-      );
-
-      // Seed the matching user inside the test shop DB
-      const testShopDb = getShopDatabase(global.testUtils.SHOP_ID);
+      // Seed the user directly in the configured (pinned) shop database — that
+      // is the only place single-tenant login looks.
+      const testShopDb = getShopDatabase();
       await testShopDb.collection('users').updateOne(
         { email: indexEmail },
         {
@@ -92,49 +71,15 @@ describe('Authentication API', () => {
         { upsert: true },
       );
 
-      // Seed a shop WITHOUT an index entry + owner user, to exercise the
-      // legacy fallback loop (which previously used shop._id instead of shop.shopId)
-      await systemDb.collection('shops').updateOne(
-        { shopId: fallbackShopId },
-        {
-          $setOnInsert: {
-            shopId: fallbackShopId,
-            name: `Fallback Shop ${unique}`,
-            email: `shop.${unique}@test.com`,
-            ownerEmail: fallbackEmail,
-            status: 'Active',
-            isActive: true,
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true },
-      );
-      const fallbackDb = getShopDatabase(fallbackShopId);
-      await fallbackDb.collection('users').updateOne(
-        { email: fallbackEmail },
-        {
-          $setOnInsert: {
-            name: 'Fallback Owner',
-            email: fallbackEmail,
-            role: 'SHOP_ADMIN',
-            shopId: fallbackShopId,
-            isActive: true,
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true },
-      );
-
       // Mock Firebase token verification (Firebase Admin is configured in .env)
       verifySpy = jest.spyOn(admin.auth(), 'verifyIdToken');
     });
 
     // resetMocks:true wipes implementations between tests — re-apply each time
     beforeEach(() => {
-      verifySpy.mockImplementation((token) => {
-        const email = token === 'auto_token' ? indexEmail : fallbackEmail;
-        return Promise.resolve({ uid: 'test-uid', email });
-      });
+      verifySpy.mockImplementation(() =>
+        Promise.resolve({ uid: 'test-uid', email: indexEmail })
+      );
     });
 
     afterEach(() => {
@@ -143,14 +88,10 @@ describe('Authentication API', () => {
 
     afterAll(async () => {
       verifySpy.mockRestore();
-      const systemDb = getSystemDatabase();
-      await systemDb.collection('user_shop_index').deleteOne({ email: indexEmail });
-      await systemDb.collection('shops').deleteOne({ shopId: fallbackShopId });
-      await getShopDatabase(fallbackShopId).collection('users').deleteOne({ email: fallbackEmail });
-      await getShopDatabase(global.testUtils.SHOP_ID).collection('users').deleteOne({ email: indexEmail });
+      await getShopDatabase().collection('users').deleteOne({ email: indexEmail });
     });
 
-    it('should login via user_shop_index lookup without shopId', async () => {
+    it('should login a user found in the configured shop database without shopId', async () => {
       const res = await request(app)
         .post('/api/auth/firebase-login')
         .send({ firebaseToken: 'auto_token', email: indexEmail });
@@ -170,53 +111,35 @@ describe('Authentication API', () => {
       expect(res.body.success).toBe(true);
     });
 
-    it('should find user via legacy shop loop using shop.shopId (not _id)', async () => {
+    it('should reject a user that exists only in a non-configured database', async () => {
+      // A user planted in a DIFFERENT database (e.g. a legacy shop_<slug> DB)
+      // must NOT be found — single-tenant mode only reads the pinned DB.
       const res = await request(app)
         .post('/api/auth/firebase-login')
-        .send({ firebaseToken: 'fallback_token', email: fallbackEmail });
+        .send({ firebaseToken: 'auto_token', email: `elsewhere.${unique}@test.com` });
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data.user.shopId).toBe(fallbackShopId);
-      expect(res.body.data.token).toBeDefined();
+      expect(res.statusCode).toBe(401);
+      expect(res.body.success).toBe(false);
     });
   });
 
-  describe('POST /api/auth/login — legacy shop auto-detection', () => {
-    const { getShopDatabase, getSystemDatabase } = require('../src/config/database');
+  describe('POST /api/auth/login — single shop database', () => {
+    const { getShopDatabase } = require('../src/config/database');
     const bcrypt = require('bcryptjs');
 
     const unique = Date.now().toString(36);
-    const legacyShopId = `shop_legacy_${unique}`;
-    const legacyEmail = `legacy.${unique}@test.com`;
+    const loginEmail = `login.${unique}@test.com`;
 
     beforeAll(async () => {
-      const systemDb = getSystemDatabase();
-
-      await systemDb.collection('shops').updateOne(
-        { shopId: legacyShopId },
+      await getShopDatabase().collection('users').updateOne(
+        { email: loginEmail },
         {
           $setOnInsert: {
-            shopId: legacyShopId,
-            name: `Legacy Shop ${unique}`,
-            email: `shop.legacy.${unique}@test.com`,
-            ownerEmail: legacyEmail,
-            status: 'Active',
-            isActive: true,
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true },
-      );
-      await getShopDatabase(legacyShopId).collection('users').updateOne(
-        { email: legacyEmail },
-        {
-          $setOnInsert: {
-            name: 'Legacy Owner',
-            email: legacyEmail,
+            name: 'Login Owner',
+            email: loginEmail,
             passwordHash: await bcrypt.hash('LegacyPass@123', 4),
             role: 'SHOP_ADMIN',
-            shopId: legacyShopId,
+            shopId: global.testUtils.SHOP_ID,
             isActive: true,
             createdAt: new Date(),
           },
@@ -226,99 +149,41 @@ describe('Authentication API', () => {
     });
 
     afterAll(async () => {
-      const systemDb = getSystemDatabase();
-      await systemDb.collection('shops').deleteOne({ shopId: legacyShopId });
-      await getShopDatabase(legacyShopId).collection('users').deleteOne({ email: legacyEmail });
+      await getShopDatabase().collection('users').deleteOne({ email: loginEmail });
     });
 
-    it('should login via shop.shopId fallback without shopId (owner email)', async () => {
+    it('should login with email and password against the configured shop database', async () => {
       const res = await request(app)
         .post('/api/auth/login')
-        .send({ email: legacyEmail, password: 'LegacyPass@123' });
+        .send({ email: loginEmail, password: 'LegacyPass@123' });
 
       expect(res.statusCode).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.user.shopId).toBe(legacyShopId);
+      expect(res.body.data.user.email).toBe(loginEmail);
       expect(res.body.data.token).toBeDefined();
+    });
+
+    it('should reject login with a wrong password', async () => {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: loginEmail, password: 'WrongPass@123' });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/invalid/i);
+    });
+
+    it('should reject login for an unknown email in the configured database', async () => {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: `nobody.${unique}@test.com`, password: 'Whatever@123' });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/invalid/i);
     });
   });
   
-  describe('POST /api/auth/firebase-login — production layout (shop_<ObjectId> DB)', () => {
-    // Regression: production stores real users in the shop DB named after the
-    // shop document's _id (e.g. shop_6a020466789ca874348b2557), while the
-    // shops.shopId field is only a business slug that maps to a junk DB.
-    // The resolver must try the _id-based name first.
-    const { client, getSystemDatabase } = require('../src/config/database');
-    const admin = require('../src/config/firebase-admin');
-
-    let verifySpy;
-    const unique = Date.now().toString(36);
-    const legacyEmail = `legacyid.${unique}@test.com`;
-    let legacyShopId;
-
-    beforeAll(async () => {
-      const systemDb = getSystemDatabase();
-      const inserted = await systemDb.collection('shops').insertOne({
-        shopId: `shop_legacyid_${unique}`,
-        name: `Legacy ID Shop ${unique}`,
-        email: `shop.legacyid.${unique}@test.com`,
-        ownerEmail: legacyEmail,
-        status: 'Active',
-        isActive: true,
-        createdAt: new Date(),
-      });
-      legacyShopId = inserted.insertedId.toString();
-
-      // The real user lives ONLY in the shot_<ObjectId> database (like prod).
-      // We deliberately do NOT create shop_<slug> with this user.
-      const legacyDb = client().db(`shop_${legacyShopId}`);
-      await legacyDb.collection('users').insertOne({
-        name: 'Legacy ID Owner',
-        email: legacyEmail,
-        role: 'SHOP_ADMIN',
-        shopId: legacyShopId,
-        isActive: true,
-        createdAt: new Date(),
-      });
-
-      verifySpy = jest.spyOn(admin.auth(), 'verifyIdToken');
-    });
-
-    beforeEach(() => {
-      verifySpy.mockImplementation((token) =>
-        Promise.resolve({
-          uid: 'test-uid',
-          email: token === 'legacyid_token' ? legacyEmail : 'other@test.com',
-        })
-      );
-    });
-
-    afterEach(() => {
-      verifySpy.mockClear();
-    });
-
-    afterAll(async () => {
-      verifySpy.mockRestore();
-      const systemDb = getSystemDatabase();
-      await client()
-        .db(`shop_${legacyShopId}`)
-        .dropDatabase();
-      await systemDb.collection('shops').deleteOne({ _id: new (require('mongodb').ObjectId)(legacyShopId) });
-    });
-
-    it('should login an owner whose shop data is in shop_<ObjectId> (production layout)', async () => {
-      const res = await request(app)
-        .post('/api/auth/firebase-login')
-        .send({ firebaseToken: 'legacyid_token', email: legacyEmail });
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data.user.email).toBe(legacyEmail);
-      expect(res.body.data.user.shopId).toBe(legacyShopId);
-      expect(res.body.data.token).toBeDefined();
-    });
-  });
-
   describe('POST /api/auth/logout', () => {
     it('should allow logout without authentication', async () => {
       const res = await request(app)
@@ -439,9 +304,9 @@ describe('Authentication API', () => {
 
       // Must NOT be a "potential injection detected" rejection — the request
       // should reach the route and be handled by normal login validation
-      // (email has no shop → 400 from the resolver, or 401 invalid creds).
+      // (unknown email → 401 invalid credentials, since the app is single-tenant).
       expect(res.body.message).not.toMatch(/injection/i);
-      expect([400, 401]).toContain(res.statusCode);
+      expect(res.statusCode).toBe(401);
     });
 
     it('should still block NoSQL operator keys in query strings', async () => {

@@ -131,7 +131,7 @@ const createRateLimiters = () => {
   // Strict rate limiter for authentication endpoints
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'development' ? 1000 : 5, // Relaxed in development
+    max: process.env.NODE_ENV === 'production' ? 5 : 1000, // Strict in production only (relaxed in dev/test)
     message: {
       success: false,
       message: 'Too many login attempts from this IP, please try again later.',
@@ -139,8 +139,8 @@ const createRateLimiters = () => {
     },
     skipSuccessfulRequests: true,
     skip: (_req) => {
-      // Skip rate limiting in development
-      return process.env.NODE_ENV === 'development';
+      // Skip rate limiting outside production
+      return process.env.NODE_ENV !== 'production';
     },
     handler: (req, res) => {
       logSecurityEvent('auth_rate_limit_exceeded', {
@@ -162,15 +162,15 @@ const createRateLimiters = () => {
   // Password reset rate limiter
   const passwordResetLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: process.env.NODE_ENV === 'development' ? 1000 : 3, // Relaxed in development
+    max: process.env.NODE_ENV === 'production' ? 3 : 1000, // Strict in production only (relaxed in dev/test)
     message: {
       success: false,
       message: 'Too many password reset attempts, please try again later.',
       retryAfter: 3600,
     },
     skip: (_req) => {
-      // Skip rate limiting in development
-      return process.env.NODE_ENV === 'development';
+      // Skip rate limiting outside production
+      return process.env.NODE_ENV !== 'production';
     },
   });
 

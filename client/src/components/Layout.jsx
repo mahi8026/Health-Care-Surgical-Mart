@@ -24,24 +24,6 @@ const Layout = () => {
     navigate("/login");
   };
 
-  // Role badge color
-  const getRoleBadgeColor = (role) => {
-    switch (role) {
-      case "SHOP_ADMIN":
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  // Format role name for display
-  const formatRoleName = (role) => {
-    return role
-      .split("_")
-      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-      .join(" ");
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -87,12 +69,8 @@ const Layout = () => {
                   </p>
                   <p className="text-xs text-gray-500">{user?.email}</p>
                 </div>
-                <span
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium ${getRoleBadgeColor(
-                    user?.role,
-                  )}`}
-                >
-                  {formatRoleName(user?.role)}
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
+                  Admin
                 </span>
               </div>
 
@@ -186,13 +164,8 @@ const Layout = () => {
             {sidebarCollapsed && (
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="flex justify-center">
-                  <span
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold ${getRoleBadgeColor(
-                      user?.role,
-                    )}`}
-                    title={formatRoleName(user?.role)}
-                  >
-                    {user?.role?.charAt(0)}
+                  <span className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold bg-blue-100 text-blue-800">
+                    A
                   </span>
                 </div>
               </div>
