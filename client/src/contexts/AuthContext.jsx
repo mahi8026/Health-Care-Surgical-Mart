@@ -205,10 +205,11 @@ export const AuthProvider = ({ children }) => {
       if (import.meta.env.DEV) {
         console.error("Login error:", error);
       }
-      setError(error.message);
+      const message = error.serverMessage || error.message || "Login failed";
+      setError(message);
       return {
         success: false,
-        message: error.message || "Login failed",
+        message,
       };
     } finally {
       setLoading(false);
@@ -216,39 +217,45 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    // Clear local state FIRST so a backend failure can't strand the user
+    // in a half-logged-out state.
+    if (tokenRefreshInterval.current) {
+      clearInterval(tokenRefreshInterval.current);
+      tokenRefreshInterval.current = null;
+    }
+
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("lastLoginTime");
+    setMongoUser(null);
+    setFirebaseUser(null);
+    clearUserContext();
+
+    let serverError = null;
     try {
-      // Clear token refresh interval
-      if (tokenRefreshInterval.current) {
-        clearInterval(tokenRefreshInterval.current);
-        tokenRefreshInterval.current = null;
-      }
-      
-      // Call backend to clear httpOnly cookie
+      // Best-effort: revoke the token server-side
       await api.post("/auth/logout");
-      
-      // Sign out from Firebase
-      await signOutUser();
-      
-      // Clear local state and token
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-      localStorage.removeItem("lastLoginTime");
-      setMongoUser(null);
-      setFirebaseUser(null);
-      
-      // Clear user context in Sentry
-      clearUserContext();
-      
-      return { success: true };
     } catch (error) {
+      serverError = error;
       if (import.meta.env.DEV) {
         console.error("Logout error:", error);
       }
-      return {
-        success: false,
-        message: error.message,
-      };
     }
+
+    try {
+      // Sign out from Firebase
+      await signOutUser();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("Firebase sign-out error:", error);
+      }
+      serverError = serverError || error;
+    }
+
+    return {
+      success: !serverError,
+      message: serverError?.message,
+    };
   };
 
   const value = {

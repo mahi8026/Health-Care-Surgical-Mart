@@ -106,45 +106,36 @@ function advancedSecurityHeaders(req, res, next) {
  * Prevents common injection attacks
  */
 function sanitizeRequest(req, res, next) {
-  // Detect and block NoSQL injection attempts
-  const noSqlInjectionPatterns = [
-    /\$where/i,
-    /\$ne/i,
-    /\$gt/i,
-    /\$lt/i,
-    /\$or/i,
-    /\$and/i,
-    /\$regex/i,
-    /\$exists/i
-  ];
+  // Detect and block NoSQL injection attempts.
+  // NOTE: MongoDB injection requires '$' operators as object keys (e.g.
+  // {"$ne": 1}) or as the start of a string value (e.g. {"email": {"$ne": ""}}).
+  // Substring matches (e.g. a password containing "$ne") are harmless, so we
+  // anchor both checks to avoid rejecting legitimate user input.
+  const noSqlKeyPattern = /^\$/;
+  const noSqlValuePattern = /^\$(where|ne|gt|lt|or|and|regex|exists)\b/i;
 
   const checkForInjection = (obj, path = '') => {
     if (typeof obj === 'string') {
-      for (const pattern of noSqlInjectionPatterns) {
-        if (pattern.test(obj)) {
-          securityLogger.warn('NoSQL injection attempt detected', {
-            ip: req.ip,
-            path: req.path,
-            field: path,
-            value: obj,
-            userAgent: req.get('User-Agent')
-          });
-          return true;
-        }
+      if (noSqlValuePattern.test(obj)) {
+        securityLogger.warn('NoSQL injection attempt detected', {
+          ip: req.ip,
+          path: req.path,
+          field: path,
+          userAgent: req.get('User-Agent')
+        });
+        return true;
       }
     } else if (typeof obj === 'object' && obj !== null) {
       for (const key in obj) {
         // Check key names for injection patterns
-        for (const pattern of noSqlInjectionPatterns) {
-          if (pattern.test(key)) {
-            securityLogger.warn('NoSQL injection attempt in key', {
-              ip: req.ip,
-              path: req.path,
-              key: key,
-              userAgent: req.get('User-Agent')
-            });
-            return true;
-          }
+        if (noSqlKeyPattern.test(key)) {
+          securityLogger.warn('NoSQL injection attempt in key', {
+            ip: req.ip,
+            path: req.path,
+            key: key,
+            userAgent: req.get('User-Agent')
+          });
+          return true;
         }
         // Recursively check values
         if (checkForInjection(obj[key], `${path}.${key}`)) {
@@ -217,12 +208,18 @@ const ACCOUNT_LOCKOUT_THRESHOLD = 10; // Lock account after 10 failed attempts
 const ACCOUNT_LOCKOUT_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 function bruteForceProtection(req, res, next) {
-  const identifier = req.body.email || req.ip;
+  // Normalize the identifier: emails are matched case-insensitively by the
+  // auth routes, so track them case-insensitively here too. Otherwise an
+  // attacker could dodge the lockout counter by case-shifting the email.
+  const rawIdentifier = req.body.email || req.ip;
+  const identifier =
+    (typeof rawIdentifier === 'string'
+      ? rawIdentifier.trim().toLowerCase()
+      : rawIdentifier) || req.ip;
   const now = Date.now();
 
   if (!loginAttempts.has(identifier)) {
     loginAttempts.set(identifier, { count: 0, lastAttempt: now, lockedUntil: null });
-    return next();
   }
 
   const attempts = loginAttempts.get(identifier);

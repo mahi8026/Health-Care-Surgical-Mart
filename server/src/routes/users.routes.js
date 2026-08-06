@@ -19,6 +19,10 @@ const { logger } = require('../config/logging');
 const auditLog = require('../services/audit-log.service');
 const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
 const { cacheService } = require('../services/cache.service');
+const {
+  updateUserShopIndex,
+  removeUserFromIndex,
+} = require('../utils/user-shop-index-helper');
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -400,6 +404,15 @@ router.post(
 
     const result = await shopDb.collection('users').insertOne(userData);
 
+    // Keep user_shop_index in sync so login auto-detect can find this user
+    await updateUserShopIndex({
+      email: userData.email,
+      shopId: req.user.shopId,
+      userId: result.insertedId.toString(),
+      role,
+      isActive: Boolean(isActive),
+    });
+
     // Return user data without password
     const { password: _, ...userResponse } = userData;
     userResponse._id = result.insertedId;
@@ -483,6 +496,15 @@ router.put(
       .collection('users')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
+    // Keep user_shop_index in sync (email/role/isActive may have changed)
+    await updateUserShopIndex({
+      email: (email || existingUser.email).toLowerCase(),
+      shopId: req.user.shopId,
+      userId: req.params.id,
+      role: role || existingUser.role,
+      isActive: isActive !== undefined ? Boolean(isActive) : existingUser.isActive,
+    });
+
     // Audit: user updated (role change gets its own action)
     const action = role && role !== existingUser.role
       ? AUDIT_ACTIONS.ROLE_CHANGED
@@ -552,6 +574,9 @@ router.delete(
     }
 
     await shopDb.collection('users').deleteOne({ _id: new ObjectId(req.params.id) });
+
+    // Remove from user_shop_index
+    await removeUserFromIndex(user.email);
 
     auditLog.log(req, AUDIT_ACTIONS.USER_DELETED, 'user', req.params.id,
       `Deleted user ${user.email}`,

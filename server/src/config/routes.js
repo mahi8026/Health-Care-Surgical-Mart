@@ -116,6 +116,9 @@ const setupRoutes = (app) => {
     // Audit Logs routes (SUPER_ADMIN + SHOP_ADMIN)
     app.use('/api/audit-logs', require('../routes/audit-logs.routes'));
 
+    // Super Admin routes (SUPER_ADMIN only)
+    app.use('/api/super-admin', require('../routes/super-admin.routes'));
+
     // Health check routes (public + admin)
     logger.info('Loading health check routes...');
     app.use('/health', require('../routes/health.routes'));

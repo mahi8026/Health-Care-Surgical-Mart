@@ -34,13 +34,13 @@ const setupMiddleware = (app) => {
     createRateLimiters();
 
   // Apply rate limiters to specific routes
-  app.use('/api/auth/login', authLimiter);
-  app.use('/api/auth/forgot-password', passwordResetLimiter);
+  app.use(['/api/auth/login', '/api/auth/firebase-login'], authLimiter);
+  app.use('/api/auth/request-password-reset', passwordResetLimiter);
   app.use('/api', apiLimiter);
 
   // Request ID middleware for tracking
   app.use((req, res, next) => {
-    req.id = Math.random().toString(36).substr(2, 9);
+    req.id = Math.random().toString(36).slice(2, 11);
     res.setHeader('X-Request-ID', req.id);
     next();
   });

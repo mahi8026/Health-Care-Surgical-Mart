@@ -15,6 +15,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config/constants';
+import api from '../config/api';
+
+/**
+ * Fetch a short-lived SSE token so the full session JWT is never placed in
+ * a URL (URLs leak into proxy/access logs).
+ */
+const getSSEToken = async () => {
+  const response = await api.post('/auth/sse-token', {});
+  return response?.data?.token;
+};
 
 const useStockEvents = (onEvent) => {
   const [connected, setConnected] = useState(false);
@@ -51,16 +61,22 @@ const useStockEvents = (onEvent) => {
       return;
     }
 
-    const connect = () => {
+    const connect = async () => {
       try {
         // Close existing connection if any
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
         }
 
-        // Create EventSource connection
-        // Note: EventSource doesn't support custom headers, so we pass token as query param
-        const url = `${API_BASE_URL}/stock/events?token=${token}`;
+        // Fetch a short-lived SSE-scoped token (2 min) so the full session
+        // JWT is never placed in a URL (Note: EventSource doesn't support
+        // custom headers, so we pass the token as a query param)
+        const sseToken = await getSSEToken();
+        if (cancelled || !sseToken) {
+          return;
+        }
+
+        const url = `${API_BASE_URL}/stock/events?token=${sseToken}`;
         const eventSource = new EventSource(url);
 
         eventSource.onopen = () => {
@@ -105,7 +121,16 @@ const useStockEvents = (onEvent) => {
         eventSourceRef.current = eventSource;
       } catch (err) {
         console.error('[SSE] Failed to create connection:', err);
+        if (cancelled) {
+          return;
+        }
         setError(err.message);
+        // Retry with backoff
+        reconnectAttemptsRef.current += 1;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, delay);
       }
     };
 

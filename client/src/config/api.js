@@ -47,11 +47,17 @@ api.interceptors.response.use(
   (error) => {
     // Handle common errors
     if (error.response?.status === 401) {
-      // Unauthorized - clear user state, token, and redirect to login
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-      localStorage.removeItem("lastLoginTime");
-      window.location.href = "/login";
+      const url = error.config?.url || "";
+      const isLoginRequest =
+        url.includes("/auth/firebase-login") || url.includes("/auth/login");
+
+      if (!isLoginRequest) {
+        // Unauthorized - clear user state, token, and redirect to login
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("lastLoginTime");
+        window.location.href = "/login";
+      }
     }
 
     // Attach the server's error message directly on the error object

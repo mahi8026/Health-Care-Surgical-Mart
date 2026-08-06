@@ -63,7 +63,9 @@ async function isTokenBlacklisted(token) {
     return await service.isBlacklisted(token);
   } catch (error) {
     logger.error('Failed to check token blacklist:', error);
-    // Fail-secure: if we can't check, assume not blacklisted but log error
+    // Fail-OPEN: if we can't check the blacklist, allow the token through but
+    // log the error. (A fail-closed policy would lock every user out whenever
+    // the blacklist backend is unavailable.)
     return false;
   }
 }
@@ -141,15 +143,18 @@ async function authenticate(req, res, next) {
       throw jwtError;
     }
 
-    // Validate shopId - all users must have shop context
-    if (!decoded.shopId) {
+    // Super admins have no shop context — they live in system_users
+    const isSuperAdmin = decoded.role === 'SUPER_ADMIN' || decoded.isSuper === true;
+
+    // Validate shopId - all non-super-admin users must have shop context
+    if (!decoded.shopId && !isSuperAdmin) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token: missing shop context',
       });
     }
 
-    // Get user from shop database with nested try-catch for database errors
+    // Get user from shop database (or system_users for super admins)
     let user;
     try {
       if (!ObjectId.isValid(decoded.userId)) {
@@ -158,10 +163,19 @@ async function authenticate(req, res, next) {
           message: 'User not found',
         });
       }
-      const shopDb = getShopDatabase(decoded.shopId);
-      user = await shopDb.collection('users').findOne({
-        _id: new ObjectId(decoded.userId),
-      });
+
+      if (isSuperAdmin && !decoded.shopId) {
+        const systemDb = getSystemDatabase();
+        user = await systemDb.collection('system_users').findOne({
+          _id: new ObjectId(decoded.userId),
+          isSuper: true,
+        });
+      } else {
+        const shopDb = getShopDatabase(decoded.shopId);
+        user = await shopDb.collection('users').findOne({
+          _id: new ObjectId(decoded.userId),
+        });
+      }
     } catch (dbError) {
       logger.error('Database error in authenticate middleware:', {
         error: dbError.message,
@@ -255,6 +269,7 @@ function generateToken(user) {
     email: user.email,
     role: user.role,
     shopId: user.shopId || null,
+    isSuper: user.isSuper === true,
   };
 
   return jwt.sign(payload, getJWTSecret(), {
@@ -326,8 +341,72 @@ async function checkShopStatus(req, res, next) {
   }
 }
 
+/**
+ * Lightweight auth for SSE endpoints.
+ * Accepts a short-lived (scope='sse') JWT from the query string and attaches
+ * user context WITHOUT per-reconnect database lookups, so reconnect storms
+ * don't hammer MongoDB.
+ */
+async function authenticateSSE(req, res, next) {
+  try {
+    const token = req.query?.token;
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided',
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, getJWTSecret());
+    } catch (_jwtError) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired SSE token',
+      });
+    }
+
+    if (decoded.scope !== 'sse') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid SSE token scope',
+      });
+    }
+
+    if (!decoded.shopId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token: missing shop context',
+      });
+    }
+
+    req.user = {
+      _id: decoded.userId,
+      name: decoded.name || '',
+      email: decoded.email || '',
+      role: decoded.role,
+      shopId: decoded.shopId,
+      permissions: decoded.permissions || [],
+      isSSE: true,
+    };
+
+    next();
+  } catch (error) {
+    logger.error('Unexpected error in authenticateSSE middleware:', {
+      error: error.message,
+      path: req.path,
+    });
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication failed',
+    });
+  }
+}
+
 module.exports = {
   authenticate,
+  authenticateSSE,
   generateToken,
   verifyShopAccess,
   checkShopStatus,

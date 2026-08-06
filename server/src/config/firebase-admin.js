@@ -60,6 +60,12 @@ if (!admin.apps || admin.apps.length === 0) {
 
 // Export admin instance and initialization status
 module.exports = admin;
+// v14 compatibility shim: restore admin.auth() namespace-style access used across routes.
+// Lazy require so Jest 29 (which can't parse the ESM jose/jwks-rsa chain) only hits it at runtime.
+module.exports.auth = () => {
+  const { getAuth } = require('firebase-admin/auth');
+  return getAuth(admin.getApp());
+};
 module.exports.isFirebaseInitialized = () => {
   return isInitialized || (admin.apps && admin.apps.length > 0);
 };

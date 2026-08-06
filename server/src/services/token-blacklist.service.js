@@ -26,7 +26,15 @@ class TokenBlacklistService {
       this.ensureMongoIndexes();
     } else {
       logger.warn('TokenBlacklistService: No storage backend configured, falling back to in-memory (NOT RECOMMENDED for production)');
-      this.inMemoryStore = new Set();
+      // Map of signature -> expiry timestamp (ms) so expired entries can be pruned
+      this.inMemoryStore = new Map();
+
+      // Periodic sweep so the in-memory store doesn't grow unbounded.
+      // unref() lets the process exit naturally when idle.
+      const cleanupInterval = setInterval(() => {
+        this.cleanup().catch(() => {});
+      }, 5 * 60 * 1000);
+      cleanupInterval.unref();
     }
   }
 
@@ -144,7 +152,7 @@ class TokenBlacklistService {
 
       // In-memory fallback (NOT RECOMMENDED for production)
       if (this.inMemoryStore) {
-        this.inMemoryStore.add(signature);
+        this.inMemoryStore.set(signature, decoded.exp * 1000);
         logger.warn('TokenBlacklistService: Token revoked in-memory (NOT PERSISTENT)');
         return true;
       }
@@ -190,7 +198,16 @@ class TokenBlacklistService {
 
       // In-memory check
       if (this.inMemoryStore) {
-        return this.inMemoryStore.has(signature);
+        const expiry = this.inMemoryStore.get(signature);
+        if (!expiry) {
+          return false;
+        }
+        // Prune expired entries lazily
+        if (expiry <= Date.now()) {
+          this.inMemoryStore.delete(signature);
+          return false;
+        }
+        return true;
       }
 
       // If all storage backends fail, deny access (fail-secure)
@@ -255,9 +272,17 @@ class TokenBlacklistService {
    */
   async cleanup() {
     if (this.inMemoryStore) {
-      // In-memory doesn't have automatic expiration
-      // This is a limitation of the fallback mode
-      logger.warn('TokenBlacklistService: In-memory cleanup not implemented (use Redis or MongoDB for automatic expiration)');
+      const now = Date.now();
+      let removed = 0;
+      for (const [signature, expiry] of this.inMemoryStore.entries()) {
+        if (expiry <= now) {
+          this.inMemoryStore.delete(signature);
+          removed += 1;
+        }
+      }
+      if (removed > 0) {
+        logger.info(`TokenBlacklistService: Cleaned ${removed} expired in-memory entries`);
+      }
     }
   }
 }

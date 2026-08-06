@@ -18,6 +18,7 @@ const router = express.Router();
 const { ObjectId } = require('mongodb');
 const {
   authenticate,
+  authenticateSSE,
   checkShopStatus,
 } = require('../middleware/auth-multi-tenant');
 const { requirePermission } = require('../utils/rbac');
@@ -27,7 +28,21 @@ const { asyncHandler, createError } = require('../config/error-handling');
 const { logger } = require('../config/logging');
 const stockCommand = require('../services/stock-command.service');
 
-// Apply authentication to all routes
+// SSE endpoint must be registered BEFORE the router-wide authenticate
+// so it can use the lightweight SSE-scoped token handler.
+// Note: EventSource API doesn't support custom headers, so we accept the
+// short-lived SSE token via query parameter for this endpoint only.
+router.get(
+  '/events',
+  authenticateSSE,
+  checkShopStatus,
+  (req, res) => {
+    const sseManager = require('../services/sse-manager.service');
+    sseManager.handleConnection(req, res);
+  }
+);
+
+// Apply authentication to all remaining routes
 router.use(authenticate);
 router.use(checkShopStatus);
 
@@ -473,24 +488,6 @@ router.get(
       },
     });
   })
-);
-
-/**
- * GET /api/stock/events
- * SSE endpoint for real-time stock updates
- *
- * Note: EventSource API doesn't support custom headers,
- * so we accept token via query parameter for this endpoint only.
- * The authenticate middleware will check req.query.token automatically.
- * Must NOT be wrapped in asyncHandler — SSE connections are long-lived.
- */
-router.get(
-  '/events',
-  // authenticate + checkShopStatus already applied via router.use() above
-  (req, res) => {
-    const sseManager = require('../services/sse-manager.service');
-    sseManager.handleConnection(req, res);
-  }
 );
 
 /**

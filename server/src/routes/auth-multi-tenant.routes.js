@@ -17,6 +17,27 @@ const { bruteForceProtection } = require('../middleware/security-headers');
 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
 
+// Shared JWT cookie options so set and clear always agree
+// (res.clearCookie must use the same options to actually remove the cookie)
+function getJwtCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/',
+  };
+}
+
+function clearJwtCookie(res) {
+  res.clearCookie('jwt', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    path: '/',
+  });
+}
+
 /**
  * @swagger
  * /api/auth/firebase-login:
@@ -240,8 +261,8 @@ const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
  */
 router.post('/login', bruteForceProtection, async (req, res) => {
   try {
-    const { email, password, shopId } = req.body;
-
+    const { email: rawEmail, password, shopId } = req.body;
+    const email = rawEmail?.trim().toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({
@@ -250,112 +271,18 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       });
     }
 
-    let user;
-    let userDb;
-
-    const systemDb = getSystemDatabase();
-
-    // Shop user login - try to find shopId automatically
-    let targetShopId = shopId;
-
-    if (!targetShopId) {
-      // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
-      // Instead of O(n) loop through all shops
-      try {
-        const userShopMapping = await systemDb
-          .collection('user_shop_index')
-          .findOne({ email, isActive: true });
-
-        if (userShopMapping) {
-          targetShopId = userShopMapping.shopId;
-          logger.debug('Login: Found shop via index lookup', { email, shopId: targetShopId });
-        }
-      } catch (indexError) {
-        logger.warn('Failed to query user_shop_index, falling back to shop loop', {
-          email,
-          error: indexError.message
-        });
-      }
-
-      // FALLBACK: If index lookup failed, use legacy method (loop through shops)
-      if (!targetShopId) {
-          logger.info('Login: Index lookup failed, using legacy shop loop', { email });
-
-        const shops = await systemDb
-          .collection('shops')
-          .find({ status: 'Active' })
-          .toArray();
-
-        // First check if email matches shop owner email
-        for (const shop of shops) {
-          if (shop.ownerEmail === email) {
-            targetShopId = shop._id.toString(); // Use _id, not shopId
-            break;
-          }
-        }
-
-        // If not found as owner, search in each shop's users collection
-        if (!targetShopId) {
-          for (const shop of shops) {
-            try {
-              const shopDb = getShopDatabase(shop._id.toString()); // Use _id, not shopId
-              const shopUser = await shopDb
-                .collection('users')
-                .findOne({ email });
-              if (shopUser) {
-                targetShopId = shop._id.toString(); // Use _id, not shopId
-                break;
-              }
-            } catch (error) {
-              logger.warn('Failed to query shop database during legacy login auto-detect', {
-                shopId: shop._id.toString(),
-                error: error.message
-              });
-            }
-          }
-        }
-      }
-
-      if (!targetShopId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Shop not found for this email. Please contact support.',
-        });
-      }
+    // Resolve shop + user (index → ownerEmail → shop scan)
+    const { resolveShopUser } = require('../utils/shop-user-resolver');
+    const resolved = await resolveShopUser(email, shopId, {
+      noShopMessage: 'Shop not found for this email. Please contact support.',
+    });
+    if (resolved.error) {
+      return res
+        .status(resolved.error.statusCode)
+        .json({ success: false, message: resolved.error.message });
     }
 
-    // Verify shop exists (find by _id as ObjectId or shopId as string)
-    let shop;
-    try {
-      shop = await systemDb.collection('shops').findOne({
-        $or: [
-          { shopId: targetShopId },
-          { _id: new ObjectId(targetShopId) }
-        ]
-      });
-    } catch {
-      // If targetShopId is not a valid ObjectId, try shopId only
-      shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
-    }
-
-    if (!shop) {
-      return res.status(404).json({
-        success: false,
-        message: 'Shop not found',
-      });
-    }
-
-    if (shop.status !== 'Active') {
-      return res.status(403).json({
-        success: false,
-        message: `Shop is ${shop.status.toLowerCase()}. Please contact support.`,
-      });
-    }
-
-    // Get user from shop database
-    const shopDb = getShopDatabase(targetShopId);
-    user = await shopDb.collection('users').findOne({ email });
-    userDb = targetShopId;
+    const { user, shopDb } = resolved;
 
     if (!user) {
       return res.status(401).json({
@@ -409,13 +336,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
 
     // Set JWT as httpOnly cookie (secure, XSS-proof)
     // For same-domain this is the most secure option
-    res.cookie('jwt', token, {
-      httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
-      secure: true,             // Always HTTPS (required for sameSite=none)
-      sameSite: 'none',         // Allow cross-site cookies
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: '/',
-    });
+    res.cookie('jwt', token, getJwtCookieOptions());
 
     // Audit: successful legacy login
     auditLog.log(req, AUDIT_ACTIONS.LOGIN, 'auth', user._id?.toString(),
@@ -457,9 +378,10 @@ router.post('/login', bruteForceProtection, async (req, res) => {
  * POST /api/auth/change-password
  * Change user password (requires old password verification)
  */
-router.post('/change-password', async (req, res) => {
+router.post('/change-password', bruteForceProtection, async (req, res) => {
   try {
-    const { email, oldPassword, newPassword, shopId } = req.body;
+    const { email: rawEmail, oldPassword, newPassword, shopId } = req.body;
+    const email = rawEmail?.trim().toLowerCase();
 
     if (!email || !oldPassword || !newPassword) {
       return res.status(400).json({
@@ -475,16 +397,18 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
-    // Get user from shop database
-    if (!shopId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Shop ID is required',
-      });
+    // Resolve shop + user (shopId is auto-detected when omitted)
+    const { resolveShopUser } = require('../utils/shop-user-resolver');
+    const resolved = await resolveShopUser(email, shopId, {
+      noShopMessage: 'User not found. Please contact support.',
+    });
+    if (resolved.error) {
+      return res
+        .status(resolved.error.statusCode)
+        .json({ success: false, message: resolved.error.message });
     }
 
-    const shopDb = getShopDatabase(shopId);
-    const user = await shopDb.collection('users').findOne({ email });
+    const { user, shopDb } = resolved;
     const collection = shopDb.collection('users');
 
     if (!user) {
@@ -508,10 +432,19 @@ router.post('/change-password', async (req, res) => {
       passwordHashField,
     );
     if (!isOldPasswordValid) {
+      // Increment login attempts on failure
+      if (req.incrementLoginAttempts) {
+        req.incrementLoginAttempts();
+      }
       return res.status(401).json({
         success: false,
         message: 'Old password is incorrect',
       });
+    }
+
+    // Reset login attempts on successful verification
+    if (req.resetLoginAttempts) {
+      req.resetLoginAttempts();
     }
 
     // Hash new password
@@ -558,7 +491,8 @@ router.post('/change-password', async (req, res) => {
  */
 router.post('/request-password-reset', bruteForceProtection, async (req, res) => {
   try {
-    const { email, shopId } = req.body;
+    const { email: rawEmail, shopId } = req.body;
+    const email = rawEmail?.trim().toLowerCase();
 
     if (!email) {
       return res.status(400).json({
@@ -567,75 +501,21 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
       });
     }
 
-    let user;
-    let targetShopId = shopId;
-    const systemDb = getSystemDatabase();
+    // Auto-detect shopId if not provided (index → ownerEmail → shop scan)
+    const { resolveShopUser } = require('../utils/shop-user-resolver');
+    const resolved = await resolveShopUser(email, shopId, {
+      noShopMessage: 'not-found',
+    });
 
-    // Auto-detect shopId if not provided
-    if (!targetShopId) {
-        // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
-        try {
-          const userShopMapping = await systemDb
-            .collection('user_shop_index')
-            .findOne({ email, isActive: true });
+    // Anti-enumeration: return success whether or not the user exists
+    if (resolved.error) {
+      return res.json({
+        success: true,
+        message: 'If an account with that email exists, a password reset code has been sent.',
+      });
+    }
 
-          if (userShopMapping) {
-            targetShopId = userShopMapping.shopId;
-            logger.debug('[PASSWORD_RESET] Found shop via index lookup', { email, shopId: targetShopId });
-          }
-        } catch (indexError) {
-          logger.warn('[PASSWORD_RESET] Failed to query user_shop_index, falling back to shop loop', {
-            email,
-            error: indexError.message
-          });
-        }
-
-        // FALLBACK: If index lookup failed, use legacy method
-        if (!targetShopId) {
-          logger.info('[PASSWORD_RESET] Index lookup failed, using legacy shop loop', { email });
-
-          const shops = await systemDb
-            .collection('shops')
-            .find({ status: 'Active' })
-            .toArray();
-
-          for (const shop of shops) {
-            if (shop.ownerEmail === email) {
-              targetShopId = shop.shopId;
-              break;
-            }
-          }
-
-          if (!targetShopId) {
-            for (const shop of shops) {
-              try {
-                const shopDb = getShopDatabase(shop.shopId);
-                const shopUser = await shopDb.collection('users').findOne({ email });
-                if (shopUser) {
-                  targetShopId = shop.shopId;
-                  break;
-                }
-              } catch (error) {
-                logger.warn('[PASSWORD_RESET] Failed to query shop during password reset', {
-                  shopId: shop.shopId,
-                  error: error.message
-                });
-              }
-            }
-          }
-        }
-
-        if (!targetShopId) {
-          // Return success even if user not found (prevent email enumeration)
-          return res.json({
-            success: true,
-            message: 'If an account with that email exists, a password reset code has been sent.',
-          });
-        }
-      }
-
-    const shopDb = getShopDatabase(targetShopId);
-    user = await shopDb.collection('users').findOne({ email });
+    const { user, shopDb } = resolved;
 
     if (!user) {
       // Return success even if user not found (prevent email enumeration)
@@ -651,7 +531,7 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
     const resetCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Store reset code in database
-    const collection = getShopDatabase(targetShopId).collection('users');
+    const collection = shopDb.collection('users');
 
     await collection.updateOne(
       { _id: user._id },
@@ -671,7 +551,7 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
     // Audit: password reset requested
     auditLog.log(req, AUDIT_ACTIONS.UPDATE, 'user', user._id?.toString(),
       `Password reset requested for ${user.email}`, {
-        shopId: targetShopId || null,
+        shopId: user.shopId || null,
         userId: user._id?.toString(),
         userEmail: user.email,
       }
@@ -699,7 +579,8 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
  */
 router.post('/reset-password', async (req, res) => {
   try {
-    const { email, resetCode, newPassword, shopId } = req.body;
+    const { email: rawEmail, resetCode, newPassword, shopId } = req.body;
+    const email = rawEmail?.trim().toLowerCase();
 
     if (!email || !resetCode || !newPassword) {
       return res.status(400).json({
@@ -715,16 +596,18 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    // Get user from shop database
-    if (!shopId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Shop ID is required',
-      });
+    // Get user from shop database (shopId auto-detected when omitted)
+    const { resolveShopUser } = require('../utils/shop-user-resolver');
+    const resolved = await resolveShopUser(email, shopId, {
+      noShopMessage: 'Invalid or expired reset code',
+    });
+    if (resolved.error) {
+      return res
+        .status(resolved.error.statusCode)
+        .json({ success: false, message: resolved.error.message });
     }
 
-    const shopDb = getShopDatabase(shopId);
-    const user = await shopDb.collection('users').findOne({ email });
+    const { user, shopDb } = resolved;
     const collection = shopDb.collection('users');
 
     if (!user) {
@@ -804,7 +687,8 @@ router.post('/reset-password', async (req, res) => {
  */
 router.post('/firebase-login', bruteForceProtection, async (req, res) => {
   try {
-    const { email, shopId, idToken, firebaseToken } = req.body;
+    const { email: rawEmail, shopId, idToken, firebaseToken } = req.body;
+    const email = rawEmail?.trim().toLowerCase();
 
     // Accept both 'idToken' and 'firebaseToken' for backward compatibility
     const firebaseIdToken = idToken || firebaseToken;
@@ -861,8 +745,8 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
         });
       }
 
-      // Verify email matches token
-      if (decodedToken.email !== email) {
+      // Verify email matches token (case-insensitive — email is normalized above)
+      if (decodedToken.email?.toLowerCase() !== email) {
         logger.warn(`[LOGIN] Email mismatch: token email ${decodedToken.email} !== request email ${email}`);
         return res.status(401).json({
           success: false,
@@ -871,125 +755,48 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
       }
     }
 
+    // Resolve shop + user (index → ownerEmail → shop scan)
+    const { resolveShopUser } = require('../utils/shop-user-resolver');
+    const resolved = await resolveShopUser(email, shopId, {
+      noShopMessage:
+        'User not found in system. Please contact administrator to add your account.',
+    });
+
     let user;
-    let userDb;
+    let shopDb = null;
 
-    const systemDb = getSystemDatabase();
-    
-    // Shop user login - try to find shopId automatically
-    let targetShopId = shopId;
-
-      if (!targetShopId) {
-        // PERFORMANCE OPTIMIZATION: Use user_shop_index for O(1) lookup
-        // Instead of O(n) loop through all shops
-        try {
-          const userShopMapping = await systemDb
-            .collection('user_shop_index')
-            .findOne({ email, isActive: true });
-
-          if (userShopMapping) {
-            targetShopId = userShopMapping.shopId;
-            logger.debug('[LOGIN] Found shop via index lookup', { email, shopId: targetShopId });
-          }
-        } catch (indexError) {
-          logger.warn('[LOGIN] Failed to query user_shop_index, falling back to shop loop', {
-            email,
-            error: indexError.message
-          });
-        }
-
-        // FALLBACK: If index lookup failed, use legacy method (loop through shops)
-        if (!targetShopId) {
-          logger.info('[LOGIN] Index lookup failed, using legacy shop loop', { email });
-
-          const shops = await systemDb
-            .collection('shops')
-            .find({ status: 'Active' })
-            .toArray();
-
-          // First check if email matches shop owner email
-          for (const shop of shops) {
-            if (shop.ownerEmail === email) {
-              targetShopId = shop._id.toString(); // Use _id, not shopId
-              break;
-            }
-          }
-
-          // If not found as owner, search in each shop's users collection
-          if (!targetShopId) {
-            for (const shop of shops) {
-              try {
-                const shopDb = getShopDatabase(shop._id.toString()); // Use _id, not shopId
-                const shopUser = await shopDb
-                  .collection('users')
-                  .findOne({ email });
-                if (shopUser) {
-                  targetShopId = shop._id.toString(); // Use _id, not shopId
-                  break;
-                }
-              } catch (error) {
-                logger.warn('[LOGIN] Failed to query shop database during Firebase login auto-detect', {
-                  shopId: shop._id.toString(),
-                  error: error.message
-                });
-              }
-            }
-          }
-        }
-
-        if (!targetShopId) {
-          logger.error('[LOGIN] User not found in any shop', { email });
-          return res.status(400).json({
-            success: false,
-            message:
-              'User not found in system. Please contact administrator to add your account.',
-          });
-        }
-      }
-
-      // Verify shop exists (find by _id as ObjectId or shopId as string)
-      let shop;
-      try {
-        shop = await systemDb.collection('shops').findOne({
-          $or: [
-            { shopId: targetShopId },
-            { _id: new ObjectId(targetShopId) }
-          ]
-        });
-      } catch {
-        // If targetShopId is not a valid ObjectId, try shopId only
-        shop = await systemDb.collection('shops').findOne({ shopId: targetShopId });
-      }
-
-      if (!shop) {
-        return res.status(404).json({
-          success: false,
-          message: 'Shop not found',
-        });
-      }
-
-      if (shop.status !== 'Active') {
-        return res.status(403).json({
-          success: false,
-          message: `Shop is ${shop.status.toLowerCase()}. Please contact support.`,
-        });
-      }
-
-    // Get user from shop database
-    const shopDb = getShopDatabase(targetShopId);
-    user = await shopDb.collection('users').findOne({ email });
-    userDb = targetShopId;
-
-    if (!user) {
-      // Increment login attempts on failure
-      if (req.incrementLoginAttempts) {
-        req.incrementLoginAttempts();
-      }
-      logger.error('[LOGIN] User not found in MongoDB', { email });
-      return res.status(401).json({
-        success: false,
-        message: 'User not found in system. Please contact administrator.',
+    if (resolved.error || !resolved.user) {
+      // Not a shop user — check for a super admin (stored in system_users,
+      // outside any shop database)
+      const systemDb = getSystemDatabase();
+      const superAdmin = await systemDb.collection('system_users').findOne({
+        email,
+        isSuper: true,
+        isActive: true,
       });
+
+      if (!superAdmin) {
+        if (resolved.error) {
+          return res
+            .status(resolved.error.statusCode)
+            .json({ success: false, message: resolved.error.message });
+        }
+        // Increment login attempts on failure
+        if (req.incrementLoginAttempts) {
+          req.incrementLoginAttempts();
+        }
+        logger.error('[LOGIN] User not found in MongoDB', { email });
+        return res.status(401).json({
+          success: false,
+          message: 'User not found in system. Please contact administrator.',
+        });
+      }
+
+      user = superAdmin;
+      logger.info('[LOGIN] Super admin authenticated', { email });
+    } else {
+      user = resolved.user;
+      shopDb = resolved.shopDb;
     }
 
     // Check if user is active
@@ -1009,23 +816,19 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
       req.resetLoginAttempts();
     }
 
-    // Update last login
-    await shopDb
-      .collection('users')
-      .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+    // Update last login (super admins have no shop database)
+    if (shopDb) {
+      await shopDb
+        .collection('users')
+        .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+    }
 
     // Generate token
     const token = generateToken(user);
 
     // Set JWT as httpOnly cookie (secure, XSS-proof)
     // For same-domain this is the most secure option
-    res.cookie('jwt', token, {
-      httpOnly: true,           // Cannot be accessed by JavaScript (XSS protection)
-      secure: true,             // Always HTTPS (required for sameSite=none)
-      sameSite: 'none',         // Allow cross-site cookies
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: '/',
-    });
+    res.cookie('jwt', token, getJwtCookieOptions());
 
     logger.info('[LOGIN] Firebase login successful', {
       email: user.email,
@@ -1056,6 +859,7 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
           email: user.email,
           role: user.role,
           shopId: user.shopId || null,
+          isSuper: user.isSuper === true,
           permissions: user.permissions || [],
         },
         token: token, // Include token for cross-domain setups
@@ -1080,7 +884,7 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
  * Logout user by revoking JWT token and clearing the cookie
  * SECURITY FIX: Added token revocation/blacklist
  */
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
     // Get token from cookie or header
     let token = req.cookies?.jwt;
@@ -1088,10 +892,11 @@ router.post('/logout', (req, res) => {
       token = req.headers.authorization.substring(7);
     }
 
-    // Revoke token (add to blacklist)
+    // Revoke token (add to blacklist) — awaited so the blacklist write
+    // completes before we respond, otherwise the token stays valid briefly
     if (token) {
       const { revokeToken } = require('../middleware/auth-multi-tenant');
-      const revoked = revokeToken(token);
+      const revoked = await revokeToken(token);
 
       if (revoked) {
         logger.info('[LOGOUT] Token revoked successfully');
@@ -1101,12 +906,7 @@ router.post('/logout', (req, res) => {
     }
 
     // Clear the JWT cookie
-    res.clearCookie('jwt', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/',
-    });
+    clearJwtCookie(res);
 
     logger.info('[LOGOUT] User logged out successfully');
 
@@ -1129,8 +929,12 @@ router.post('/logout', (req, res) => {
  */
 router.get('/me', async (req, res) => {
   try {
-    // Get JWT from cookie
-    const token = req.cookies?.jwt;
+    // Get JWT from cookie or Authorization header (same fallback as
+    // the authenticate middleware — the SPA sends the header)
+    let token = req.cookies?.jwt;
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.substring(7);
+    }
 
     if (!token) {
       return res.status(401).json({
@@ -1147,12 +951,7 @@ router.get('/me', async (req, res) => {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (_error) {
       // Token invalid or expired
-      res.clearCookie('jwt', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        path: '/',
-      });
+      clearJwtCookie(res);
 
       return res.status(401).json({
         success: false,
@@ -1160,26 +959,48 @@ router.get('/me', async (req, res) => {
       });
     }
 
+    // Check if the token has been revoked (e.g. after logout)
+    const { isTokenBlacklisted } = require('../middleware/auth-multi-tenant');
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
+      clearJwtCookie(res);
+      return res.status(401).json({
+        success: false,
+        message: 'Token has been revoked. Please login again.',
+      });
+    }
+
     // Get fresh user data from database
-    if (!decoded.shopId) {
+    const isSuperAdmin = decoded.role === 'SUPER_ADMIN' || decoded.isSuper === true;
+    if (!decoded.shopId && !isSuperAdmin) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token: missing shopId',
       });
     }
 
-    const shopDb = getShopDatabase(decoded.shopId);
-    const user = await shopDb
-      .collection('users')
-      .findOne({ _id: require('mongodb').ObjectId(decoded.userId) });
+    if (!ObjectId.isValid(decoded.userId)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token: missing userId',
+      });
+    }
+
+    let user;
+    if (isSuperAdmin && !decoded.shopId) {
+      const systemDb = getSystemDatabase();
+      user = await systemDb
+        .collection('system_users')
+        .findOne({ _id: new ObjectId(decoded.userId), isSuper: true });
+    } else {
+      const shopDb = getShopDatabase(decoded.shopId);
+      user = await shopDb
+        .collection('users')
+        .findOne({ _id: new ObjectId(decoded.userId) });
+    }
 
     if (!user || !user.isActive) {
-      res.clearCookie('jwt', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        path: '/',
-      });
+      clearJwtCookie(res);
 
       return res.status(401).json({
         success: false,
@@ -1197,6 +1018,7 @@ router.get('/me', async (req, res) => {
           email: user.email,
           role: user.role,
           shopId: user.shopId || null,
+          isSuper: user.isSuper === true,
           permissions: user.permissions || [],
         },
       },
@@ -1206,6 +1028,43 @@ router.get('/me', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get user data',
+    });
+  }
+});
+
+/**
+ * POST /api/auth/sse-token
+ * Issue a short-lived (2 min) SSE-scoped JWT so real-time streams don't
+ * expose the full session token in URLs. Authenticated via the standard
+ * Authorization header / cookie.
+ */
+const { authenticate } = require('../middleware/auth-multi-tenant');
+router.post('/sse-token', authenticate, async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+
+    const sseToken = jwt.sign(
+      {
+        userId: req.user._id.toString(),
+        email: req.user.email,
+        role: req.user.role,
+        shopId: req.user.shopId,
+        permissions: req.user.permissions || [],
+        scope: 'sse',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '2m' }
+    );
+
+    res.json({
+      success: true,
+      data: { token: sseToken, expiresIn: 120 },
+    });
+  } catch (error) {
+    logger.error('SSE token error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to issue SSE token',
     });
   }
 });
