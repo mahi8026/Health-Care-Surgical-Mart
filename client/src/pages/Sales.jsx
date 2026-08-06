@@ -274,13 +274,25 @@ const Sales = () => {
     );
 
     if (!product) {
-      const response = await api.get(
-        `/products/lookup/${encodeURIComponent(String(code).trim())}`,
-      );
-      if (!response.success || !response.data) {
-        throw new Error(response.message || `No product found for "${code}"`);
+      try {
+        const response = await api.get(
+          `/products/lookup/${encodeURIComponent(String(code).trim())}`,
+        );
+        if (!response.success || !response.data) {
+          throw new Error(
+            response.message || `No product found for "${code}"`,
+          );
+        }
+        product = response.data;
+      } catch (lookupError) {
+        // 404 from the server carries a friendly message; surface it instead
+        // of the raw axios "Request failed with status code 404".
+        throw new Error(
+          lookupError.serverMessage ||
+            lookupError.message ||
+            `No product found for "${code}"`,
+        );
       }
-      product = response.data;
     }
 
     if (product.isActive === false) {

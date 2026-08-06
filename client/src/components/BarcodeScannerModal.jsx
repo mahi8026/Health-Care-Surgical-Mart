@@ -1,13 +1,40 @@
 /**
  * BarcodeScannerModal
  * Camera-based barcode scanning for the POS using @zxing/browser.
- * Continuously decodes the video feed and reports the first detected code.
+ * Uses getUserMedia constraints (facingMode: 'environment') which is the
+ * reliable way to pick the rear camera on phones — device enumeration
+ * returns unusable/empty labels on several mobile browsers.
+ * TRY_HARDER + 1D-format hints keep decoding fast and accurate on camera.
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
+import {
+  BrowserMultiFormatReader,
+} from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import Modal from "./ui/Modal";
 import { beepSuccess } from "../utils/scannerSound";
+
+// Restrict decoding to linear (1D) barcodes + QR. Excluding PDF417/DataMatrix
+// lets the decoder spend its time on the codes a retail POS sees.
+const POSSIBLE_FORMATS = [
+  BarcodeFormat.EAN_13,
+  BarcodeFormat.EAN_8,
+  BarcodeFormat.UPC_A,
+  BarcodeFormat.UPC_E,
+  BarcodeFormat.CODE_128,
+  BarcodeFormat.CODE_39,
+  BarcodeFormat.QR_CODE,
+];
+
+const VIDEO_CONSTRAINTS = {
+  audio: false,
+  video: {
+    facingMode: "environment",
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  },
+};
 
 const BarcodeScannerModal = ({
   isOpen,
@@ -25,24 +52,17 @@ const BarcodeScannerModal = ({
     if (!isOpen) return undefined;
 
     let cancelled = false;
-    const reader = new BrowserMultiFormatReader();
+    const hints = new Map();
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, POSSIBLE_FORMATS);
+    const reader = new BrowserMultiFormatReader(hints, {
+      delayBetweenScanAttempts: 100,
+    });
 
     const start = async () => {
       try {
-        // Prefer the rear camera if multiple devices exist (common on mobile)
-        let desiredDevice = undefined;
-        try {
-          const devices = await reader.listVideoInputDevices();
-          const rear = devices.find((dev) =>
-            /back|environment|rear/i.test(dev.label || ""),
-          );
-          desiredDevice = (rear || devices[0])?.deviceId;
-        } catch {
-          /* device enumeration is best-effort */
-        }
-
-        const controls = await reader.decodeFromVideoDevice(
-          desiredDevice,
+        const controls = await reader.decodeFromConstraints(
+          VIDEO_CONSTRAINTS,
           videoRef.current,
           (result) => {
             if (cancelled || scanLockRef.current) return;
@@ -58,8 +78,13 @@ const BarcodeScannerModal = ({
       } catch (startError) {
         if (cancelled) return;
         console.error("Camera scan error:", startError);
+        const name = startError?.name || "";
         setError(
-          "Unable to access the camera. Allow camera permission or use the USB scanner instead.",
+          name === "NotAllowedError" || name === "SecurityError"
+            ? "Camera permission was denied. Allow camera access in your browser settings, or use the USB scanner instead."
+            : name === "NotFoundError"
+              ? "No camera found on this device. Use the USB scanner or type the code instead."
+              : "Unable to access the camera. Allow camera permission or use the USB scanner instead.",
         );
       }
     };
