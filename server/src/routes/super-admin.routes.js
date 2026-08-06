@@ -79,18 +79,25 @@ router.get('/dashboard', async (req, res) => {
 
     await Promise.all(
       shops.map(async (shop) => {
-        try {
-          const shopDb = getShopDatabase(shop.shopId);
-          const [count, activeCount] = await Promise.all([
-            shopDb.collection('users').countDocuments({}),
-            shopDb.collection('users').countDocuments({ isActive: true }),
-          ]);
-          totalUsers += count;
-          activeUsers += activeCount;
-        } catch (err) {
-          logger.warn(
-            `Super admin: failed to count users for shop ${shop.shopId}: ${err.message}`
-          );
+        // Per-shop DB may be named shop_<ObjectId> (production layout) or
+        // shop_<business shopId> (bootstrap layout) — count the one that has
+        // user data, preferring the _id-based name.
+        const dbCandidates = [shop._id?.toString(), shop.shopId].filter(Boolean);
+        for (const candidate of dbCandidates) {
+          try {
+            const shopDb = getShopDatabase(candidate);
+            const [count, activeCount] = await Promise.all([
+              shopDb.collection('users').countDocuments({}),
+              shopDb.collection('users').countDocuments({ isActive: true }),
+            ]);
+            totalUsers += count;
+            activeUsers += activeCount;
+            break;
+          } catch (err) {
+            logger.warn(
+              `Super admin: failed to count users for shop ${shop.shopId} (db ${candidate}): ${err.message}`
+            );
+          }
         }
       })
     );

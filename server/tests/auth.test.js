@@ -243,6 +243,82 @@ describe('Authentication API', () => {
     });
   });
   
+  describe('POST /api/auth/firebase-login — production layout (shop_<ObjectId> DB)', () => {
+    // Regression: production stores real users in the shop DB named after the
+    // shop document's _id (e.g. shop_6a020466789ca874348b2557), while the
+    // shops.shopId field is only a business slug that maps to a junk DB.
+    // The resolver must try the _id-based name first.
+    const { client, getSystemDatabase } = require('../src/config/database');
+    const admin = require('../src/config/firebase-admin');
+
+    let verifySpy;
+    const unique = Date.now().toString(36);
+    const legacyEmail = `legacyid.${unique}@test.com`;
+    let legacyShopId;
+
+    beforeAll(async () => {
+      const systemDb = getSystemDatabase();
+      const inserted = await systemDb.collection('shops').insertOne({
+        shopId: `shop_legacyid_${unique}`,
+        name: `Legacy ID Shop ${unique}`,
+        email: `shop.legacyid.${unique}@test.com`,
+        ownerEmail: legacyEmail,
+        status: 'Active',
+        isActive: true,
+        createdAt: new Date(),
+      });
+      legacyShopId = inserted.insertedId.toString();
+
+      // The real user lives ONLY in the shot_<ObjectId> database (like prod).
+      // We deliberately do NOT create shop_<slug> with this user.
+      const legacyDb = client().db(`shop_${legacyShopId}`);
+      await legacyDb.collection('users').insertOne({
+        name: 'Legacy ID Owner',
+        email: legacyEmail,
+        role: 'SHOP_ADMIN',
+        shopId: legacyShopId,
+        isActive: true,
+        createdAt: new Date(),
+      });
+
+      verifySpy = jest.spyOn(admin.auth(), 'verifyIdToken');
+    });
+
+    beforeEach(() => {
+      verifySpy.mockImplementation((token) =>
+        Promise.resolve({
+          uid: 'test-uid',
+          email: token === 'legacyid_token' ? legacyEmail : 'other@test.com',
+        })
+      );
+    });
+
+    afterEach(() => {
+      verifySpy.mockClear();
+    });
+
+    afterAll(async () => {
+      verifySpy.mockRestore();
+      const systemDb = getSystemDatabase();
+      await client()
+        .db(`shop_${legacyShopId}`)
+        .dropDatabase();
+      await systemDb.collection('shops').deleteOne({ _id: new (require('mongodb').ObjectId)(legacyShopId) });
+    });
+
+    it('should login an owner whose shop data is in shop_<ObjectId> (production layout)', async () => {
+      const res = await request(app)
+        .post('/api/auth/firebase-login')
+        .send({ firebaseToken: 'legacyid_token', email: legacyEmail });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user.email).toBe(legacyEmail);
+      expect(res.body.data.user.shopId).toBe(legacyShopId);
+      expect(res.body.data.token).toBeDefined();
+    });
+  });
+
   describe('POST /api/auth/logout', () => {
     it('should allow logout without authentication', async () => {
       const res = await request(app)
