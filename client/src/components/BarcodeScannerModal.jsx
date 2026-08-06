@@ -95,6 +95,8 @@ const BarcodeScannerModal = ({
             ref={videoRef}
             className="w-full aspect-video object-cover"
             muted
+            playsInline
+            autoPlay
           />
           <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-0.5 bg-red-500 opacity-80 pointer-events-none" />
         </div>
