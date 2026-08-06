@@ -109,6 +109,7 @@ app.use(
           'https://unpkg.com',
         ],
         imgSrc: ["'self'", 'data:', 'https:'],
+        mediaSrc: ["'self'", 'blob:', 'mediastream:'],
         fontSrc: [
           "'self'",
           'https://cdnjs.cloudflare.com',
