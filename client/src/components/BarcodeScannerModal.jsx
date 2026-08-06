@@ -41,6 +41,7 @@ const BarcodeScannerModal = ({
   onClose,
   onScan,
   title = "Scan barcode",
+  hint = "Point the camera at the product barcode. The item is added to the cart automatically when a code is detected.",
 }) => {
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
@@ -110,10 +111,7 @@ const BarcodeScannerModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
-          Point the camera at the product barcode. The item is added to the
-          cart automatically when a code is detected.
-        </p>
+        <p className="text-sm text-gray-600">{hint}</p>
 
         <div className="relative bg-black rounded-lg overflow-hidden">
           <video

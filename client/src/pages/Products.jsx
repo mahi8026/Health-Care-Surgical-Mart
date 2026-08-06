@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import BulkProductImport from "../components/BulkProductImport";
 import StockAdjustmentModal from "../components/StockAdjustmentModal";
+
+// Lazy-load the camera scanner (pulls in @zxing) only when the camera opens.
+const BarcodeScannerModal = lazy(() => import("../components/BarcodeScannerModal"));
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -794,6 +797,12 @@ const ProductModal = ({
     }),
   });
   const [loading, setLoading] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+
+  const handleCameraScan = (code) => {
+    setFormData((prev) => ({ ...prev, barcode: String(code || "").trim() }));
+    setCameraOpen(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -976,19 +985,39 @@ const ProductModal = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Barcode
               </label>
-              <input
-                type="text"
-                name="barcode"
-                value={formData.barcode}
-                onChange={handleChange}
-                className="input-field font-mono"
-                placeholder="Scan barcode or enter EAN/UPC (optional)"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="barcode"
+                  value={formData.barcode}
+                  onChange={handleChange}
+                  className="input-field flex-1 font-mono"
+                  placeholder="Scan barcode or enter EAN/UPC (optional)"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCameraOpen(true)}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm font-medium whitespace-nowrap"
+                  title="Scan barcode with camera"
+                >
+                  <i className="fas fa-camera mr-1"></i>
+                  Scan
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">
                 Scannable code for the POS barcode scanner. Must be unique
                 across products.
               </p>
             </div>
+
+            <Suspense fallback={null}>
+              <BarcodeScannerModal
+                isOpen={cameraOpen}
+                onClose={() => setCameraOpen(false)}
+                onScan={handleCameraScan}
+                hint="Point the camera at the product barcode. The detected code will be filled into the Barcode field."
+              />
+            </Suspense>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
