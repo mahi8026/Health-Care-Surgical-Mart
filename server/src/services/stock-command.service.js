@@ -65,6 +65,7 @@ class StockCommandService {
    * @param {string} [params.note] - Optional note
    * @param {Array} [params.batchAllocations] - FEFO batch allocations
    * @param {Object} [params.metadata] - Additional metadata
+   * @param {Object} [params.session] - MongoDB client session (transactional writes)
    * @returns {Promise<Object>} Result with ledgerEntry and snapshot
    */
   async recordMovement({
@@ -81,7 +82,8 @@ class StockCommandService {
     costPrice = null,
     note = '',
     batchAllocations = [],
-    metadata = {}
+    metadata = {},
+    session = null
   }) {
     // Validate required parameters
     if (!shopId || !productId || !movementType || quantity === undefined || quantity === null) {
@@ -112,7 +114,7 @@ class StockCommandService {
       // 1. Get current snapshot with optimistic lock check
       let snapshot = await shopDb.collection('stock_snapshots').findOne({
         productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
-      });
+      }, { session });
 
       // AUTO-FIX: If no snapshot exists, create one initialized to zero
       if (!snapshot) {
@@ -132,7 +134,7 @@ class StockCommandService {
           updatedAt: new Date()
         };
 
-        await shopDb.collection('stock_snapshots').insertOne(snapshot);
+        await shopDb.collection('stock_snapshots').insertOne(snapshot, { session });
         logger.info(`Created missing stock snapshot for product ${productId}`);
       }
 
@@ -181,52 +183,73 @@ class StockCommandService {
         metadata
       };
 
-      // 5. Insert ledger entry (immutable)
-      const ledgerResult = await shopDb.collection('stock_ledger').insertOne(ledgerData);
-      ledgerEntry = { _id: ledgerResult.insertedId, ...ledgerData };
-
-      // 6. Update snapshot atomically with optimistic lock
-      const snapshotUpdate = {
-        $set: {
-          onHandQty: newBalance,
-          availableQty: newBalance - snapshot.reservedQty,
-          lastLedgerEntryId: ledgerResult.insertedId,
-          lastLedgerVersion: snapshot.lastLedgerVersion + 1,
-          lastMovementAt: new Date(),
-          lastMovementType: movementType,
-          updatedAt: new Date()
-        }
-      };
-
+      // 5. Update snapshot atomically with optimistic lock FIRST so a
+      //    concurrency-conflict loser never leaves a phantom ledger row.
+      //    (Previously the ledger was inserted first, so the loser of the
+      //    optimistic-lock race committed an orphan ledger entry.)
+      // Step 5: Update the snapshot atomically with an optimistic lock.
+      // (Previously the ledger was inserted first, so the loser of the
+      // optimistic-lock race committed an orphan ledger entry.)
       const snapshotResult = await shopDb.collection('stock_snapshots').findOneAndUpdate(
         {
           productId: snapshot.productId,
           lastLedgerVersion: snapshot.lastLedgerVersion // Optimistic lock
         },
-        snapshotUpdate,
-        { returnDocument: 'after' }
+        { $set: { onHandQty: newBalance, availableQty: newBalance - snapshot.reservedQty, lastLedgerVersion: snapshot.lastLedgerVersion + 1, lastMovementAt: new Date(), lastMovementType: movementType, updatedAt: new Date() } },
+        { returnDocument: 'after', session }
       );
 
       if (!snapshotResult) {
-        // Concurrent modification detected
+        // Concurrent modification detected — nothing was persisted
         throw new ConcurrencyConflictError(
           'Stock snapshot was modified by another transaction. Please retry.'
         );
       }
 
-      updatedSnapshot = snapshotResult;
+      // 6. Insert ledger entry (immutable), then link the snapshot to it
+      const ledgerResult = await shopDb.collection('stock_ledger').insertOne(
+        { ...ledgerData, snapshotId: snapshotResult._id },
+        { session },
+      );
+      ledgerEntry = { _id: ledgerResult.insertedId, ...ledgerData };
+
+      await shopDb.collection('stock_snapshots').updateOne(
+        { _id: snapshotResult._id },
+        { $set: { lastLedgerEntryId: ledgerResult.insertedId, updatedAt: new Date() } },
+        { session },
+      );
+      updatedSnapshot = { ...snapshotResult, lastLedgerEntryId: ledgerResult.insertedId };
 
       // 7. Update batch quantities if FEFO allocations provided
       if (batchAllocations && batchAllocations.length > 0) {
         for (const alloc of batchAllocations) {
+          if (!alloc.batchId) {
+            // Un-batched stock: nothing to update at batch level (recorded in
+            // the ledger + snapshot only).
+            continue;
+          }
+
+          const filter = direction === 'OUT'
+            ? { _id: new ObjectId(alloc.batchId), quantity: { $gte: alloc.quantity } }
+            : { _id: new ObjectId(alloc.batchId) };
           const batchUpdate = direction === 'IN'
             ? { $inc: { quantity: alloc.quantity } }
             : { $inc: { quantity: -alloc.quantity } };
 
-          await shopDb.collection('stock_batches').updateOne(
-            { _id: new ObjectId(alloc.batchId) },
-            batchUpdate
+          const batchResult = await shopDb.collection('stock_batches').updateOne(
+            filter,
+            batchUpdate,
+            { session }
           );
+
+          // OUT decrement with a precondition prevents driving a batch negative.
+          if (direction === 'OUT' && batchResult.matchedCount === 0) {
+            throw new InsufficientStockError(
+              `Batch ${alloc.batchId} does not have enough quantity for this allocation (${alloc.quantity})`,
+              0,
+              alloc.quantity
+            );
+          }
         }
       }
 
@@ -293,20 +316,52 @@ class StockCommandService {
     }
 
     if (remaining > 0) {
-      // Check if there are expired batches
-      const expiredBatches = await shopDb.collection('stock_batches')
+      const productObjId = ObjectId.isValid(productId) ? new ObjectId(productId) : productId;
+
+      // Everything the snapshot holds that is NOT tracked in an active batch is
+      // unbatched stock (opening stock, bulk import, batch-less purchases).
+      // Active batches include expired ones, so subtracting the total active
+      // batch quantity from the snapshot yields the true unbatched amount.
+      const allActiveBatches = await shopDb.collection('stock_batches')
         .find({
-          productId: ObjectId.isValid(productId) ? new ObjectId(productId) : productId,
+          productId: productObjId,
           status: 'ACTIVE',
           quantity: { $gt: 0 },
-          expiryDate: { $lt: new Date() }
         })
         .toArray();
 
+      const snapshot = await shopDb.collection('stock_snapshots').findOne({
+        productId: productObjId,
+      });
+
+      const batchedQty = allActiveBatches.reduce((sum, b) => sum + b.quantity, 0);
+      const unbatchedQty = Math.max(0, (snapshot?.onHandQty || 0) - batchedQty);
+
+      // Prefer the unbatched fallback (never sell expired stock).
+      if (unbatchedQty >= remaining) {
+        // If batch numbers were entered on the sale, they're ignored here —
+        // the inventory is unbatched. recordMovement handles the ledger.
+        allocations.push({
+          batchId: null,
+          batchNo: null,
+          expiryDate: snapshot?.lastExpiryDate || null,
+          quantity: remaining,
+          costPrice: null
+        });
+        return allocations;
+      }
+
+      // Only the expired batches hold stock — nothing sellable remains.
+      const expiredBatches = allActiveBatches.filter(
+        (b) => b.expiryDate && new Date(b.expiryDate) < new Date()
+      );
       if (expiredBatches.length > 0) {
+        const sellableQty = unbatchedQty + allActiveBatches
+          .filter((b) => !b.expiryDate || new Date(b.expiryDate) >= new Date())
+          .reduce((sum, b) => sum + b.quantity, 0);
         throw new InsufficientStockError(
-          `Cannot complete sale: all remaining stock has expired. Available expired quantity: ${expiredBatches.reduce((sum, b) => sum + b.quantity, 0)}`,
-          qtyNeeded - remaining,
+          `Cannot complete sale: remaining stock is expired or insufficient. Sellable: ${sellableQty}, Needed: ${qtyNeeded}`,
+          sellableQty,
           qtyNeeded
         );
       }

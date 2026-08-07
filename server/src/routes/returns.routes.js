@@ -497,6 +497,7 @@ router.post(
       returnType, // 'full' or 'partial'
       refundMethod, // 'cash', 'bank', 'store_credit'
       notes,
+      idempotencyKey, // optional client-generated key to prevent duplicate returns
     } = req.body;
 
     // Validate required fields
@@ -504,6 +505,22 @@ router.post(
       throw createError.badRequest(
         'Original sale ID and return items are required',
       );
+    }
+
+    // Idempotency: a retry with the same key returns the already-created
+    // return instead of processing the refund twice.
+    if (idempotencyKey) {
+      const existing = await shopDb
+        .collection('returns')
+        .findOne({ idempotencyKey });
+      if (existing) {
+        return res.status(201).json({
+          success: true,
+          message: 'Return already processed (idempotent replay)',
+          data: existing,
+          idempotent: true,
+        });
+      }
     }
 
     if (!returnReason) {
@@ -630,6 +647,7 @@ router.post(
       status: 'completed', // 'pending', 'completed', 'cancelled'
       returnDate: new Date(),
       notes: notes || '',
+      idempotencyKey: idempotencyKey || null,
       createdBy: req.user._id,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -637,8 +655,27 @@ router.post(
 
     // Start transaction-like operations
     try {
-      // Insert return record
-      const result = await shopDb.collection('returns').insertOne(returnData);
+      // Insert return record (unique idempotencyKey index turns a racing
+      // duplicate submit into a conflict we can resolve safely)
+      let result;
+      try {
+        result = await shopDb.collection('returns').insertOne(returnData);
+      } catch (insertError) {
+        if (insertError.code === 11000 && idempotencyKey) {
+          const existing = await shopDb
+            .collection('returns')
+            .findOne({ idempotencyKey });
+          if (existing) {
+            return res.status(201).json({
+              success: true,
+              message: 'Return already processed (idempotent replay)',
+              data: existing,
+              idempotent: true,
+            });
+          }
+        }
+        throw insertError;
+      }
 
       // Phase 6: Update stock using event-sourced system
       const stockCommand = require('../services/stock-command.service');
@@ -710,6 +747,32 @@ router.post(
           $set: { updatedAt: new Date() },
         },
       );
+
+      // Credit/partial sales: refunding item value must reduce the customer's
+      // outstanding due too, otherwise money is lost twice (refund handed out,
+      // but due never lowered). Reduce up to the refund amount, never negative.
+      const originalPaymentMethod = originalSale.paymentMethod?.toLowerCase();
+      const originalDue = originalSale.dueAmount || 0;
+      const saleCustomerId = originalSale.customerId || customer?.id;
+      if (
+        (originalPaymentMethod === 'credit' || originalDue > 0) &&
+        saleCustomerId &&
+        ObjectId.isValid(saleCustomerId)
+      ) {
+        await shopDb.collection('customers').updateOne(
+          { _id: new ObjectId(saleCustomerId) },
+          [
+            {
+              $set: {
+                currentDue: {
+                  $max: [0, { $subtract: [{ $ifNull: ['$currentDue', 0] }, totalRefundAmount] }],
+                },
+                updatedAt: new Date(),
+              },
+            },
+          ],
+        );
+      }
 
       res.status(201).json({
         success: true,

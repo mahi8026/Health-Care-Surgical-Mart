@@ -754,7 +754,21 @@ router.post(
 
       const newDue = Math.max(0, currentDue - payAmount);
 
-      // Create payment record
+      // Atomic due decrement: guard on currentDue >= payAmount so two concurrent
+      // payments can never both decrement past zero (check-then-act race).
+      const dueUpdate = await shopDb.collection('customers').updateOne(
+        { _id: customerId, currentDue: { $gte: payAmount } },
+        { $inc: { currentDue: -payAmount }, $set: { updatedAt: new Date() } }
+      );
+
+      if (dueUpdate.matchedCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Payment amount ৳${payAmount.toFixed(2)} exceeds outstanding due`,
+        });
+      }
+
+      // Create payment record (only after the due was atomically claimed)
       const paymentRecord = {
         customerId,
         amount: payAmount,
@@ -769,12 +783,6 @@ router.post(
       };
 
       await shopDb.collection('customer_payments').insertOne(paymentRecord);
-
-      // Update customer due
-      await shopDb.collection('customers').updateOne(
-        { _id: customerId },
-        { $set: { currentDue: newDue, updatedAt: new Date() } }
-      );
 
       // Audit log
       try {

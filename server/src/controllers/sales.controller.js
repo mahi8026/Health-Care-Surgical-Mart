@@ -154,9 +154,17 @@ class SalesController {
               'MongoDB transactions not supported (standalone node) � falling back to non-transactional writes',
               { error: txError.message },
             );
+            // Validate every item's stock BEFORE inserting the sale to avoid an
+            // orphan sale (sale committed, stock never deducted).
+            const fallbackPlan = await this._allocateStockForSale(enrichedItems, req.user.shopId);
             const result = await req.shopDb.collection('sales').insertOne(sale);
             insertedId = result.insertedId;
-            await this._updateStockForSale(req.shopDb, enrichedItems, null, insertedId, req.user._id, req.user.shopId);
+            for (const { item, batchAllocations } of fallbackPlan) {
+              if (!item.productId) {
+                continue;
+              }
+              await this._recordStockMovement(item, batchAllocations, null, insertedId, req.user._id, req.user.shopId);
+            }
             if (customer?.id) {
               await this._updateCustomerAfterSale(
                 req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
@@ -171,9 +179,17 @@ class SalesController {
       } else {
         // Client not yet available (e.g. test environment) � non-transactional
         logger.warn('MongoDB client unavailable � using non-transactional sale insert');
+        // Validate stock BEFORE inserting the sale (avoid orphan sale on
+        // insufficient stock).
+        const legacyPlan = await this._allocateStockForSale(enrichedItems, req.user.shopId);
         const result = await req.shopDb.collection('sales').insertOne(sale);
         insertedId = result.insertedId;
-        await this._updateStockForSale(req.shopDb, enrichedItems, null, insertedId, req.user._id, req.user.shopId);
+        for (const { item, batchAllocations } of legacyPlan) {
+          if (!item.productId) {
+            continue;
+          }
+          await this._recordStockMovement(item, batchAllocations, null, insertedId, req.user._id, req.user.shopId);
+        }
         if (customer?.id) {
           await this._updateCustomerAfterSale(
             req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
@@ -511,62 +527,76 @@ class SalesController {
   }
 
   /**
-   * Update stock quantities after sale
-   * Phase 6: Event-sourced system with FEFO batch tracking (legacy system retired)
+   * Pass 1: allocate batches (FEFO) for every item. Throws InsufficientStockError
+   * before any write happens so a sale can never be committed without its stock.
    */
-  async _updateStockForSale(shopDb, enrichedItems, _session = null, saleId = null, userId = null, shopId = null) {
+  async _allocateStockForSale(enrichedItems, shopId) {
     const stockCommand = require('../services/stock-command.service');
     const { InsufficientStockError } = stockCommand;
 
+    const plan = [];
     for (const item of enrichedItems) {
-      // Skip stock updates for custom items (no productId)
-      if (!item.productId || item.productId === null) {
-        logger.info(`Skipping stock update for custom item: ${item.name}`);
+      if (!item.productId) {
+        plan.push({ item, batchAllocations: [] });
         continue;
       }
-
+      let batchAllocations;
       try {
-        // 1. Allocate batches using FEFO (First Expiry First Out)
-        const batchAllocations = await stockCommand.allocateBatchesFEFO(
+        batchAllocations = await stockCommand.allocateBatchesFEFO(
           item.productId,
           item.qty,
           shopId
         );
-
-        // 2. Record stock movement with batch tracking
-        await stockCommand.recordMovement({
-          shopId,
-          productId: item.productId,
-          movementType: 'SALE',
-          quantity: item.qty,
-          userId,
-          referenceType: 'SALE',
-          referenceId: saleId,
-          batchAllocations,
-          costPrice: item.rate, // Use selling price as reference
-          note: `Sale ${saleId}`
-        });
-
-        logger.info(`Stock consumed via FEFO for ${item.name}:`, {
-          productId: item.productId.toString(),
-          quantity: item.qty,
-          batches: batchAllocations.length
-        });
-
       } catch (error) {
         if (error instanceof InsufficientStockError) {
-          // Re-throw with more context
           throw new Error(
             `Insufficient stock for ${item.name}. Available: ${error.available}, Requested: ${error.requested}`
           );
         }
         throw error;
       }
+      plan.push({ item, batchAllocations });
+    }
+    return plan;
+  }
+
+  /**
+   * Update stock quantities after sale
+   * Phase 6: Event-sourced system with FEFO batch tracking (legacy system retired)
+   */
+  async _updateStockForSale(shopDb, enrichedItems, session = null, saleId = null, userId = null, shopId = null) {
+    // Allocate first (throws before any write on insufficient stock)
+    const plan = await this._allocateStockForSale(enrichedItems, shopId);
+
+    // Apply movements only after every allocation succeeded
+    for (const { item, batchAllocations } of plan) {
+      if (!item.productId) {
+        continue;
+      }
+      await this._recordStockMovement(item, batchAllocations, session, saleId, userId, shopId);
     }
 
-    // Phase 6: Legacy stock collection updates REMOVED
-    // Snapshot system is now the single source of truth
     logger.info('Stock updates completed via event-sourced system');
+  }
+
+  /**
+   * Persist one stock movement. Uses an existing session when available.
+   */
+  async _recordStockMovement(item, batchAllocations, session, saleId, userId, shopId) {
+    const stockCommand = require('../services/stock-command.service');
+    await stockCommand.recordMovement({
+      shopId,
+      productId: item.productId,
+      movementType: 'SALE',
+      quantity: item.qty,
+      userId,
+      referenceType: 'SALE',
+      referenceId: saleId,
+      batchAllocations,
+      costPrice: item.rate, // Use selling price as reference
+      note: `Sale ${saleId}`,
+      session,
+    });
   }
 
   /**

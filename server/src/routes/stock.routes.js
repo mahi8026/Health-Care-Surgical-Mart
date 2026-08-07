@@ -326,6 +326,31 @@ router.get(
       .sort({ expiryDate: 1 }) // FEFO: earliest expiry first
       .toArray();
 
+    // Products stocked without a batch row (opening stock, bulk import, or a
+    // batch-less purchase) hold quantity only in the snapshot. Surface that
+    // remaining stock as a synthetic unbatched entry so the report is never
+    // empty while stock exists.
+    const snapshot = await shopDb
+      .collection('stock_snapshots')
+      .findOne({ productId: new ObjectId(req.params.productId) });
+
+    const batchedQty = batches.reduce((sum, b) => sum + (b.quantity || 0), 0);
+    const unbatchedQty = Math.max(0, (snapshot?.onHandQty || 0) - batchedQty);
+
+    if (unbatchedQty > 0) {
+      batches.push({
+        _id: null,
+        batchNo: null,
+        lotNo: null,
+        quantity: unbatchedQty,
+        expiryDate: snapshot?.lastExpiryDate || null,
+        status: 'ACTIVE',
+        costPrice: null,
+        unbatched: true,
+        isUnbatched: true,
+      });
+    }
+
     res.json({
       success: true,
       data: batches,

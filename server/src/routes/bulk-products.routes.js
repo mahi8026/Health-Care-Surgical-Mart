@@ -596,13 +596,23 @@ router.get('/bulk-export', authenticate, requirePermission(PERMISSIONS.VIEW_PROD
       name: 1, sku: 1, category: 1, purchasePrice: 1, sellingPrice: 1, unit: 1, minStockLevel: 1, description: 1,
     }).toArray();
 
+    // CSV formula injection guard: prefix cells that start with = + - @ or tab
+    // with a single quote so Excel/Sheets treats them as text, never formula.
+    const safeCell = (value) => {
+      const str = value === null || value === undefined ? '' : String(value);
+      if (/^[=+\-@\t]/.test(str)) {
+        return `'${str}`;
+      }
+      return str;
+    };
+
     // Convert to CSV format
     const csvHeader =
       'name,sku,category,purchasePrice,sellingPrice,unit,minStockLevel,description\n';
     const csvRows = products
       .map(
         (p) =>
-          `"${p.name}","${p.sku}","${p.category}",${p.purchasePrice},${p.sellingPrice},"${p.unit}",${p.minStockLevel},"${p.description || ''}"`,
+          `"${safeCell(p.name)}","${safeCell(p.sku)}","${safeCell(p.category)}",${p.purchasePrice},${p.sellingPrice},"${safeCell(p.unit)}",${p.minStockLevel},"${safeCell(p.description)}"`,
       )
       .join('\n');
 

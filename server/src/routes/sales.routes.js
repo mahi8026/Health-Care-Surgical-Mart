@@ -500,40 +500,54 @@ router.post(
         remainingPayment -= previousDuePayment;
       }
 
-      // Update paid amounts based on payment method
-      const updatedFields = {
-        dueAmount: newDueAmount,
-        previousDue: newPreviousDue,
-        totalOutstanding: newDueAmount + newPreviousDue,
-        updatedAt: new Date(),
-      };
+      // Atomic due write: apply a compound $inc guarded by totalOutstanding so
+      // two concurrent pay-due requests can never both clear the same debt
+      // (check-then-act race). The guard filters on the doc-as-locked, so the
+      // loser sees totalOutstanding < parsedAmount and matches nothing.
+      const incField = paymentMethod === 'cash' ? 'cashPaid' : 'bankPaid';
+      const updatedSale = await req.shopDb.collection('sales').findOneAndUpdate(
+        {
+          _id: saleId,
+          totalOutstanding: { $gte: parsedAmount },
+        },
+        {
+          $set: { updatedAt: new Date() },
+          $inc: {
+            dueAmount: -(currentDueAmount - newDueAmount),
+            previousDue: -(currentPreviousDue - newPreviousDue),
+            totalOutstanding: -parsedAmount,
+            [incField]: parsedAmount,
+          },
+        },
+        { returnDocument: 'after' },
+      );
 
-      // Add payment to the appropriate paid field
-      if (paymentMethod === 'cash') {
-        updatedFields.cashPaid = (sale.cashPaid || 0) + parsedAmount;
-      } else if (paymentMethod === 'bank') {
-        updatedFields.bankPaid = (sale.bankPaid || 0) + parsedAmount;
-      } else if (paymentMethod === 'card') {
-        // For card, add to bank paid (can be separated if needed)
-        updatedFields.bankPaid = (sale.bankPaid || 0) + parsedAmount;
+      if (!updatedSale) {
+        return res.status(400).json({
+          success: false,
+          message: `Payment amount (Tk ${parsedAmount.toFixed(2)}) exceeds total due (Tk ${totalDue.toFixed(2)})`,
+        });
       }
 
-      // Recalculate payment status
-      const totalPaid = (updatedFields.cashPaid || sale.cashPaid || 0) + (updatedFields.bankPaid || sale.bankPaid || 0);
+      const newDueAmountFinal = updatedSale.dueAmount || 0;
+      const newPreviousDueFinal = updatedSale.previousDue || 0;
+
+      // Recalculate payment status from the freshly-written values
+      const totalPaidFinal =
+        (updatedSale.cashPaid || 0) + (updatedSale.bankPaid || 0);
       const grandTotal = sale.grandTotal || 0;
-
-      if (totalPaid >= grandTotal && newDueAmount === 0 && newPreviousDue === 0) {
-        updatedFields.paymentStatus = 'Paid';
-      } else if (totalPaid > 0) {
-        updatedFields.paymentStatus = 'Partial';
+      let newPaymentStatus;
+      if (totalPaidFinal >= grandTotal && newDueAmountFinal === 0 && newPreviousDueFinal === 0) {
+        newPaymentStatus = 'Paid';
+      } else if (totalPaidFinal > 0) {
+        newPaymentStatus = 'Partial';
       } else {
-        updatedFields.paymentStatus = 'Credit';
+        newPaymentStatus = 'Credit';
       }
 
-      // Update the sale
       await req.shopDb.collection('sales').updateOne(
         { _id: saleId },
-        { $set: updatedFields }
+        { $set: { paymentStatus: newPaymentStatus } }
       );
 
       // Record payment in payment history (optional - create payments collection if needed)
@@ -572,10 +586,10 @@ router.post(
               paymentStatus: sale.paymentStatus,
             },
             after: {
-              dueAmount: newDueAmount,
-              previousDue: newPreviousDue,
-              totalOutstanding: newDueAmount + newPreviousDue,
-              paymentStatus: updatedFields.paymentStatus,
+              dueAmount: newDueAmountFinal,
+              previousDue: newPreviousDueFinal,
+              totalOutstanding: newDueAmountFinal + newPreviousDueFinal,
+              paymentStatus: newPaymentStatus,
             },
             payment: {
               amount: parsedAmount,
@@ -602,10 +616,10 @@ router.post(
           invoiceNo: sale.invoiceNo,
           paymentReceived: parsedAmount,
           paymentMethod,
-          dueAmount: newDueAmount,
-          previousDue: newPreviousDue,
-          totalOutstanding: newDueAmount + newPreviousDue,
-          paymentStatus: updatedFields.paymentStatus,
+          dueAmount: newDueAmountFinal,
+          previousDue: newPreviousDueFinal,
+          totalOutstanding: newDueAmountFinal + newPreviousDueFinal,
+          paymentStatus: newPaymentStatus,
         },
       });
     } catch (error) {

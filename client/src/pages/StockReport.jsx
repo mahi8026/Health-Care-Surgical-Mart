@@ -22,6 +22,13 @@ const expiryStyle = (expiryDate) => {
 
 // ── Export to Excel (CSV) ─────────────────────────────────────────────────────
 const exportToExcel = (stockData) => {
+  // CSV formula injection guard: cells starting with = + - @ or tab are
+  // prefixed with a single quote so Excel treats them as text, not formula.
+  const safeCell = (value) => {
+    const str = value === null || value === undefined ? "" : String(value);
+    return /^[=+\-@\t]/.test(str) ? `'${str}` : str;
+  };
+
   const headers = [
     "Product", "SKU", "Batch No", "Lot No", "Current Qty", "Unit",
     "Cost Price", "Selling Price", "Stock Value", "Reorder Point",
@@ -33,20 +40,20 @@ const exportToExcel = (stockData) => {
     const reorder = item.reorderPoint ?? 0;
     const status = qty === 0 ? "Out of Stock" : qty <= reorder ? "Low Stock" : "In Stock";
     return [
-      item.productName ?? "",
-      item.sku ?? "",
-      item.batchNo ?? "",
-      item.lotNo ?? "",
+      safeCell(item.productName),
+      safeCell(item.sku),
+      safeCell(item.batchNo),
+      safeCell(item.lotNo),
       qty,
-      item.unit ?? "",
+      safeCell(item.unit),
       cost,
       item.sellingPrice ?? 0,
       (qty * cost).toFixed(2),
       reorder,
       item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : "",
-      status,
-      item.category ?? "",
-      item.supplier ?? "",
+      safeCell(status),
+      safeCell(item.category),
+      safeCell(item.supplier),
     ];
   });
   const csv = [headers, ...rows].map((r) => r.map((f) => `"${f}"`).join(",")).join("\n");

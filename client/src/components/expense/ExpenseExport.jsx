@@ -58,6 +58,13 @@ const ExpenseExport = ({
   };
 
   const generateCSV = (data) => {
+    // CSV formula injection guard: cells starting with = + - @ or tab are
+    // prefixed with a single quote so Excel treats them as text, not formula.
+    const safeCell = (value) => {
+      const str = value === null || value === undefined ? "" : String(value);
+      return /^[=+\-@\t]/.test(str) ? `'${str}` : str;
+    };
+
     const headers = exportFields.map(
       (field) => availableFields.find((f) => f.key === field)?.label || field,
     );
@@ -67,17 +74,17 @@ const ExpenseExport = ({
         switch (field) {
           case "expenseDate":
           case "createdAt":
-            return formatDate(expense[field]);
+            return safeCell(formatDate(expense[field]));
           case "amount":
             return expense[field];
           case "vendor":
-            return expense.vendor?.name || "";
+            return safeCell(expense.vendor?.name);
           case "tags":
-            return Array.isArray(expense.tags) ? expense.tags.join(", ") : "";
+            return safeCell(Array.isArray(expense.tags) ? expense.tags.join(", ") : "");
           case "isRecurring":
-            return expense.isRecurring ? "Yes" : "No";
+            return safeCell(expense.isRecurring ? "Yes" : "No");
           default:
-            return expense[field] || "";
+            return safeCell(expense[field]);
         }
       }),
     );

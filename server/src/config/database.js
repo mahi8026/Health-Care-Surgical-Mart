@@ -336,6 +336,13 @@ async function createShopIndexes(shopId) {
       { key: { createdBy: 1 }, name: 'created_by_index' },
     ]);
 
+    // Return indexes (idempotency)
+    await shopDb.collection('returns').createIndexes([
+      { key: { idempotencyKey: 1 }, unique: true, sparse: true, name: 'return_idempotency_unique' },
+      { key: { originalSaleId: 1 }, name: 'returns_original_sale_index' },
+      { key: { returnDate: -1 }, name: 'returns_date_desc' },
+    ]);
+
     logger.info(`Database indexes created for shop: ${shopId}`);
   } catch (error) {
     logger.error(`Error creating indexes for shop ${shopId}:`, error);

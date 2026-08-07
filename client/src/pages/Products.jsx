@@ -149,6 +149,13 @@ const Products = () => {
 
   // Export products to CSV
   const exportProducts = () => {
+    // CSV formula injection guard: cells starting with = + - @ or tab are
+    // prefixed with a single quote so Excel treats them as text, not formula.
+    const safeCell = (value) => {
+      const str = value === null || value === undefined ? "" : String(value);
+      return /^[=+\-@\t]/.test(str) ? `'${str}` : str;
+    };
+
     const headers = [
       "Name",
       "Category",
@@ -162,18 +169,20 @@ const Products = () => {
       "Status",
     ];
     const csvData = products.map((product) => [
-      product.name,
-      typeof product.category === "object"
-        ? product.category.name
-        : product.category,
-      product.brand || "",
-      product.sku,
+      safeCell(product.name),
+      safeCell(
+        typeof product.category === "object"
+          ? product.category.name
+          : product.category,
+      ),
+      safeCell(product.brand),
+      safeCell(product.sku),
       product.purchasePrice,
       product.sellingPrice,
-      product.unit,
+      safeCell(product.unit),
       product.stockQuantity,
       product.minStockLevel,
-      product.isActive ? "Active" : "Inactive",
+      safeCell(product.isActive ? "Active" : "Inactive"),
     ]);
 
     const csvContent = [headers, ...csvData]

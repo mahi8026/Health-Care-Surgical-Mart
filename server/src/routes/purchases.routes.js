@@ -547,24 +547,46 @@ router.put(
       throw createError.badRequest('Cannot receive cancelled purchase order');
     }
 
+    // Atomic status claim: transition this purchase to a 'processing' state so
+    // two concurrent receive requests can never both apply stock (check-then-act
+    // race). Only one caller wins matchedCount === 1.
+    const claim = await shopDb.collection('purchases').updateOne(
+      { _id: toObjectId(req.params.id), status: { $nin: ['received', 'cancelled', 'processing'] } },
+      { $set: { status: 'processing', receivedProcessingAt: new Date(), updatedAt: new Date() } },
+    );
+
+    if (claim.matchedCount === 0) {
+      const current = await shopDb.collection('purchases').findOne({ _id: toObjectId(req.params.id) });
+      if (current?.status === 'received') {
+        throw createError.badRequest('Purchase order already received');
+      }
+      if (current?.status === 'cancelled') {
+        throw createError.badRequest('Cannot receive cancelled purchase order');
+      }
+      throw createError.conflict('Purchase order is being received by another request');
+    }
+
+    const previousStatus = purchase.status;
+
     // If no receivedItems provided, receive all items as ordered
     const itemsToReceive = receivedItems || purchase.items;
 
-    // Process each received item
-    for (const item of itemsToReceive) {
-      const productId = toObjectId(item.productId || item.productId);
-      const receivedQty = item.receivedQty || item.qty;
-      const unitCost = item.unitCost || item.rate;
+    try {
+      // Process each received item
+      for (const item of itemsToReceive) {
+        const productId = toObjectId(item.productId || item.productId);
+        const receivedQty = item.receivedQty || item.qty;
+        const unitCost = item.unitCost || item.rate;
 
-      // Get product details
-      const product = await shopDb
-        .collection('products')
-        .findOne({ _id: productId });
+        // Get product details
+        const product = await shopDb
+          .collection('products')
+          .findOne({ _id: productId });
 
-      if (!product) {
-        logger.warn(`Product not found during purchase receive: ${productId}`);
-        continue;
-      }
+        if (!product) {
+          logger.warn(`Product not found during purchase receive: ${productId}`);
+          continue;
+        }
 
       // Phase 3B: Create batch if batch tracking info provided
       if (item.batchNo || item.expiryDate) {
@@ -680,6 +702,7 @@ router.put(
           receivingNotes: notes?.trim() || null,
           updatedAt: new Date(),
         },
+        $unset: { receivedProcessingAt: 1 },
       },
     );
 
@@ -691,6 +714,23 @@ router.put(
       success: true,
       message: 'Purchase order received, stock updated, and batches created successfully',
     });
+    } catch (receiveError) {
+      // Roll back the claim so the purchase can be received again after fixing
+      // the error (partial stock writes are not rolled back on standalone
+      // MongoDB — a retry must re-run the full receive).
+      try {
+        await shopDb.collection('purchases').updateOne(
+          { _id: toObjectId(req.params.id), status: 'processing' },
+          {
+            $set: { status: previousStatus || 'pending', updatedAt: new Date() },
+            $unset: { receivedProcessingAt: 1 },
+          },
+        );
+      } catch (rollbackError) {
+        logger.error('Failed to roll back purchase receive claim:', rollbackError.message);
+      }
+      throw receiveError;
+    }
   }),
 );
 
