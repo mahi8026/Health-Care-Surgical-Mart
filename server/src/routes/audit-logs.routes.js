@@ -106,7 +106,7 @@ router.get('/', async (req, res) => {
     const { role, shopId: userShopId } = req.user;
 
     // Only SHOP_ADMIN can access audit logs
-    if (role !== 'SHOP_ADMIN') {
+    if (role !== ROLES.SHOP_ADMIN) {
       return res.status(403).json({
         success: false,
         message: 'Insufficient permissions to view audit logs',

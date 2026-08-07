@@ -178,23 +178,23 @@ const parseExcel = async (filePath) => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
     const worksheet = workbook.worksheets[0];
-    
+
     if (!worksheet) {
       throw new Error('No worksheets found in Excel file');
     }
-    
+
     const data = [];
     const headers = [];
-    
+
     // Get headers from first row
     worksheet.getRow(1).eachCell((cell, colNumber) => {
       headers[colNumber] = cell.value?.toString() || `column_${colNumber}`;
     });
-    
+
     // Get data rows
     worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // Skip header row
-      
+      if (rowNumber === 1) {return;} // Skip header row
+
       const rowData = {};
       row.eachCell((cell, colNumber) => {
         const header = headers[colNumber];
@@ -202,13 +202,13 @@ const parseExcel = async (filePath) => {
           rowData[header] = cell.value;
         }
       });
-      
+
       // Only add non-empty rows
       if (Object.keys(rowData).length > 0) {
         data.push(rowData);
       }
     });
-    
+
     return data;
   } catch (error) {
     throw new Error(`Failed to parse Excel file: ${error.message}`);

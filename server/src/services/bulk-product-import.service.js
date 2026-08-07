@@ -48,23 +48,23 @@ class BulkProductImportService {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(filePath);
       const worksheet = workbook.worksheets[0];
-      
+
       if (!worksheet) {
         throw new Error('No worksheets found in Excel file');
       }
-      
+
       const data = [];
       const headers = [];
-      
+
       // Get headers from first row
       worksheet.getRow(1).eachCell((cell, colNumber) => {
         headers[colNumber] = cell.value?.toString() || `column_${colNumber}`;
       });
-      
+
       // Get data rows
       worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return; // Skip header row
-        
+        if (rowNumber === 1) {return;} // Skip header row
+
         const rowData = {};
         row.eachCell((cell, colNumber) => {
           const header = headers[colNumber];
@@ -72,13 +72,13 @@ class BulkProductImportService {
             rowData[header] = cell.value;
           }
         });
-        
+
         // Only add non-empty rows
         if (Object.keys(rowData).length > 0) {
           data.push(rowData);
         }
       });
-      
+
       return data;
     } catch (error) {
       throw new Error(`Excel parsing error: ${error.message}`);
@@ -359,21 +359,21 @@ class BulkProductImportService {
     const template = this.getSampleTemplate();
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Products');
-    
+
     // Add headers
     const headers = Object.keys(template[0]);
     worksheet.addRow(headers);
-    
+
     // Add sample data
     template.forEach(item => {
       worksheet.addRow(Object.values(item));
     });
-    
+
     // Auto-fit columns
     worksheet.columns.forEach(column => {
       column.width = 15;
     });
-    
+
     return workbook;
   }
 
