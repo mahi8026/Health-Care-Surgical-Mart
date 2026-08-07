@@ -52,11 +52,21 @@ api.interceptors.response.use(
         url.includes("/auth/firebase-login") || url.includes("/auth/login");
 
       if (!isLoginRequest) {
-        // Unauthorized - clear user state, token, and redirect to login
+        // Unauthorized - clear user state, token, and redirect to login.
+        // Stash a message so the login page can explain why the session ended.
+        const hadSession = !!localStorage.getItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("token");
         localStorage.removeItem("lastLoginTime");
-        window.location.href = "/login";
+        if (hadSession) {
+          sessionStorage.setItem(
+            "authMessage",
+            "Your session has expired. Please log in again.",
+          );
+        }
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       }
     }
 

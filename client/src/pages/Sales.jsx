@@ -201,7 +201,7 @@ const Sales = () => {
       updatedCart[existingItemIndex] = {
         ...updatedCart[existingItemIndex],
         quantity: newQuantity,
-        total: newQuantity * rate,
+        total: updatedCart[existingItemIndex].total + quantity * rate,
       };
       setCart(updatedCart);
     } else {
@@ -333,7 +333,7 @@ const Sales = () => {
       updatedCart[existingItemIndex] = {
         ...updatedCart[existingItemIndex],
         quantity: newQuantity,
-        total: newQuantity * rate,
+        total: updatedCart[existingItemIndex].total + quantity * rate,
       };
       setCart(updatedCart);
     } else {
@@ -1581,11 +1581,15 @@ const Sales = () => {
           onClose={() => setShowInvoiceModal(false)}
           onDownload={async (saleId, invoiceNo) => {
             try {
-              // Stream PDF directly from backend — uses httpOnly cookie for auth
+              // Stream PDF directly from backend — uses the auth token header
               const apiUrl = import.meta.env.VITE_API_URL || "/api";
               const response = await fetch(
                 `${apiUrl}/sales/${saleId}/download-invoice`,
-                { credentials: "include" }  // Send httpOnly cookie automatically
+                {
+                  headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+                  },
+                },
               );
               if (!response.ok) {
                 const err = await response.json().catch(() => ({}));

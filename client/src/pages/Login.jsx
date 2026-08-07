@@ -6,7 +6,9 @@ import LoadingSpinner from "../components/LoadingSpinner";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    () => sessionStorage.getItem("authMessage") || "",
+  );
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
@@ -25,6 +27,7 @@ const Login = () => {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
+      sessionStorage.removeItem("authMessage");
     }
   };
 

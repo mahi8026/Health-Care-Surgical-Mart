@@ -20,6 +20,7 @@ export default [
         document: "readonly",
         console: "readonly",
         localStorage: "readonly",
+        sessionStorage: "readonly",
         navigator: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",

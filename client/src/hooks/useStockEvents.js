@@ -72,8 +72,11 @@ const useStockEvents = (onEvent) => {
         // JWT is never placed in a URL (Note: EventSource doesn't support
         // custom headers, so we pass the token as a query param)
         const sseToken = await getSSEToken();
-        if (cancelled || !sseToken) {
+        if (cancelled) {
           return;
+        }
+        if (!sseToken) {
+          throw new Error('Failed to obtain SSE token');
         }
 
         const url = `${API_BASE_URL}/stock/events?token=${sseToken}`;
@@ -106,6 +109,9 @@ const useStockEvents = (onEvent) => {
           setConnected(false);
           setError('Connection lost');
           eventSource.close();
+          if (eventSourceRef.current === eventSource) {
+            eventSourceRef.current = null;
+          }
 
           // Exponential backoff for reconnection
           reconnectAttemptsRef.current += 1;

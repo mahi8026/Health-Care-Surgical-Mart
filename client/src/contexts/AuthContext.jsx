@@ -8,6 +8,26 @@ import { hasPermission as checkPermission } from "../utils/permissions";
 
 const AuthContext = createContext();
 
+// Returns true when the stored JWT is structurally valid and (if it carries
+// an exp claim) not yet expired. A session with no exp is treated as valid —
+// the backend rejects it anyway if it is stale.
+const isStoredTokenValid = (storedToken) => {
+  if (!storedToken) return false;
+  const parts = storedToken.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(
+      window.atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    if (typeof payload.exp === "number") {
+      return Date.now() < payload.exp * 1000;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -95,33 +115,17 @@ export const AuthProvider = ({ children }) => {
         const storedUser = localStorage.getItem("user");
         const storedToken = localStorage.getItem("token");
 
-        if (storedUser && storedToken) {
+        if (storedUser && isStoredTokenValid(storedToken)) {
           try {
             const parsedUser = JSON.parse(storedUser);
-            
-            // Verify token is not expired (JWT format: header.payload.signature)
-            const tokenParts = storedToken.split('.');
-            if (tokenParts.length === 3) {
-              const payload = JSON.parse(window.atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/')));
-              const expiryTime = payload.exp * 1000; // Convert to milliseconds
-              
-              if (Date.now() < expiryTime) {
-                // Token is still valid - restore session without API call
-                setMongoUser(parsedUser);
-                setUserContext(parsedUser);
-                setLoading(false);
-                return;
-              } else {
-                // Token expired - clear it
-                if (import.meta.env.DEV) {
-                  console.log('[AUTH] Token expired, clearing session');
-                }
-                localStorage.removeItem("user");
-                localStorage.removeItem("token");
-              }
-            }
+
+            // Token is still valid - restore session without API call
+            setMongoUser(parsedUser);
+            setUserContext(parsedUser);
+            setLoading(false);
+            return;
           } catch (error) {
-            // Invalid token or user data - clear it
+            // Invalid stored user data - clear it
             if (import.meta.env.DEV) {
               console.error('[AUTH] Failed to parse stored session:', error);
             }
@@ -130,7 +134,36 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        // No valid stored session - user needs to log in
+        // Stored session missing, expired or malformed. The Firebase session
+        // is still valid, so try a silent re-login before showing the login
+        // page — the backend issues a fresh JWT from the current ID token.
+        if (currentUser) {
+          try {
+            const idToken = await currentUser.getIdToken(true);
+            const response = await api.post("/auth/firebase-login", {
+              firebaseToken: idToken,
+              email: currentUser.email,
+            });
+
+            if (response.success && response.data?.user && response.data?.token) {
+              localStorage.setItem("user", JSON.stringify(response.data.user));
+              localStorage.setItem("token", response.data.token);
+              localStorage.setItem("lastLoginTime", Date.now().toString());
+              setMongoUser(response.data.user);
+              setUserContext(response.data.user);
+              setLoading(false);
+              return;
+            }
+          } catch (error) {
+            // Silent re-login failed (offline, user removed, ...) - fall
+            // through and show the login page.
+            if (import.meta.env.DEV) {
+              console.error('[AUTH] Silent re-login failed:', error);
+            }
+          }
+        }
+
+        // No valid session and silent re-login unavailable - user needs to log in
         setMongoUser(null);
         clearUserContext();
       } else {

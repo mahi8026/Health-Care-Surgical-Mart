@@ -34,7 +34,12 @@ const WEDGE_SCAN_GAP_MS = 30;
 // Keep history short — operators scan dozens of items quickly.
 const MAX_HISTORY = 6;
 
-const EMPTY_BUFFER = { keys: [], lastKeyAt: 0 };
+const EMPTY_BUFFER = {
+  keys: [],
+  lastKeyAt: 0,
+  leakTarget: null,
+  leakValue: null,
+};
 
 const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
   const [code, setCode] = useState("");
@@ -101,6 +106,24 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
   // When typing happens much faster than a human (< 30ms between keys) in a
   // field that is NOT the scan input, we assume a scanner is entering a code.
   useEffect(() => {
+    // Undo the first character of a confirmed burst: on the first key of a
+    // burst we cannot yet know it is a scanner, so the char goes to the
+    // focused field normally; once the second key confirms the burst we
+    // restore the field to its pre-scan value (captured at the first keydown,
+    // which fires before the input event mutates the value).
+    const restoreLeakedChar = (buffer) => {
+      const { leakTarget, leakValue } = buffer;
+      buffer.leakTarget = null;
+      buffer.leakValue = null;
+      if (!leakTarget || leakValue === null || leakValue === undefined) return;
+      if (leakTarget !== document.activeElement) return;
+      if (leakTarget.value === leakValue) return;
+      leakTarget.value = leakValue;
+      if (typeof leakTarget.setSelectionRange === "function") {
+        leakTarget.setSelectionRange(leakValue.length, leakValue.length);
+      }
+    };
+
     const onKeyDown = (e) => {
       const buffer = wedgeBufferRef.current;
 
@@ -108,6 +131,8 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
       if (e.target === inputRef.current) {
         buffer.keys = [];
         buffer.lastKeyAt = 0;
+        buffer.leakTarget = null;
+        buffer.leakValue = null;
         return;
       }
 
@@ -117,6 +142,7 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
       if (e.key === "Enter") {
         if (buffer.keys.length >= 1 && duration <= 160 && buffer.lastKeyAt !== 0) {
           const scanned = buffer.keys.join("");
+          restoreLeakedChar(buffer);
           buffer.keys = [];
           buffer.lastKeyAt = 0;
           e.preventDefault();
@@ -125,6 +151,8 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
         } else {
           buffer.keys = [];
           buffer.lastKeyAt = 0;
+          buffer.leakTarget = null;
+          buffer.leakValue = null;
         }
         return;
       }
@@ -133,26 +161,45 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
       if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) {
         buffer.keys = [];
         buffer.lastKeyAt = 0;
+        buffer.leakTarget = null;
+        buffer.leakValue = null;
+        return;
+      }
+
+      // Empty buffer → potential start of a scanner burst. Accept the key so
+      // the first character is never dropped, and record the focused field
+      // so a confirmed burst can undo the (unavoidable) leak below.
+      if (buffer.keys.length === 0) {
+        buffer.keys.push(e.key);
+        buffer.lastKeyAt = now;
+        const target = document.activeElement;
+        buffer.leakTarget = target;
+        buffer.leakValue =
+          target && typeof target.value === "string" ? target.value : null;
         return;
       }
 
       // If the gap between keys exceeds the wedge threshold, a human is
-      // typing — reset the buffer and do not swallow this keystroke so
+      // typing — abandon the burst and do not swallow this keystroke so
       // normal inputs keep working.
       if (duration > WEDGE_SCAN_GAP_MS) {
         buffer.keys = [];
         buffer.lastKeyAt = 0;
+        buffer.leakTarget = null;
+        buffer.leakValue = null;
         return;
       }
 
-      // Faster-than-human burst → accumulate and suppress the keys so they
-      // don't leak into the focused field.
+      // Second key within the gap confirms the burst: undo the leaked first
+      // character now, then accumulate and suppress the remaining keys so
+      // they don't leak into the focused field.
+      if (buffer.keys.length === 1) {
+        restoreLeakedChar(buffer);
+      }
       buffer.keys.push(e.key);
       buffer.lastKeyAt = now;
-      if (buffer.keys.length > 0) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+      e.preventDefault();
+      e.stopPropagation();
     };
 
     document.addEventListener("keydown", onKeyDown, true);

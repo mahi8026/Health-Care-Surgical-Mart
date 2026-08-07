@@ -49,26 +49,6 @@ class BulkProductService {
   }
 
   /**
-   * Download Excel template
-   */
-  downloadExcelTemplate() {
-    const token = localStorage.getItem("token");
-    const url = `${import.meta.env.VITE_API_URL}/api/bulk-products/template/excel`;
-
-    window.open(`${url}?token=${token}`, "_blank");
-  }
-
-  /**
-   * Download CSV template
-   */
-  downloadCSVTemplate() {
-    const token = localStorage.getItem("token");
-    const url = `${import.meta.env.VITE_API_URL}/api/bulk-products/template/csv`;
-
-    window.open(`${url}?token=${token}`, "_blank");
-  }
-
-  /**
    * Get bulk import statistics
    */
   async getStats() {
