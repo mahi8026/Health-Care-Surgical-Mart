@@ -234,14 +234,14 @@ router.get(
       ? new Date(endDate)
       : new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of current month
 
-    // Sales Revenue
+    // Sales Revenue — includes ALL sales (accrual basis): a credit or partial
+    // sale is still revenue for the period even if not yet collected.
     const salesRevenue = await shopDb
       .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -249,7 +249,7 @@ router.get(
             _id: null,
             totalRevenue: { $sum: '$grandTotal' },
             totalSales: { $sum: 1 },
-            totalDiscount: { $sum: '$discount' },
+            totalDiscount: { $sum: { $ifNull: ['$discountAmount', 0] } },
             totalVAT: { $sum: '$vatAmount' },
             netRevenue: { $sum: { $subtract: ['$grandTotal', '$vatAmount'] } },
           },
@@ -279,14 +279,13 @@ router.get(
       .toArray();
     const productsCollectionName = 'products';
 
-    // Cost of Goods Sold (COGS)
+    // Cost of Goods Sold (COGS) — must mirror the revenue match (accrual basis)
     const cogs = await shopDb
       .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: 'Paid',
           },
         },
         { $unwind: '$items' },
@@ -500,14 +499,14 @@ router.get(
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
 
-    // Daily sales summary
+    // Daily sales summary — revenue on accrual basis (all sales), cash/bank
+    // columns reflect actual cash collected.
     const dailySales = await shopDb
       .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: startOfDay, $lt: endOfDay },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -515,7 +514,7 @@ router.get(
             _id: null,
             totalSales: { $sum: 1 },
             totalRevenue: { $sum: '$grandTotal' },
-            totalDiscount: { $sum: '$discount' },
+            totalDiscount: { $sum: { $ifNull: ['$discountAmount', 0] } },
             totalVAT: { $sum: '$vatAmount' },
             cashSales: {
               $sum: {
@@ -625,7 +624,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfDay, $lt: endOfDay },
-            paymentStatus: 'Paid',
           },
         },
         { $unwind: '$items' },
@@ -649,7 +647,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfDay, $lt: endOfDay },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -752,7 +749,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: 'Paid',
           },
         },
         { $unwind: '$items' },
@@ -831,7 +827,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: 'Paid',
           },
         },
         { $unwind: '$items' },
@@ -1004,7 +999,6 @@ router.get(
     // Return rate calculation
     const totalSales = await shopDb.collection('sales').countDocuments({
       saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-      paymentStatus: 'Paid',
     });
 
     const totalReturns = await shopDb.collection('returns').countDocuments({
@@ -1025,7 +1019,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -1090,21 +1083,26 @@ router.get(
       ? new Date(endDate)
       : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    // Cash inflows (sales)
+    // Cash inflows (sales) — actual cash collected, regardless of payment
+    // status: cashPaid + bankPaid are the real money that moved. A partial
+    // payment must count even if the invoice is not fully settled.
     const cashInflows = await shopDb
       .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
-            totalCashSales: { $sum: '$cashPaid' },
-            totalBankSales: { $sum: '$bankPaid' },
+            totalCashSales: {
+              $sum: { $ifNull: ['$cashPaid', 0] },
+            },
+            totalBankSales: {
+              $sum: { $ifNull: ['$bankPaid', 0] },
+            },
             totalSales: { $sum: '$grandTotal' },
           },
         },
@@ -1170,14 +1168,13 @@ router.get(
       ])
       .toArray();
 
-    // Daily cash flow
+    // Daily cash flow — actual cash collected per day (cashPaid + bankPaid)
     const dailyCashFlow = await shopDb
       .collection('sales')
       .aggregate([
         {
           $match: {
             saleDate: { $gte: defaultStartDate, $lte: defaultEndDate },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -1185,7 +1182,14 @@ router.get(
             _id: {
               $dateToString: { format: '%Y-%m-%d', date: '$saleDate' },
             },
-            cashIn: { $sum: '$grandTotal' },
+            cashIn: {
+              $sum: {
+                $add: [
+                  { $ifNull: ['$cashPaid', 0] },
+                  { $ifNull: ['$bankPaid', 0] },
+                ],
+              },
+            },
             salesCount: { $sum: 1 },
           },
         },

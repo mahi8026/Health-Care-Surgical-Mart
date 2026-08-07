@@ -214,7 +214,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -235,7 +234,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfWeek },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -255,7 +253,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfMonth },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -334,7 +331,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: thirtyDaysAgo },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -816,16 +812,15 @@ router.get(
             ...(Object.keys(dateFilter).length > 0 && {
               saleDate: dateFilter,
             }),
-            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
             totalSales: { $sum: 1 },
-            grossRevenue: { $sum: '$totalAmount' },
+            grossRevenue: { $sum: '$grandTotal' },
             totalVAT: { $sum: '$vatAmount' },
-            totalDiscount: { $sum: '$discountAmount' },
+            totalDiscount: { $sum: { $ifNull: ['$discountAmount', 0] } },
           },
         },
       ])
@@ -840,14 +835,14 @@ router.get(
             ...(Object.keys(dateFilter).length > 0 && {
               returnDate: dateFilter,
             }),
-            status: 'Approved',
+            status: 'completed',
           },
         },
         {
           $group: {
             _id: null,
             totalReturns: { $sum: 1 },
-            totalRefund: { $sum: '$refundAmount' },
+            totalRefund: { $sum: '$totalRefund' },
           },
         },
       ])
@@ -859,7 +854,9 @@ router.get(
       .aggregate([
         {
           $match: {
-            ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+            ...(Object.keys(dateFilter).length > 0 && {
+              expenseDate: dateFilter,
+            }),
           },
         },
         {
@@ -882,7 +879,6 @@ router.get(
             ...(Object.keys(dateFilter).length > 0 && {
               saleDate: dateFilter,
             }),
-            paymentStatus: 'Paid',
           },
         },
         { $unwind: '$items' },
@@ -900,7 +896,10 @@ router.get(
             _id: null,
             totalCOGS: {
               $sum: {
-                $multiply: ['$items.quantity', '$product.purchasePrice'],
+                $multiply: [
+                  { $ifNull: ['$items.qty', '$items.quantity'] },
+                  { $ifNull: ['$items.costPrice', '$product.purchasePrice'] },
+                ],
               },
             },
           },
@@ -986,23 +985,18 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: 'Paid',
           },
         },
         {
           $group: {
             _id: null,
             count: { $sum: 1 },
-            revenue: { $sum: '$totalAmount' },
+            revenue: { $sum: '$grandTotal' },
             cash: {
-              $sum: {
-                $cond: [{ $eq: ['$paymentMethod', 'Cash'] }, '$totalAmount', 0],
-              },
+              $sum: { $ifNull: ['$cashPaid', 0] },
             },
             bank: {
-              $sum: {
-                $cond: [{ $eq: ['$paymentMethod', 'Bank'] }, '$totalAmount', 0],
-              },
+              $sum: { $ifNull: ['$bankPaid', 0] },
             },
           },
         },
@@ -1016,14 +1010,14 @@ router.get(
         {
           $match: {
             returnDate: { $gte: startOfDay },
-            status: 'Approved',
+            status: 'completed',
           },
         },
         {
           $group: {
             _id: null,
             count: { $sum: 1 },
-            refund: { $sum: '$refundAmount' },
+            refund: { $sum: '$totalRefund' },
           },
         },
       ])
@@ -1036,7 +1030,6 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -1068,16 +1061,15 @@ router.get(
         {
           $match: {
             saleDate: { $gte: startOfDay },
-            paymentStatus: 'Paid',
           },
         },
         { $unwind: '$items' },
         {
           $group: {
             _id: '$items.productId',
-            productName: { $first: '$items.productName' },
-            totalQuantity: { $sum: '$items.quantity' },
-            totalRevenue: { $sum: '$items.subtotal' },
+            productName: { $first: '$items.name' },
+            totalQuantity: { $sum: { $ifNull: ['$items.qty', '$items.quantity'] } },
+            totalRevenue: { $sum: { $ifNull: ['$items.total', '$items.subtotal'] } },
           },
         },
         { $sort: { totalRevenue: -1 } },
@@ -1120,7 +1112,7 @@ router.get(
     const products = await shopDb
       .collection('sales')
       .aggregate([
-        { $match: { paymentStatus: 'Paid' } },
+        { $match: {} },
         { $unwind: '$items' },
         {
           $lookup: {
@@ -1134,14 +1126,17 @@ router.get(
         {
           $group: {
             _id: '$items.productId',
-            productName: { $first: '$items.productName' },
+            productName: { $first: '$items.name' },
             sku: { $first: '$product.sku' },
             category: { $first: '$product.category' },
-            totalQuantitySold: { $sum: '$items.quantity' },
-            totalRevenue: { $sum: '$items.subtotal' },
+            totalQuantitySold: { $sum: { $ifNull: ['$items.qty', '$items.quantity'] } },
+            totalRevenue: { $sum: { $ifNull: ['$items.total', '$items.subtotal'] } },
             totalCost: {
               $sum: {
-                $multiply: ['$items.quantity', '$product.purchasePrice'],
+                $multiply: [
+                  { $ifNull: ['$items.qty', '$items.quantity'] },
+                  { $ifNull: ['$items.costPrice', '$product.purchasePrice'] },
+                ],
               },
             },
           },
@@ -1183,7 +1178,7 @@ router.get(
     const categories = await shopDb
       .collection('sales')
       .aggregate([
-        { $match: { paymentStatus: 'Paid' } },
+        { $match: {} },
         { $unwind: '$items' },
         {
           $lookup: {
@@ -1198,10 +1193,13 @@ router.get(
           $group: {
             _id: '$product.category',
             productCount: { $addToSet: '$items.productId' },
-            totalRevenue: { $sum: '$items.subtotal' },
+            totalRevenue: { $sum: { $ifNull: ['$items.total', '$items.subtotal'] } },
             totalCost: {
               $sum: {
-                $multiply: ['$items.quantity', '$product.purchasePrice'],
+                $multiply: [
+                  { $ifNull: ['$items.qty', '$items.quantity'] },
+                  { $ifNull: ['$items.costPrice', '$product.purchasePrice'] },
+                ],
               },
             },
           },
@@ -1256,20 +1254,18 @@ router.get(
     const shopDb = getShopDatabase(req.user.shopId);
 
     // Get total sales for return rate calculation
-    const totalSales = await shopDb.collection('sales').countDocuments({
-      paymentStatus: 'Paid',
-    });
+    const totalSales = await shopDb.collection('sales').countDocuments({});
 
     // Get returns summary
     const returnsSummary = await shopDb
       .collection('returns')
       .aggregate([
-        { $match: { status: 'Approved' } },
+        { $match: { status: 'completed' } },
         {
           $group: {
             _id: null,
             totalReturns: { $sum: 1 },
-            totalRefund: { $sum: '$refundAmount' },
+            totalRefund: { $sum: '$totalRefund' },
           },
         },
       ])
@@ -1279,12 +1275,12 @@ router.get(
     const byReason = await shopDb
       .collection('returns')
       .aggregate([
-        { $match: { status: 'Approved' } },
+        { $match: { status: 'completed' } },
         {
           $group: {
-            _id: '$reason',
+            _id: '$returnReason',
             count: { $sum: 1 },
-            totalRefund: { $sum: '$refundAmount' },
+            totalRefund: { $sum: '$totalRefund' },
           },
         },
         { $sort: { count: -1 } },
@@ -1295,15 +1291,15 @@ router.get(
     const byProduct = await shopDb
       .collection('returns')
       .aggregate([
-        { $match: { status: 'Approved' } },
+        { $match: { status: 'completed' } },
         { $unwind: '$items' },
         {
           $group: {
             _id: '$items.productId',
-            productName: { $first: '$items.productName' },
+            productName: { $first: '$items.name' },
             returnCount: { $sum: 1 },
-            totalQuantity: { $sum: '$items.quantity' },
-            totalRefund: { $sum: '$items.subtotal' },
+            totalQuantity: { $sum: '$items.returnQuantity' },
+            totalRefund: { $sum: '$items.total' },
           },
         },
         { $sort: { returnCount: -1 } },
@@ -1344,7 +1340,7 @@ router.get(
     if (startDate) {dateFilter.$gte = new Date(startDate);}
     if (endDate) {dateFilter.$lte = new Date(endDate);}
 
-    // Get cash inflows (sales)
+    // Get cash inflows (sales) — actual cash collected (cashPaid + bankPaid)
     const cashInflows = await shopDb
       .collection('sales')
       .aggregate([
@@ -1353,7 +1349,6 @@ router.get(
             ...(Object.keys(dateFilter).length > 0 && {
               saleDate: dateFilter,
             }),
-            paymentStatus: 'Paid',
           },
         },
         {
@@ -1361,16 +1356,19 @@ router.get(
             _id: {
               $dateToString: { format: '%Y-%m-%d', date: '$saleDate' },
             },
-            totalInflow: { $sum: '$totalAmount' },
-            cash: {
+            totalInflow: {
               $sum: {
-                $cond: [{ $eq: ['$paymentMethod', 'Cash'] }, '$totalAmount', 0],
+                $add: [
+                  { $ifNull: ['$cashPaid', 0] },
+                  { $ifNull: ['$bankPaid', 0] },
+                ],
               },
             },
+            cash: {
+              $sum: { $ifNull: ['$cashPaid', 0] },
+            },
             bank: {
-              $sum: {
-                $cond: [{ $eq: ['$paymentMethod', 'Bank'] }, '$totalAmount', 0],
-              },
+              $sum: { $ifNull: ['$bankPaid', 0] },
             },
           },
         },
@@ -1384,12 +1382,16 @@ router.get(
       .aggregate([
         {
           $match: {
-            ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+            ...(Object.keys(dateFilter).length > 0 && {
+              expenseDate: dateFilter,
+            }),
           },
         },
         {
           $group: {
-            _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$expenseDate' },
+            },
             totalExpenses: { $sum: '$amount' },
           },
         },
