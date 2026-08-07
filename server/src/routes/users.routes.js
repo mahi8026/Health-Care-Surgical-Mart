@@ -339,8 +339,8 @@ router.post(
       throw createError.badRequest('Name, email, and password are required');
     }
 
-    if (password.length < 6) {
-      throw createError.badRequest('Password must be at least 6 characters');
+    if (password.length < 8) {
+      throw createError.badRequest('Password must be at least 8 characters');
     }
 
     // Single-tenant app: every account is a shop admin
@@ -563,8 +563,8 @@ router.put(
       throw createError.forbidden('You can only change your own password');
     }
 
-    if (!newPassword || newPassword.length < 6) {
-      throw createError.badRequest('New password must be at least 6 characters');
+    if (!newPassword || newPassword.length < 8) {
+      throw createError.badRequest('New password must be at least 8 characters');
     }
 
     const user = await shopDb

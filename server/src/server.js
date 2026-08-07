@@ -172,7 +172,9 @@ const corsOptions = {
     // In development, allow all localhost origins and null origin (file://)
     if (process.env.NODE_ENV === 'development') {
       const isLocalhost =
-        origin.includes('localhost') || origin.includes('127.0.0.1') || origin === 'null';
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('http://127.0.0.1') ||
+        origin === 'null';
       if (isLocalhost) {
         return callback(null, true);
       }

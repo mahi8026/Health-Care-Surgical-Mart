@@ -14,6 +14,13 @@ function requiresTls(uri) {
   );
 }
 
+// Standard (SRV) Atlas URIs terminate TLS at a server-resolvable hostname, so
+// strict certificate verification is possible. Legacy "mongodb://" URIs to an
+// Atlas IP end-point cannot be hostname-verified and need the bypass.
+function requiresSrv(uri) {
+  return Boolean(uri && uri.startsWith('mongodb+srv://'));
+}
+
 // Connection configuration
 const config = {
   uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
@@ -43,8 +50,13 @@ const config = {
 
     // SSL/TLS settings — only for Atlas URIs (mongodb+srv:// or ?ssl=true)
     ssl: requiresTls(process.env.MONGODB_URI),
-    tlsAllowInvalidCertificates: true,
-    tlsAllowInvalidHostnames: true,
+    // Strict TLS certificate verification is used for standard Atlas URIs
+    // (mongodb+srv://). Legacy "standard format" URIs (mongodb:// with an IP
+    // end-point, used here to work around ECONNREFUSED on Windows) rely on the
+    // Atlas hostname alias, so they need the hostname/cert bypass to connect.
+    ...(requiresSrv(process.env.MONGODB_URI)
+      ? {}
+      : { tlsAllowInvalidCertificates: true, tlsAllowInvalidHostnames: true }),
 
     // Monitoring
     monitorCommands: process.env.NODE_ENV === 'development',

@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { ObjectId } = require('mongodb');
 const { getShopDatabase, getSystemDatabase } = require('../config/database');
 const { generateToken } = require('../middleware/auth-multi-tenant');
@@ -495,8 +496,9 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
       });
     }
 
-    // Generate 6-digit reset code
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6-digit reset code (CSPRNG — Math.random is not
+    // cryptographically secure and would weaken the reset-code brute force)
+    const resetCode = crypto.randomInt(100000, 1000000).toString();
     const resetCodeHash = await bcrypt.hash(resetCode, 10);
     const resetCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
@@ -547,7 +549,7 @@ router.post('/request-password-reset', bruteForceProtection, async (req, res) =>
  * Reset password with verification code
  * SECURITY FIX: Requires email verification code
  */
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', bruteForceProtection, async (req, res) => {
   try {
     const { email: rawEmail, resetCode, newPassword } = req.body;
     const email = rawEmail?.trim().toLowerCase();
@@ -1014,7 +1016,7 @@ router.post('/sse-token', authenticate, async (req, res) => {
  * GET /api/auth/health
  * Health check endpoint for auth system diagnostics
  */
-router.get('/health', async (req, res) => {
+router.get('/health', authenticate, async (req, res) => {
   try {
     const health = {
       status: 'healthy',
