@@ -7,6 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const { ObjectId: _ObjectId } = require('mongodb');
 const { authenticate } = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
 const { importUpload } = require('../services/file-upload.service');
 const { cacheService } = require('../services/cache.service');
 
@@ -355,6 +357,7 @@ router.post(
   (req, res, next) => {
     next();
   },
+  requirePermission(PERMISSIONS.CREATE_PRODUCT),
   authenticate,
   importUpload.single('file'),
   async (req, res) => {
@@ -585,7 +588,7 @@ router.post(
 );
 
 // Bulk export products
-router.get('/bulk-export', authenticate, async (req, res) => {
+router.get('/bulk-export', authenticate, requirePermission(PERMISSIONS.VIEW_PRODUCTS), async (req, res) => {
   try {
     const products = await req.shopDb.collection('products').find({
       isActive: true,
@@ -621,7 +624,7 @@ router.get('/bulk-export', authenticate, async (req, res) => {
 });
 
 // Bulk update products
-router.put('/bulk-update', authenticate, async (req, res) => {
+router.put('/bulk-update', authenticate, requirePermission(PERMISSIONS.EDIT_PRODUCT), async (req, res) => {
   try {
     const { updates } = req.body;
 
@@ -702,7 +705,7 @@ router.put('/bulk-update', authenticate, async (req, res) => {
 });
 
 // Bulk delete products
-router.post('/bulk-delete', authenticate, async (req, res) => {
+router.post('/bulk-delete', authenticate, requirePermission(PERMISSIONS.DELETE_PRODUCT), async (req, res) => {
   try {
     const { skus } = req.body;
 

@@ -6,6 +6,9 @@
 const express = require('express');
 const router = express.Router();
 const { logger } = require('../config/logging');
+const { authenticate } = require('../middleware/auth-multi-tenant');
+const { requirePermission } = require('../utils/rbac');
+const { PERMISSIONS } = require('../utils/rbac');
 
 /**
  * @swagger
@@ -118,7 +121,7 @@ function getQueues() {
  * GET /api/queues/health
  * Get health status of all queues
  */
-router.get('/health', async (req, res) => {
+router.get('/health', authenticate, requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const { emailQueue, smsQueue } = getQueues();
 
@@ -165,7 +168,7 @@ router.get('/health', async (req, res) => {
  * GET /api/queues/stats
  * Get detailed statistics for all queues
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', authenticate, requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const { emailQueue, smsQueue } = getQueues();
 
@@ -193,7 +196,7 @@ router.get('/stats', async (req, res) => {
  * GET /api/queues/email/stats
  * Get email queue statistics
  */
-router.get('/email/stats', async (req, res) => {
+router.get('/email/stats', authenticate, requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const { emailQueue } = getQueues();
 
@@ -229,7 +232,7 @@ router.get('/email/stats', async (req, res) => {
  * GET /api/queues/sms/stats
  * Get SMS queue statistics
  */
-router.get('/sms/stats', async (req, res) => {
+router.get('/sms/stats', authenticate, requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const { smsQueue } = getQueues();
 

@@ -669,25 +669,17 @@ router.post('/firebase-login', bruteForceProtection, async (req, res) => {
     const firebaseAdminConfigured = admin.isFirebaseInitialized();
 
     if (!firebaseAdminConfigured) {
-      // In production, Firebase Admin MUST be configured
-      if (process.env.NODE_ENV === 'production') {
-        logger.error('[LOGIN] Firebase Admin SDK not configured in PRODUCTION - authentication blocked', {
-          email,
-          environment: process.env.NODE_ENV
-        });
-        return res.status(503).json({
-          success: false,
-          message: 'Authentication service unavailable. Please contact support.',
-        });
-      } else {
-        // Development-only bypass (for local testing without Firebase credentials)
-        logger.warn('[LOGIN] Firebase Admin SDK not configured — BYPASSING token verification (DEVELOPMENT ONLY)', {
-          file: 'auth-multi-tenant.routes.js',
-          function: 'firebase-login',
-          email,
-          environment: process.env.NODE_ENV
-        });
-      }
+      // Firebase Admin MUST be configured in every environment. The previous
+      // development-only bypass skipped token verification entirely whenever
+      // NODE_ENV was unset — a full auth bypass on any misconfigured deploy.
+      logger.error('[LOGIN] Firebase Admin SDK not configured - authentication blocked', {
+        email,
+        environment: process.env.NODE_ENV,
+      });
+      return res.status(503).json({
+        success: false,
+        message: 'Authentication service unavailable. Please contact support.',
+      });
     } else {
       // Verify Firebase token
       let decodedToken;

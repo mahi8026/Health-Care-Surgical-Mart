@@ -393,7 +393,7 @@ router.post(
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
-      createdBy: req.user.id,
+      createdBy: req.user._id,
     };
 
     const result = await shopDb.collection('suppliers').insertOne(supplierData);
@@ -451,7 +451,7 @@ router.put(
       contactPerson: contactPerson?.trim() || null,
       isActive: isActive !== undefined ? isActive : true,
       updatedAt: new Date(),
-      updatedBy: req.user.id,
+      updatedBy: req.user._id,
     };
 
     await shopDb

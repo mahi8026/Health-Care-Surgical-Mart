@@ -101,10 +101,10 @@ async function authenticate(req, res, next) {
     else if (req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.substring(7);
     }
-    // Fallback: Query parameter (for SSE EventSource which can't send custom headers)
-    else if (req.query?.token) {
-      token = req.query.token;
-    }
+    // NOTE: No query-string token fallback here. Only the dedicated SSE path
+    // (authenticateSSE) accepts a ?token= because EventSource cannot send
+    // custom headers. Accepting query tokens on every route leaks the JWT
+    // into access logs, proxies and browser history.
 
     if (!token) {
       return res.status(401).json({

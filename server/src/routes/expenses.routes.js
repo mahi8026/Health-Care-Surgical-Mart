@@ -882,7 +882,7 @@ router.post(
         ? tags.filter((tag) => typeof tag === 'string' && tag.trim())
         : [],
       notes: notes?.trim() || null,
-      createdBy: new ObjectId(req.user.id),
+      createdBy: new ObjectId(req.user._id),
       createdAt: new Date(),
       updatedAt: new Date(),
     };

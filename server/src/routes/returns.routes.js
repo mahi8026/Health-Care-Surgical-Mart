@@ -630,7 +630,7 @@ router.post(
       status: 'completed', // 'pending', 'completed', 'cancelled'
       returnDate: new Date(),
       notes: notes || '',
-      createdBy: req.user.id,
+      createdBy: req.user._id,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -650,7 +650,7 @@ router.post(
           productId: item.productId,
           movementType: 'RETURN_IN',
           quantity: item.returnQuantity,
-          userId: req.user._id || req.user.id,
+          userId: req.user._id || req.user._id,
           referenceType: 'RETURN',
           referenceId: result.insertedId,
           batchNo: item.batchNumber || `RET-${returnNumber}`,
@@ -690,7 +690,7 @@ router.post(
           referenceId: result.insertedId.toString(),
           referenceNumber: returnNumber,
           notes: `Return from sale ${originalInvoiceNumber}`,
-          createdBy: req.user.id,
+          createdBy: req.user._id,
           createdAt: new Date(),
         });
       }
@@ -762,7 +762,7 @@ router.put(
           productId: item.productId,
           movementType: 'RETURN_OUT',
           quantity: item.returnQuantity,
-          userId: req.user._id || req.user.id,
+          userId: req.user._id || req.user._id,
           referenceType: 'RETURN_CANCEL',
           referenceId: returnRecord._id,
           note: `Cancelled return ${returnRecord.returnNumber}`,
@@ -784,7 +784,7 @@ router.put(
           productId: item.productId,
           movementType: 'RETURN_IN',
           quantity: item.returnQuantity,
-          userId: req.user._id || req.user.id,
+          userId: req.user._id || req.user._id,
           referenceType: 'RETURN',
           referenceId: returnRecord._id,
           note: `Approved return ${returnRecord.returnNumber}`,
@@ -803,7 +803,7 @@ router.put(
           status,
           notes: notes || returnRecord.notes,
           updatedAt: new Date(),
-          updatedBy: req.user.id,
+          updatedBy: req.user._id,
         },
       },
     );

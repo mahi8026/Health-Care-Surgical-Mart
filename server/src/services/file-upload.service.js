@@ -370,6 +370,11 @@ function moveToLocalStorage(tempFilePath, folder, shopId, filename) {
   };
 
   const baseDir = folderMap[folder] || receiptsDir;
+
+  if (!isSafeSegment(shopId) || !isSafeSegment(filename)) {
+    throw new Error('Rejected unsafe file path segment on save');
+  }
+
   const shopDir = path.join(baseDir, shopId);
 
   // Create shop directory if it doesn't exist
@@ -404,10 +409,16 @@ function deleteFromLocalStorage(folder, shopId, filename) {
   };
 
   const baseDir = folderMap[folder] || receiptsDir;
+
+  if (!isSafeSegment(shopId) || !isSafeSegment(filename)) {
+    logger.warn('Rejected unsafe file path segment for delete', { shopId, filename });
+    return false;
+  }
+
   const filePath = path.join(baseDir, shopId, filename);
 
   try {
-    if (fs.existsSync(filePath)) {
+    if (fs.existsSync(filePath) && isPathInside(baseDir, filePath)) {
       fs.unlinkSync(filePath);
       logger.info(`File deleted from local storage: ${filePath}`);
       return true;
@@ -507,6 +518,36 @@ async function deleteUploadedFile(shopId, filename, folder = 'receipts') {
 }
 
 /**
+ * Validate that a resolved file path stays inside its base directory.
+ * Prevents path-traversal (../) escapes via user-supplied filename/shopId.
+ * @param {string} baseDir - Expected containing directory
+ * @param {string} filePath - Resolved candidate path
+ * @returns {boolean}
+ */
+function isPathInside(baseDir, filePath) {
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedFile = path.resolve(filePath);
+  return (
+    resolvedFile === resolvedBase ||
+    resolvedFile.startsWith(resolvedBase + path.sep)
+  );
+}
+
+/**
+ * Reject filename/shopId segments that could escape the uploads tree.
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isSafeSegment(value) {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 255 &&
+    /^[a-zA-Z0-9._-]+$/.test(value)
+  );
+}
+
+/**
  * Get file path for serving (local storage only)
  * @param {string} shopId - Shop ID
  * @param {string} filename - Stored filename
@@ -516,6 +557,11 @@ async function deleteUploadedFile(shopId, filename, folder = 'receipts') {
 function getFilePath(shopId, filename, folder = 'receipts') {
   if (useGCS) {
     // GCS files are served via public URL, not local path
+    return null;
+  }
+
+  if (!isSafeSegment(shopId) || !isSafeSegment(filename)) {
+    logger.warn('Rejected unsafe file path segment', { shopId, filename });
     return null;
   }
 
@@ -529,7 +575,7 @@ function getFilePath(shopId, filename, folder = 'receipts') {
   const baseDir = folderMap[folder] || receiptsDir;
   const filePath = path.join(baseDir, shopId, filename);
 
-  if (fs.existsSync(filePath)) {
+  if (fs.existsSync(filePath) && isPathInside(baseDir, filePath)) {
     return filePath;
   }
 

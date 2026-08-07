@@ -546,7 +546,7 @@ router.post(
           amount: parsedAmount,
           paymentMethod,
           paymentDate: new Date(),
-          recordedBy: new ObjectId(req.user.id),
+          recordedBy: new ObjectId(req.user._id),
           recordedByName: req.user.name || 'Unknown',
           notes: `Payment towards ${sale.invoiceNo}`,
           createdAt: new Date(),

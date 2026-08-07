@@ -362,7 +362,7 @@ router.put(
       currency: currency || 'BDT',
       timezone: timezone || 'Asia/Dhaka',
       updatedAt: new Date(),
-      updatedBy: req.user.id,
+      updatedBy: req.user._id,
     };
 
     await shopDb
@@ -438,7 +438,7 @@ router.put(
       taxNumber: taxNumber?.trim() || '',
       taxInclusive: Boolean(taxInclusive),
       updatedAt: new Date(),
-      updatedBy: req.user.id,
+      updatedBy: req.user._id,
     };
 
     await shopDb
@@ -537,7 +537,7 @@ router.put(
       dateFormat: dateFormat || 'DD/MM/YYYY',
       timeFormat: timeFormat || '12',
       updatedAt: new Date(),
-      updatedBy: req.user.id,
+      updatedBy: req.user._id,
     };
 
     await shopDb
@@ -627,7 +627,7 @@ router.put(
       headerText: headerText?.trim() || 'بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ',
       paperSize: paperSize || '80mm',
       updatedAt: new Date(),
-      updatedBy: req.user.id,
+      updatedBy: req.user._id,
     };
 
     await shopDb
@@ -676,7 +676,7 @@ router.post(
         'users',
         'settings',
       ],
-      createdBy: req.user.id,
+      createdBy: req.user._id,
     };
 
     // Log backup in history

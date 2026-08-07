@@ -500,7 +500,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
-    if (req.params.id === req.user.id) {
+    if (req.params.id === req.user._id?.toString()) {
       throw createError.forbidden('You cannot delete your own account');
     }
 
@@ -615,7 +615,7 @@ router.get(
     const shopDb = getShopDatabase(req.user.shopId);
 
     const user = await shopDb.collection('users').findOne(
-      { _id: new ObjectId(req.user.id) },
+      { _id: req.user._id },
       {
         projection: {
           password: 0,
