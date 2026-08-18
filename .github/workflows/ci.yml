@@ -89,9 +89,9 @@ jobs:
           status=${PIPESTATUS[0]}
           if [ $status -ne 0 ]; then
             sed 's/\x1b\[[0-9;]*m//g' jest-ci.log \
-              | grep -E "FAIL|✕|●|Expected|Received|at Object|Test Suites:|Tests:|Cannot find|Error:" \
-              | grep -v "console.warn\|console.error" \
-              | head -30 | while IFS= read -r line; do echo "::error::$line"; done
+              | grep -v '"service"' \
+              | grep -vE "console\.(warn|error)|at Object.warn \(tests/setup|at Console\." \
+              | tail -80 | while IFS= read -r line; do echo "::error::$line"; done
           fi
           exit $status
 
