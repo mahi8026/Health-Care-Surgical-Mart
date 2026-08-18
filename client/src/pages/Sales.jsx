@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../config/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ProfessionalInvoice from "../components/ProfessionalInvoice";
@@ -22,6 +22,14 @@ const Sales = () => {
   const [showCustomItemForm, setShowCustomItemForm] = useState(false);
   const [customItemErrors, setCustomItemErrors] = useState({});
   const [shopSettings, setShopSettings] = useState(null);
+
+  // Guards: latest cart for concurrent scan handling, and sale double-submit.
+  const cartRef = useRef(cart);
+  const processingRef = useRef(false);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
 
   // POS Form State
   const [posData, setPosData] = useState({
@@ -318,27 +326,32 @@ const Sales = () => {
     const rate = parseFloat(product.sellingPrice);
     const quantity = 1;
 
-    // Merge with an existing cart line if present.
-    const existingItemIndex = cart.findIndex(
+    // Validate against the LATEST cart: rapid scans may resolve before the
+    // component re-renders, so the render closure can be stale.
+    const existing = cartRef.current.find(
       (item) => item.productId === product._id,
     );
-    if (existingItemIndex >= 0) {
-      const newQuantity = cart[existingItemIndex].quantity + quantity;
-      if (newQuantity > stockQty) {
-        throw new Error(
-          `Total quantity of "${product.name}" cannot exceed ${stockQty}`,
-        );
+    if (existing && existing.quantity + quantity > stockQty) {
+      throw new Error(
+        `Total quantity of "${product.name}" cannot exceed ${stockQty}`,
+      );
+    }
+
+    // Merge atomically — a functional update so two scans that resolve in
+    // the same render cycle can never drop each other's item.
+    setCart((prev) => {
+      const idx = prev.findIndex((item) => item.productId === product._id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = {
+          ...next[idx],
+          quantity: next[idx].quantity + quantity,
+          total: next[idx].total + quantity * rate,
+        };
+        return next;
       }
-      const updatedCart = [...cart];
-      updatedCart[existingItemIndex] = {
-        ...updatedCart[existingItemIndex],
-        quantity: newQuantity,
-        total: updatedCart[existingItemIndex].total + quantity * rate,
-      };
-      setCart(updatedCart);
-    } else {
-      setCart([
-        ...cart,
+      return [
+        ...prev,
         {
           productId: product._id,
           name: product.name,
@@ -349,8 +362,8 @@ const Sales = () => {
           unit: product.unit,
           maxStock: stockQty,
         },
-      ]);
-    }
+      ];
+    });
 
     // Ensure the scanned product is in the picker for follow-up scans.
     setProducts((prev) =>
@@ -381,8 +394,14 @@ const Sales = () => {
 
   // Process sale
   const processSale = async () => {
+    // Ref guard: Enter/click double-activation before the button's disabled
+    // state renders would otherwise create two sales from one cart.
+    if (processingRef.current) return;
+    processingRef.current = true;
+
     if (cart.length === 0) {
       setError("Please add items to cart");
+      processingRef.current = false;
       return;
     }
 
@@ -486,6 +505,7 @@ const Sales = () => {
       setError(serverMsg || "Failed to process sale");
       console.error("Process sale error:", error);
     } finally {
+      processingRef.current = false;
       setLoading(false);
     }
   };
@@ -1365,7 +1385,10 @@ const Sales = () => {
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-4 pt-6">
               <button
-                onClick={processSale}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  processSale();
+                }}
                 disabled={loading || cart.length === 0}
                 className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-400 text-white py-4 px-6 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none flex items-center justify-center gap-2"
               >

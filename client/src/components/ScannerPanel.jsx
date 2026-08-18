@@ -31,6 +31,11 @@ const BarcodeScannerModal = lazy(() => import("./BarcodeScannerModal"));
 
 // Gap between keystrokes (ms) below which a burst is treated as a scanner.
 const WEDGE_SCAN_GAP_MS = 30;
+// Window (ms) in which a trailing Enter after the last buffered key is still
+// treated as the scanner's terminator. Some scanner models delay the Enter
+// well beyond the inter-key gap; a leaked Enter can activate whatever button
+// has focus (e.g. "Complete Sale") and create a sale with a partial cart.
+const WEDGE_ENTER_WINDOW_MS = 1000;
 // Keep history short — operators scan dozens of items quickly.
 const MAX_HISTORY = 6;
 
@@ -51,6 +56,11 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
 
   const inputRef = useRef(null);
   const wedgeBufferRef = useRef({ ...EMPTY_BUFFER });
+  // Sequential scan queue: a scan submitted while the previous one is still
+  // resolving is queued instead of being dropped (the old `scanning` guard
+  // silently swallowed it, so an invoice could come out missing items).
+  const scanQueueRef = useRef([]);
+  const queueRunningRef = useRef(false);
 
   const beep = useCallback(
     (success) => {
@@ -70,36 +80,46 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
   const submit = useCallback(
     async (rawCode) => {
       const trimmed = String(rawCode || "").trim();
-      if (!trimmed || scanning) return;
+      if (!trimmed) return;
 
-      setScanning(true);
-      setLastError("");
+      scanQueueRef.current.push(trimmed);
+      if (queueRunningRef.current) return;
+
+      queueRunningRef.current = true;
       try {
-        const line = await onScan(trimmed);
-        setHistory((prev) =>
-          [
-            { code: trimmed, ok: true, ...line, time: Date.now() },
-            ...prev,
-          ].slice(0, MAX_HISTORY),
-        );
-        beep(true);
-      } catch (err) {
-        const message = err?.message || "Product not found";
-        setLastError(`${trimmed}: ${message}`);
-        setHistory((prev) =>
-          [
-            { code: trimmed, ok: false, error: message, time: Date.now() },
-            ...prev,
-          ].slice(0, MAX_HISTORY),
-        );
-        beep(false);
+        while (scanQueueRef.current.length > 0) {
+          const code = scanQueueRef.current.shift();
+          setScanning(true);
+          setLastError("");
+          try {
+            const line = await onScan(code);
+            setHistory((prev) =>
+              [
+                { code, ok: true, ...line, time: Date.now() },
+                ...prev,
+              ].slice(0, MAX_HISTORY),
+            );
+            beep(true);
+          } catch (err) {
+            const message = err?.message || "Product not found";
+            setLastError(`${code}: ${message}`);
+            setHistory((prev) =>
+              [
+                { code, ok: false, error: message, time: Date.now() },
+                ...prev,
+              ].slice(0, MAX_HISTORY),
+            );
+            beep(false);
+          }
+        }
       } finally {
+        queueRunningRef.current = false;
         setScanning(false);
         setCode("");
         refocus();
       }
     },
-    [onScan, scanning, beep, refocus],
+    [onScan, beep, refocus],
   );
 
   // Keyboard-wedge scanner detection.
@@ -140,20 +160,35 @@ const ScannerPanel = ({ onScan, disabled = false, autoFocus = true }) => {
       const duration = now - buffer.lastKeyAt;
 
       if (e.key === "Enter") {
-        if (buffer.keys.length >= 1 && duration <= 160 && buffer.lastKeyAt !== 0) {
-          const scanned = buffer.keys.join("");
-          restoreLeakedChar(buffer);
-          buffer.keys = [];
-          buffer.lastKeyAt = 0;
-          e.preventDefault();
-          e.stopPropagation();
-          submit(scanned);
-        } else {
-          buffer.keys = [];
-          buffer.lastKeyAt = 0;
-          buffer.leakTarget = null;
-          buffer.leakValue = null;
+        // A scan is in progress (keys buffered): this Enter is (or could be)
+        // the scanner's terminator. NEVER let it reach a focused button —
+        // a leaked scanner Enter would activate "Complete Sale" and create a
+        // sale with a partial cart.
+        if (buffer.keys.length >= 1 && buffer.lastKeyAt !== 0) {
+          if (duration <= WEDGE_ENTER_WINDOW_MS) {
+            const scanned = buffer.keys.join("");
+            restoreLeakedChar(buffer);
+            buffer.keys = [];
+            buffer.lastKeyAt = 0;
+            buffer.leakTarget = null;
+            buffer.leakValue = null;
+            e.preventDefault();
+            e.stopPropagation();
+            submit(scanned);
+          } else {
+            // Enter far outside the scan window — stale buffer, clear it and
+            // let the Enter pass through (genuine user action).
+            buffer.keys = [];
+            buffer.lastKeyAt = 0;
+            buffer.leakTarget = null;
+            buffer.leakValue = null;
+          }
+          return;
         }
+        buffer.keys = [];
+        buffer.lastKeyAt = 0;
+        buffer.leakTarget = null;
+        buffer.leakValue = null;
         return;
       }
 
