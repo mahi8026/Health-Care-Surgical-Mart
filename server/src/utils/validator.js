@@ -39,9 +39,14 @@ const validateEmail = (email) => {
  * Validate phone number (Bangladesh format)
  */
 const validatePhone = (phone) => {
-  // Bangladesh phone: 11 digits starting with 01
+  // Bangladesh phone: 11 digits starting with 01. Accept optional leading
+  // +880 / 880 (international format) and spaces/dashes.
+  const normalized = String(phone)
+    .trim()
+    .replace(/^\+?880/, '0')
+    .replace(/[\s-]/g, '');
   const phoneRegex = /^01[0-9]{9}$/;
-  if (!phoneRegex.test(phone.replace(/[\s-]/g, ''))) {
+  if (!phoneRegex.test(normalized)) {
     throw new ValidationError(
       'Invalid phone number. Must be 11 digits starting with 01',
     );

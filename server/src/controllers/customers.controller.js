@@ -7,6 +7,8 @@ const BaseController = require('./base.controller');
 const { ObjectId } = require('mongodb');
 const { logger } = require('../config/logging');
 const { getShopDatabase } = require('../config/database');
+const { validatePhone, validateEmail } = require('../utils/validator');
+const { createError } = require('../utils/errors');
 
 class CustomersController extends BaseController {
   /**
@@ -81,6 +83,7 @@ class CustomersController extends BaseController {
       } = req.body;
 
       this.validateRequired(req.body, ['name', 'phone']);
+      this._validateContact({ phone, email });
 
       const existingCustomer = await shopDb
         .collection('customers')
@@ -121,6 +124,7 @@ class CustomersController extends BaseController {
       } = req.body;
 
       this.validateRequired(req.body, ['name', 'phone']);
+      this._validateContact({ phone, email });
 
       if (!ObjectId.isValid(req.params.id)) {
         return this.sendError(res, 'Customer not found', 404);
@@ -205,6 +209,19 @@ class CustomersController extends BaseController {
   }
 
   // ==================== Private Helper Methods ====================
+
+  /**
+   * Validate phone (required) and email (optional) format. The shared
+   * validators throw ValidationError (422); remap to 400 for the API.
+   */
+  _validateContact({ phone, email }) {
+    try {
+      validatePhone(phone);
+      if (email) {validateEmail(email);}
+    } catch (err) {
+      throw createError.badRequest(err.message);
+    }
+  }
 
   /**
    * Build search query

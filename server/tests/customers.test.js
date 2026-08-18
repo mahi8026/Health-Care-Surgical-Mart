@@ -70,7 +70,7 @@ describe('Customer Management API', () => {
   describe('POST /api/customers', () => {
     const validCustomer = {
       name: 'Test Customer',
-      phone: `91234${Date.now().toString().slice(-5)}`,
+      phone: `0171234${Date.now().toString().slice(-4)}`,
       email: `test${Date.now()}@test.com`,
       type: 'retail',
       address: '123 Test Street'
