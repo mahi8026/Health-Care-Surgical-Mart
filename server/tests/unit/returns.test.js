@@ -95,6 +95,7 @@ describe("Return Processing with Stock Restoration", () => {
       stock_batches: {
         insertOne: jest.fn(),
         updateOne: jest.fn(),
+        deleteMany: jest.fn(),
       },
     };
 

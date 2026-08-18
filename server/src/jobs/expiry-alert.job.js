@@ -9,7 +9,7 @@
 
 const cron = require('node-cron');
 const { ObjectId: _ObjectId } = require('mongodb');
-const { getShopDatabase, getSharedDatabase } = require('../config/database');
+const { getShopDatabase, getSystemDatabase } = require('../config/database');
 const EmailService = require('../services/email/email.service');
 const { logger } = require('../config/logging');
 
@@ -20,9 +20,11 @@ async function checkExpiryAlerts() {
   try {
     logger.info('Starting expiry alert job...');
 
-    // Get all active shops
-    const sharedDb = getSharedDatabase();
-    const shops = await sharedDb.collection('shops').find({
+    // Single-tenant: the shops registry lives in the system database
+    // (Health_Care_Shop_DB). Previously this job called getSharedDatabase(),
+    // which does not exist — the job crashed on every run.
+    const systemDb = getSystemDatabase();
+    const shops = await systemDb.collection('shops').find({
       status: 'Active'
     }).toArray();
 
@@ -30,6 +32,8 @@ async function checkExpiryAlerts() {
 
     for (const shop of shops) {
       try {
+        // Single-tenant: getShopDatabase() resolves to the pinned
+        // SHOP_DB_NAME regardless of the shopId argument
         const shopDb = getShopDatabase(shop.shopId);
 
         // Get batches expiring within next 30 days
@@ -43,7 +47,9 @@ async function checkExpiryAlerts() {
                 shopId: shop.shopId,
                 status: 'ACTIVE',
                 quantity: { $gt: 0 },
-                expiryDate: { $lte: thresholdDate }
+                // $lte would also match null expiry dates (null sorts before
+                // dates) — exclude them explicitly
+                expiryDate: { $ne: null, $lte: thresholdDate }
               }
             },
             {
@@ -98,11 +104,10 @@ async function checkExpiryAlerts() {
         if (shop.ownerEmail || shop.email) {
           const emailTo = shop.ownerEmail || shop.email;
 
-          await EmailService.send({
-            to: emailTo,
-            subject: `⚠️ Stock Expiry Alert - ${shop.name}`,
-            templateName: 'expiry_alert',
-            variables: {
+          await EmailService.sendTransactionalEmail(
+            emailTo,
+            'expiry_alert',
+            {
               shopName: shop.name,
               totalItems: batches.length,
               expired: expired.map(formatBatchForEmail),
@@ -114,7 +119,7 @@ async function checkExpiryAlerts() {
                 day: 'numeric'
               })
             }
-          });
+          );
 
           totalAlertsProcessed++;
           logger.info(`Expiry alert email sent to ${emailTo} for shop ${shop.name}`);

@@ -56,6 +56,23 @@ const setupErrorHandling = (app) => {
       });
     }
 
+    // MongoDB $jsonSchema validation failure (driver code 121) is a client
+    // data problem — surface it as 400, not 500
+    if (error.code === 121 || error.codeName === 'DocumentValidationFailure') {
+      const details = error.errInfo?.details?.schemaRulesNotSatisfied ||
+        error.errInfo?.details ||
+        null;
+      logger.warn('MongoDB schema validation failed:', {
+        url: req.url,
+        details,
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Data does not match the required schema',
+        ...(details && { errors: details }),
+      });
+    }
+
     if (error.code === 11000) {
       const field = Object.keys(error.keyValue)[0];
       return res.status(409).json({

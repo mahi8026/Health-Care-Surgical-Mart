@@ -45,7 +45,7 @@ class SalesController {
       // -- Credit sale validation --------------------------------------------
       const paymentMethod = req.body.paymentMethod || 'cash';
       if (paymentMethod === 'credit') {
-        if (!customer || !customer.id) {
+        if (!customer || !customer.id || !ObjectId.isValid(customer.id)) {
           return res.status(400).json({
             success: false,
             message: 'A customer must be selected for credit sales',
@@ -85,6 +85,38 @@ class SalesController {
 
       // Enrich items with product details (outside transaction � read-only)
       const enrichedItems = await this._enrichSaleItems(req.shopDb, items);
+
+      // -- Server-side totals validation -------------------------------------
+      // Recompute the total from the item prices we actually fetched, so a
+      // tampered client payload cannot inflate sales amounts. Client values
+      // are accepted only within a 1 Tk tolerance.
+      const parsedSubtotal = parseFloat(subtotal) || 0;
+      const parsedDiscount = parseFloat(discount) || 0;
+      const parsedVat = parseFloat(vatAmount) || 0;
+      const parsedGrandTotal = parseFloat(grandTotal) || 0;
+      if (
+        !isFinite(parsedSubtotal) ||
+        !isFinite(parsedDiscount) ||
+        !isFinite(parsedVat) ||
+        !isFinite(parsedGrandTotal) ||
+        parsedSubtotal < 0 ||
+        parsedDiscount < 0 ||
+        parsedVat < 0 ||
+        parsedGrandTotal <= 0
+      ) {
+        return res.status(400).json({ success: false, message: 'Invalid sale amounts' });
+      }
+      const computedSubtotal = enrichedItems.reduce(
+        (sum, it) => sum + (Number(it.rate) || 0) * (Number(it.qty) || 0),
+        0,
+      );
+      const expectedTotal = Math.max(0, computedSubtotal - parsedDiscount + parsedVat);
+      if (Math.abs(expectedTotal - parsedGrandTotal) > 1) {
+        return res.status(400).json({
+          success: false,
+          message: `Sale total mismatch: expected ${expectedTotal.toFixed(2)}, received ${parsedGrandTotal.toFixed(2)}`,
+        });
+      }
 
       // Fetch customer's previous due balance before this sale
       let previousDue = 0;
@@ -506,7 +538,8 @@ class SalesController {
   async _updateCustomerAfterSale(shopDb, customerId, saleTotal, paymentMethod, session = null, dueAmount = 0) {
     try {
       const update = {
-        $inc: { totalPurchased: saleTotal, totalPurchases: saleTotal },
+        // totalPurchases is a count of sale records, not a second money total
+        $inc: { totalPurchased: saleTotal, totalPurchases: 1 },
         $set: { lastPurchaseDate: new Date(), updatedAt: new Date() },
       };
       // Add to currentDue for credit sales OR partial payments
@@ -593,7 +626,7 @@ class SalesController {
       referenceType: 'SALE',
       referenceId: saleId,
       batchAllocations,
-      costPrice: item.rate, // Use selling price as reference
+      costPrice: item.costPrice, // Actual cost (purchase price) for profit reporting
       note: `Sale ${saleId}`,
       session,
     });
@@ -604,27 +637,28 @@ class SalesController {
    */
   async _sendSaleNotification(shopDb, sale, customer) {
     try {
-      if (!customer || !customer._id) {
+      // req.body.customer carries `id` (not `_id`); accept either shape
+      const customerId = customer?.id || customer?._id;
+      if (!customerId || !ObjectId.isValid(customerId)) {
         return;
       }
 
       const customerData = await shopDb
         .collection('customers')
-        .findOne({ _id: new ObjectId(customer._id) });
+        .findOne({ _id: new ObjectId(customerId) });
 
       if (customerData && customerData.email) {
-        await EmailService.send({
-          to: customerData.email,
-          subject: `Order Confirmation - Invoice #${sale.invoiceNo}`,
-          templateName: 'order_confirmation',
-          variables: {
+        await EmailService.sendTransactionalEmail(
+          customerData.email,
+          'order_confirmation',
+          {
             customerName: customerData.name,
             invoiceNo: sale.invoiceNo,
             saleDate: sale.saleDate.toLocaleDateString(),
             grandTotal: sale.grandTotal,
             items: sale.items,
           },
-        });
+        );
       }
     } catch (error) {
       // Don't fail the sale if notification fails

@@ -123,22 +123,6 @@ const setupRoutes = (app) => {
     logger.info('Loading health check routes...');
     app.use('/health', require('../routes/health.routes'));
 
-    // Test route (no auth required)
-    app.get('/api/test', (req, res) => {
-      res.json({
-        success: true,
-        message: 'API is working',
-        timestamp: new Date().toISOString(),
-        version: process.env.npm_package_version || '2.0.0',
-        commit: '652bd77', // Latest commit with auth route reload
-        nodeVersion: process.version,
-        routes: {
-          authMounted: !!app._router.stack.find(layer => layer.regexp && layer.regexp.test('/api/auth/login')),
-          productsMounted: !!app._router.stack.find(layer => layer.regexp && layer.regexp.test('/api/products')),
-        }
-      });
-    });
-
     logger.info('All routes loaded successfully with advanced security and health monitoring');
   } catch (error) {
     logger.error('Error loading routes:', error);

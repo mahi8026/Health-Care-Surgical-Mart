@@ -21,6 +21,12 @@ function requiresSrv(uri) {
   return Boolean(uri && uri.startsWith('mongodb+srv://'));
 }
 
+// Local/CI MongoDB runs without TLS — the invalid-cert bypass below is only
+// applied to these hosts (never to real remote clusters)
+function isLocalHost(uri) {
+  return /localhost|127\.0\.0\.1|::1/i.test(uri || '');
+}
+
 // Connection configuration
 const config = {
   uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
@@ -51,10 +57,10 @@ const config = {
     // SSL/TLS settings — only for Atlas URIs (mongodb+srv:// or ?ssl=true)
     ssl: requiresTls(process.env.MONGODB_URI),
     // Strict TLS certificate verification is used for standard Atlas URIs
-    // (mongodb+srv://). Legacy "standard format" URIs (mongodb:// with an IP
-    // end-point, used here to work around ECONNREFUSED on Windows) rely on the
-    // Atlas hostname alias, so they need the hostname/cert bypass to connect.
-    ...(requiresSrv(process.env.MONGODB_URI)
+    // (mongodb+srv://) and for any host that can verify certificates. The
+    // invalid-cert bypass is only kept for local/CI MongoDB (localhost) where
+    // TLS is typically off — never silently for a real remote cluster.
+    ...(requiresSrv(process.env.MONGODB_URI) || isLocalHost(process.env.MONGODB_URI)
       ? {}
       : { tlsAllowInvalidCertificates: true, tlsAllowInvalidHostnames: true }),
 
@@ -341,6 +347,19 @@ async function createShopIndexes(shopId) {
       { key: { idempotencyKey: 1 }, unique: true, sparse: true, name: 'return_idempotency_unique' },
       { key: { originalSaleId: 1 }, name: 'returns_original_sale_index' },
       { key: { returnDate: -1 }, name: 'returns_date_desc' },
+    ]);
+
+    // Stock event-sourcing indexes: one snapshot per product (the service
+    // auto-creates a zeroed snapshot when missing — a unique index prevents
+    // two concurrent creates from producing duplicate snapshots), and a
+    // ledger lookup index for receive-dedupe + audit queries.
+    await shopDb.collection('stock_snapshots').createIndexes([
+      { key: { productId: 1 }, unique: true, name: 'snapshot_product_unique' },
+      { key: { lastLedgerVersion: 1 }, name: 'snapshot_ledger_version' },
+    ]);
+    await shopDb.collection('stock_ledger').createIndexes([
+      { key: { productId: 1, timestamp: -1 }, name: 'ledger_product_time' },
+      { key: { movementType: 1, referenceId: 1, productId: 1 }, name: 'ledger_dedupe_lookup' },
     ]);
 
     logger.info(`Database indexes created for shop: ${shopId}`);

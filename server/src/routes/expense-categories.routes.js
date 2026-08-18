@@ -200,7 +200,7 @@ router.get(
     const query = includeInactive === 'true' ? {} : { isActive: true };
 
     const categories = await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .find(query)
       .sort({ name: 1 })
       .toArray();
@@ -221,8 +221,13 @@ router.get(
   requirePermission(PERMISSIONS.VIEW_EXPENSE_CATEGORIES),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
+
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Expense category not found');
+    }
+
     const category = await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!category) {
@@ -274,7 +279,7 @@ router.post(
 
     // Check if category name already exists
     const existingCategory = await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .findOne({ name: name.trim() });
 
     if (existingCategory) {
@@ -292,7 +297,7 @@ router.post(
     };
 
     const result = await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .insertOne(categoryData);
 
     // Invalidate expense categories cache
@@ -316,6 +321,10 @@ router.put(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, description, type } = req.body;
+
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Expense category not found');
+    }
 
     // Validate required fields
     if (!name || !type) {
@@ -344,7 +353,7 @@ router.put(
 
     // Check if category exists
     const existingCategory = await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!existingCategory) {
@@ -352,7 +361,7 @@ router.put(
     }
 
     // Check if name is taken by another category
-    const nameCheck = await shopDb.collection('expenseCategories').findOne({
+    const nameCheck = await shopDb.collection('expense_categories').findOne({
       name: name.trim(),
       _id: { $ne: new ObjectId(req.params.id) },
     });
@@ -369,7 +378,7 @@ router.put(
     };
 
     await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
 
     // Invalidate expense categories cache
@@ -392,9 +401,13 @@ router.delete(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Expense category not found');
+    }
+
     // Check if category exists
     const category = await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .findOne({ _id: new ObjectId(req.params.id) });
 
     if (!category) {
@@ -414,7 +427,7 @@ router.delete(
 
     // Soft delete - set isActive to false
     await shopDb
-      .collection('expenseCategories')
+      .collection('expense_categories')
       .updateOne(
         { _id: new ObjectId(req.params.id) },
         { $set: { isActive: false, updatedAt: new Date() } },

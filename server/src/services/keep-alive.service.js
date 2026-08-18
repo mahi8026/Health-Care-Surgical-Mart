@@ -1,3 +1,4 @@
+/* global fetch, AbortSignal */
 /**
  * Keep-Alive Service
  * Pings the server's own health endpoint every 14 minutes to prevent
@@ -32,12 +33,11 @@ function startKeepAlive() {
   // Run every 14 minutes: at minutes 0, 14, 28, 42, 56 of every hour (Render free tier sleeps after 15 min)
   keepAliveJob = cron.schedule('*/14 * * * *', async () => {
     try {
-      const fetch = (...args) =>
-        import('node-fetch').then(({ default: f }) => f(...args));
-
+      // Node 18+ has a global fetch; AbortSignal.timeout implements the
+      // 10-second deadline without the node-fetch dependency
       const res = await fetch(healthUrl, {
         method: 'GET',
-        timeout: 10000,
+        signal: AbortSignal.timeout(10000),
       });
 
       if (res.ok) {

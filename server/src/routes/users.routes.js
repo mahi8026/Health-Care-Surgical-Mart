@@ -278,6 +278,7 @@ router.get(
         {
           projection: {
             password: 0, // Exclude password from response
+            passwordHash: 0, // Exclude hashed password (never expose)
             refreshToken: 0,
           },
         },
@@ -302,11 +303,16 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('User not found');
+    }
+
     const user = await shopDb.collection('users').findOne(
       { _id: new ObjectId(req.params.id) },
       {
         projection: {
           password: 0,
+          passwordHash: 0, // Exclude hashed password (never expose)
           refreshToken: 0,
         },
       },
@@ -383,7 +389,7 @@ router.post(
     const userData = {
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      password: hashedPassword,
+      passwordHash: hashedPassword, // Matches user.schema.js (requires passwordHash)
       firebaseUid,
       role,
       isActive: Boolean(isActive),
@@ -398,7 +404,7 @@ router.post(
     const result = await shopDb.collection('users').insertOne(userData);
 
     // Return user data without password
-    const { password: _, ...userResponse } = userData;
+    const { passwordHash: _, ...userResponse } = userData;
     userResponse._id = result.insertedId;
 
     // Audit log
@@ -426,6 +432,10 @@ router.put(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { name, email, password, isActive } = req.body;
+
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('User not found');
+    }
 
     // Check if user exists
     const existingUser = await shopDb
@@ -462,14 +472,36 @@ router.put(
     if (email) {updateData.email = email.toLowerCase().trim();}
     if (isActive !== undefined) {updateData.isActive = Boolean(isActive);}
 
-    // Hash new password if provided
+    // Hash new password if provided (store in passwordHash — matches schema)
+    let setPasswordHash = null;
     if (password && password.trim()) {
-      updateData.password = await bcrypt.hash(password.trim(), 12);
+      setPasswordHash = await bcrypt.hash(password.trim(), 12);
+      updateData.passwordHash = setPasswordHash;
+    }
+
+    // Keep Firebase Auth in sync with the new email (otherwise Firebase login
+    // would keep using the old email and lock the user out)
+    if (email && email !== existingUser.email && existingUser.firebaseUid) {
+      try {
+        const admin = require('../config/firebase-admin');
+        await admin.auth().updateUser(existingUser.firebaseUid, {
+          email: email.toLowerCase().trim(),
+        });
+        logger.info(`Firebase email updated for ${existingUser.email} → ${email.toLowerCase().trim()}`);
+      } catch (firebaseErr) {
+        logger.warn(`Firebase email update failed for ${existingUser.email}: ${firebaseErr.message}`);
+      }
+    }
+
+    const updateOp = { $set: updateData };
+    if (setPasswordHash) {
+      // Drop the legacy `password` field if present (pre-passwordHash migration)
+      updateOp.$unset = { password: '' };
     }
 
     await shopDb
       .collection('users')
-      .updateOne({ _id: new ObjectId(req.params.id) }, { $set: updateData });
+      .updateOne({ _id: new ObjectId(req.params.id) }, updateOp);
 
     // Audit: user updated
     auditLog.log(req, AUDIT_ACTIONS.USER_UPDATED, 'user', req.params.id,
@@ -500,6 +532,10 @@ router.delete(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('User not found');
+    }
+
     if (req.params.id === req.user._id?.toString()) {
       throw createError.forbidden('You cannot delete your own account');
     }
@@ -514,7 +550,7 @@ router.delete(
 
     const salesCount = await shopDb
       .collection('sales')
-      .countDocuments({ createdBy: req.params.id });
+      .countDocuments({ createdBy: new ObjectId(req.params.id) });
 
     if (salesCount > 0) {
       throw createError.conflict(
@@ -559,6 +595,10 @@ router.put(
     const shopDb = getShopDatabase(req.user.shopId);
     const { currentPassword, newPassword } = req.body;
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('User not found');
+    }
+
     if (req.params.id !== req.user._id?.toString() && req.user.role !== 'SHOP_ADMIN') {
       throw createError.forbidden('You can only change your own password');
     }
@@ -575,16 +615,22 @@ router.put(
 
     if (req.params.id === req.user._id?.toString()) {
       if (!currentPassword) {throw createError.badRequest('Current password is required');}
-      const isValid = await bcrypt.compare(currentPassword, user.password);
+      // Accounts created after the passwordHash migration only have passwordHash
+      const storedHash = user.passwordHash || user.password;
+      const isValid = await bcrypt.compare(currentPassword, storedHash);
       if (!isValid) {throw createError.unauthorized('Current password is incorrect');}
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    // Update MongoDB
+    // Update MongoDB (passwordHash matches user.schema.js; legacy `password`
+    // field is dropped so it can never be read again)
     await shopDb.collection('users').updateOne(
       { _id: new ObjectId(req.params.id) },
-      { $set: { password: hashedPassword, updatedAt: new Date(), updatedBy: req.user._id } }
+      {
+        $set: { passwordHash: hashedPassword, updatedAt: new Date(), updatedBy: req.user._id },
+        $unset: { password: '' },
+      }
     );
 
     // Update Firebase Auth
@@ -619,6 +665,7 @@ router.get(
       {
         projection: {
           password: 0,
+          passwordHash: 0, // Exclude hashed password (never expose)
           refreshToken: 0,
         },
       },

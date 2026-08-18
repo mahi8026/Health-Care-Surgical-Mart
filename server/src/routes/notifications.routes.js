@@ -298,15 +298,14 @@ router.post(
     }
 
     try {
-      const result = await EmailService.send({
-        to: email,
-        subject: 'Test Email from Health Care Surgical Mart',
-        templateName: 'test_email',
-        variables: {
+      const result = await EmailService.sendTransactionalEmail(
+        email,
+        'test_email',
+        {
           timestamp: new Date().toLocaleString(),
           shopName: 'Health Care Surgical Mart',
         },
-      });
+      );
 
       res.json({
         success: true,
@@ -429,12 +428,14 @@ router.post(
     // Get customers
     let customers;
     if (customerIds && customerIds.length > 0) {
-      customers = await shopDb
-        .collection('customers')
-        .find({
-          _id: { $in: customerIds.map((id) => new ObjectId(id)) },
-        })
-        .toArray();
+      // Ignore malformed IDs instead of crashing the whole request
+      const validIds = customerIds.filter((id) => ObjectId.isValid(id));
+      customers = validIds.length
+        ? await shopDb
+            .collection('customers')
+            .find({ _id: { $in: validIds.map((id) => new ObjectId(id)) } })
+            .toArray()
+        : [];
     } else {
       // Send to all active customers
       customers = await shopDb
@@ -460,15 +461,14 @@ router.post(
       for (const customer of customers) {
         if (customer.email) {
           try {
-            await EmailService.send({
-              to: customer.email,
-              subject: message.subject || 'Special Offer from Health Care Surgical Mart',
-              templateName: 'promotional',
-              variables: {
+            await EmailService.sendTransactionalEmail(
+              customer.email,
+              'promotional',
+              {
                 customerName: customer.name,
                 message: message.text,
               },
-            });
+            );
             results.email.sent++;
           } catch (error) {
             logger.error(`Failed to send email to ${customer.email}:`, error);
@@ -576,16 +576,15 @@ router.post(
     for (const admin of admins) {
       if (admin.email) {
         try {
-          await EmailService.send({
-            to: admin.email,
-            subject: `⚠️ Low Stock Alert - ${products.length} Products`,
-            templateName: 'low_stock_alert',
-            variables: {
+          await EmailService.sendTransactionalEmail(
+            admin.email,
+            'low_stock_alert',
+            {
               adminName: admin.name,
               productCount: products.length,
               products: products,
             },
-          });
+          );
           results.sent++;
         } catch (error) {
           logger.error(`Failed to send alert to ${admin.email}:`, error);
@@ -613,7 +612,7 @@ router.post(
     const shopDb = getShopDatabase(req.user.shopId);
     const { customerId, dueAmount, dueDate } = req.body;
 
-    if (!customerId || !dueAmount || !dueDate) {
+    if (!customerId || !ObjectId.isValid(customerId) || !dueAmount || !dueDate) {
       return res.status(400).json({
         success: false,
         message: 'Customer ID, due amount, and due date are required',
@@ -637,16 +636,15 @@ router.post(
     // Send email reminder
     if (customer.email) {
       try {
-        await EmailService.send({
-          to: customer.email,
-          subject: `Payment Reminder - BDT ${dueAmount} Due`,
-          templateName: 'payment_reminder',
-          variables: {
+        await EmailService.sendTransactionalEmail(
+          customer.email,
+          'payment_reminder',
+          {
             customerName: customer.name,
             dueAmount: dueAmount,
             dueDate: new Date(dueDate).toLocaleDateString(),
           },
-        });
+        );
         results.email = true;
       } catch (error) {
         logger.error('Failed to send payment reminder email:', error);

@@ -13,7 +13,7 @@ const {
   getDatabaseSizeBreakdown
 } = require('../utils/database-health');
 const { authenticate } = require('../middleware/auth-multi-tenant');
-const { requirePermission } = require('../utils/rbac');
+const { requirePermission, PERMISSIONS } = require('../utils/rbac');
 
 /**
  * @route GET /health
@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
  * @desc Comprehensive health check with metrics
  * @access Private (Admin only)
  */
-router.get('/detailed', authenticate, requirePermission('VIEW_SETTINGS'), async (req, res) => {
+router.get('/detailed', authenticate,   requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const healthData = await comprehensiveHealthCheck();
 
@@ -77,7 +77,7 @@ router.get('/detailed', authenticate, requirePermission('VIEW_SETTINGS'), async 
  * @desc Database-specific health metrics
  * @access Private (Admin only)
  */
-router.get('/database', authenticate, requirePermission('VIEW_SETTINGS'), async (req, res) => {
+router.get('/database', authenticate,   requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const [healthData, connectionPool, sizeBreakdown] = await Promise.all([
       comprehensiveHealthCheck(),
@@ -109,7 +109,7 @@ router.get('/database', authenticate, requirePermission('VIEW_SETTINGS'), async 
  * @desc Get list of slow queries
  * @access Private (Admin only)
  */
-router.get('/slow-queries', authenticate, requirePermission('VIEW_SETTINGS'), async (req, res) => {
+router.get('/slow-queries', authenticate,   requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const threshold = parseInt(req.query.threshold) || 100; // milliseconds
     const slowQueries = await getSlowQueries(threshold);
@@ -133,7 +133,7 @@ router.get('/slow-queries', authenticate, requirePermission('VIEW_SETTINGS'), as
  * @desc Monitor connection pool health
  * @access Private (Admin only)
  */
-router.get('/connection-pool', authenticate, requirePermission('VIEW_SETTINGS'), async (req, res) => {
+router.get('/connection-pool', authenticate,   requirePermission(PERMISSIONS.VIEW_SETTINGS), async (req, res) => {
   try {
     const poolMetrics = await monitorConnectionPool();
 

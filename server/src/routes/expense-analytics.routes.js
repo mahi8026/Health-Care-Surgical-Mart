@@ -501,10 +501,15 @@ router.get(
     const shopDb = getShopDatabase(req.user.shopId);
     const { months = 6 } = req.query;
 
+    const parsedMonths = parseInt(months);
+    if (!Number.isFinite(parsedMonths) || parsedMonths < 1 || parsedMonths > 24) {
+      throw createError.badRequest('months must be a number between 1 and 24');
+    }
+
     const today = new Date();
     const startDate = new Date(
       today.getFullYear(),
-      today.getMonth() - parseInt(months) + 1,
+      today.getMonth() - parsedMonths + 1,
       1,
     );
 
@@ -831,7 +836,6 @@ router.get(
   }),
 );
 
-module.exports = router;
 /**
  * GET /api/expense-analytics/forecast
  * Get expense forecasting based on trends
@@ -866,6 +870,9 @@ router.get(
     };
 
     if (categoryId) {
+      if (!ObjectId.isValid(categoryId)) {
+        throw createError.badRequest('Invalid categoryId');
+      }
       matchQuery.categoryId = new ObjectId(categoryId);
     }
 
@@ -1192,3 +1199,5 @@ router.get(
     });
   }),
 );
+
+module.exports = router;

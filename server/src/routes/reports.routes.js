@@ -12,7 +12,18 @@ const {
 const { requirePermission } = require('../utils/rbac');
 const { PERMISSIONS } = require('../utils/rbac');
 const { getShopDatabase } = require('../config/database');
-const { asyncHandler } = require('../config/error-handling');
+const { asyncHandler, createError } = require('../config/error-handling');
+
+// Parse an optional date query param; invalid values → 400 instead of a 500
+// from a BSON conversion error mid-pipeline.
+function parseDateParam(value, name) {
+  if (!value) {return null;}
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw createError.badRequest(`Invalid ${name}: must be a valid date`);
+  }
+  return date;
+}
 
 // Apply authentication and shop status check to all routes
 router.use(authenticate);
@@ -800,8 +811,10 @@ router.get(
     const { startDate, endDate } = req.query;
 
     const dateFilter = {};
-    if (startDate) {dateFilter.$gte = new Date(startDate);}
-    if (endDate) {dateFilter.$lte = new Date(endDate);}
+    const parsedStart = parseDateParam(startDate, 'startDate');
+    const parsedEnd = parseDateParam(endDate, 'endDate');
+    if (parsedStart) {dateFilter.$gte = parsedStart;}
+    if (parsedEnd) {dateFilter.$lte = parsedEnd;}
 
     // Get sales data
     const salesData = await shopDb
@@ -1337,8 +1350,10 @@ router.get(
     const { startDate, endDate } = req.query;
 
     const dateFilter = {};
-    if (startDate) {dateFilter.$gte = new Date(startDate);}
-    if (endDate) {dateFilter.$lte = new Date(endDate);}
+    const parsedStart = parseDateParam(startDate, 'startDate');
+    const parsedEnd = parseDateParam(endDate, 'endDate');
+    if (parsedStart) {dateFilter.$gte = parsedStart;}
+    if (parsedEnd) {dateFilter.$lte = parsedEnd;}
 
     // Get cash inflows (sales) — actual cash collected (cashPaid + bankPaid)
     const cashInflows = await shopDb

@@ -3,18 +3,26 @@
  * v5 — Network-first for HTML, cache-first for assets, auto-update on deploy
  */
 
-const CACHE_NAME = 'hc-mart-v5';
+const CACHE_NAME = 'hc-mart-v6';
 
 const PRECACHE_URLS = [
+  '/',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/favicon.svg',
 ];
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
+  // Cache each entry individually — a single 404 (e.g. a renamed asset) must
+  // not reject the whole install and leave the old service worker running
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(
+        PRECACHE_URLS.map((url) => cache.add(url))
+      )
+    )
   );
   // Take control immediately — don't wait for old SW to expire
   self.skipWaiting();
@@ -63,10 +71,16 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache the fresh HTML
+          // Cache the fresh HTML under BOTH the requested URL and '/' so the
+          // offline fallback below always has a copy
           if (response && response.status === 200) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, clone);
+              if (url.pathname !== '/') {
+                cache.put('/', response.clone());
+              }
+            });
           }
           return response;
         })

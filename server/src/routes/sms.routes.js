@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 const SMSService = require('../services/sms/sms.service');
 const { authenticate } = require('../middleware/auth-multi-tenant');
-const { requirePermission, requireRole, ROLES } = require('../utils/rbac');
+const { requirePermission, requireRole, ROLES, PERMISSIONS } = require('../utils/rbac');
 const { getShopDatabase } = require('../config/database');
 const { asyncHandler } = require('../config/error-handling');
 
@@ -318,7 +318,7 @@ router.post(
 router.post(
   '/bulk',
   authenticate,
-  requirePermission('SEND_BULK_SMS'),
+  requirePermission(PERMISSIONS.SEND_BULK_SMS),
   asyncHandler(async (req, res) => {
     const { recipients, message, scheduledAt } = req.body;
 

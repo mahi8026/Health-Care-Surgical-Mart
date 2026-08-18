@@ -331,9 +331,20 @@ router.get(
     const filter = {};
 
     if (startDate || endDate) {
+      const parsedStart = startDate ? new Date(startDate) : null;
+      const parsedEnd = endDate ? new Date(endDate) : null;
+      if (
+        (parsedStart && Number.isNaN(parsedStart.getTime())) ||
+        (parsedEnd && Number.isNaN(parsedEnd.getTime()))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid startDate/endDate: must be valid dates',
+        });
+      }
       filter.createdAt = {};
-      if (startDate) {filter.createdAt.$gte = new Date(startDate);}
-      if (endDate) {filter.createdAt.$lte = new Date(endDate);}
+      if (parsedStart) {filter.createdAt.$gte = parsedStart;}
+      if (parsedEnd) {filter.createdAt.$lte = parsedEnd;}
     }
 
     if (type) {filter.type = type;}

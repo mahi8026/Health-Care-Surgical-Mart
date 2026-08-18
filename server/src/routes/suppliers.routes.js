@@ -341,6 +341,11 @@ router.get(
   requirePermission(PERMISSIONS.VIEW_SUPPLIERS),
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
+
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Supplier not found');
+    }
+
     const supplier = await shopDb
       .collection('suppliers')
       .findOne({ _id: new ObjectId(req.params.id) });
@@ -423,6 +428,10 @@ router.put(
       throw createError.badRequest('Name and phone are required');
     }
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Supplier not found');
+    }
+
     // Check if supplier exists
     const existingSupplier = await shopDb
       .collection('suppliers')
@@ -475,6 +484,10 @@ router.delete(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Supplier not found');
+    }
+
     // Check if supplier exists
     const supplier = await shopDb
       .collection('suppliers')
@@ -484,10 +497,10 @@ router.delete(
       throw createError.notFound('Supplier not found');
     }
 
-    // Check if supplier has any purchases
+    // Check if supplier has any purchases (purchases store supplierId as ObjectId)
     const purchasesCount = await shopDb
       .collection('purchases')
-      .countDocuments({ supplierId: req.params.id });
+      .countDocuments({ supplierId: new ObjectId(req.params.id) });
 
     if (purchasesCount > 0) {
       throw createError.conflict(

@@ -20,6 +20,7 @@ const StockReport = lazy(() => import("./pages/StockReport"));
 const ExpenseCategories = lazy(() => import("./pages/ExpenseCategories"));
 const ExpensesPage = lazy(() => import("./pages/ExpensesPage"));
 const AddExpensePage = lazy(() => import("./pages/AddExpensePage"));
+const EditExpensePage = lazy(() => import("./pages/EditExpensePage"));
 const SMSDashboard = lazy(() => import("./pages/SMSDashboard"));
 const EmailDashboard = lazy(() => import("./pages/EmailDashboard"));
 const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
@@ -204,6 +205,16 @@ function App() {
               element={
                 <ProtectedRoute permission={PERMISSIONS.CREATE_EXPENSE}>
                   <AddExpensePage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Edit Expense - Requires EDIT_EXPENSE permission */}
+            <Route
+              path="expenses/edit/:id"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.EDIT_EXPENSE}>
+                  <EditExpensePage />
                 </ProtectedRoute>
               }
             />

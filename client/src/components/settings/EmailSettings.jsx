@@ -25,17 +25,31 @@ const EmailSettings = () => {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.resolve().then(() => {
+    (async () => {
+      try {
+        const response = await api.get("/settings/email");
+        if (!cancelled && response.success && response.data) {
+          setSettings((prev) => ({ ...prev, ...response.data }));
+          // Fall back to locally cached credentials (server doc may not
+          // contain them — provider keys live in env vars)
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            try {
+              setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
+            } catch { /* ignore parse errors */ }
+          }
+          return;
+        }
+      } catch { /* server unreachable — use local cache below */ }
+
       if (cancelled) return;
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
           setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
-        } catch {
-          // ignore parse errors
-        }
+        } catch { /* ignore parse errors */ }
       }
-    });
+    })();
     return () => { cancelled = true; };
   }, []);
 
@@ -48,11 +62,16 @@ const EmailSettings = () => {
     setSaving(true);
     setMessage({ type: "", text: "" });
     try {
-      await api.post("/settings/email", settings);
+      await api.put("/settings/email", settings);
       setMessage({ type: "success", text: "Email settings saved successfully!" });
-    } catch {
+    } catch (error) {
+      // Route unavailable — keep a local copy so the form is not lost, but
+      // surface the failure instead of pretending it saved
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-      setMessage({ type: "success", text: "Email settings saved locally." });
+      setMessage({
+        type: "error",
+        text: error.serverMessage || "Could not save email settings to server. Saved locally only.",
+      });
     } finally {
       setSaving(false);
     }
@@ -66,18 +85,19 @@ const EmailSettings = () => {
     setTesting(true);
     setMessage({ type: "", text: "" });
     try {
-      const testRes = await api.post("/email/send", {
-        to: testEmail,
-        subject: "Test Email from Notification System",
-        html: "<p>This is a test email from your notification system.</p>",
+      const testRes = await api.post("/notifications/test-email", {
+        email: testEmail,
       });
       if (testRes.success !== false) {
         setMessage({ type: "success", text: "Test email sent successfully!" });
       } else {
         setMessage({ type: "error", text: testRes.message || "Failed to send test email." });
       }
-    } catch {
-      setMessage({ type: "error", text: "Could not reach email API. Check your server." });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.serverMessage || "Could not reach email API. Check your server.",
+      });
     } finally {
       setTesting(false);
     }

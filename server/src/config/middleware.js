@@ -35,7 +35,14 @@ const setupMiddleware = (app) => {
   // Apply rate limiters to specific routes
   app.use(['/api/auth/login', '/api/auth/firebase-login'], authLimiter);
   app.use('/api/auth/request-password-reset', passwordResetLimiter);
-  app.use('/api', apiLimiter);
+  // Global API limiter — skip auth paths so login attempts are not
+  // double-counted (authLimiter already covers them)
+  app.use('/api', (req, res, next) => {
+    if (req.path.startsWith('/auth/')) {
+      return next();
+    }
+    return apiLimiter(req, res, next);
+  });
 
   // Request ID middleware for tracking
   app.use((req, res, next) => {
@@ -49,8 +56,7 @@ const setupMiddleware = (app) => {
     // Skip auth routes and public endpoints
     if (
       req.path.startsWith('/auth/') ||
-      req.path === '/health' ||
-      req.path === '/test'
+      req.path === '/health'
     ) {
       return next();
     }

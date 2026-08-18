@@ -351,8 +351,8 @@ router.put(
     const settingsData = {
       type: 'shop',
       name: name.trim(),
-      address: address.trim(),
-      phone: phone.trim(),
+      address: address?.trim() || '',
+      phone: phone?.trim() || '',
       email: email?.trim() || '',
       website: website?.trim() || '',
       logo: logo?.trim() || '',
@@ -556,6 +556,131 @@ router.put(
     res.json({
       success: true,
       message: 'System settings updated successfully',
+    });
+  }),
+);
+
+/**
+ * GET /api/settings/pos
+ * Get POS settings (display + receipt defaults for the sales screen)
+ */
+router.get(
+  '/pos',
+  requirePermission(PERMISSIONS.VIEW_SETTINGS),
+  cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:pos`),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+
+    let posSettings = await shopDb.collection('settings').findOne({
+      type: 'pos',
+    });
+
+    // If no settings exist, return defaults
+    if (!posSettings) {
+      posSettings = {
+        shopName: 'Health Care Surgical Mart',
+        currency: 'BDT',
+        receiptFooter: '',
+        showCustomerOnReceipt: true,
+        autoPrintReceipt: false,
+        defaultDiscountPercent: 0,
+        enableBarcodeScan: true,
+      };
+    }
+
+    res.json({
+      success: true,
+      data: posSettings,
+    });
+  }),
+);
+
+/**
+ * GET /api/settings/email
+ * Get email provider settings (stored per shop, overriding env defaults)
+ */
+router.get(
+  '/email',
+  requirePermission(PERMISSIONS.VIEW_SETTINGS),
+  cacheResponse(TTL.SETTINGS, (req) => `settings:${req.user.shopId}:email`),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+
+    let emailSettings = await shopDb.collection('settings').findOne({
+      type: 'email',
+    });
+
+    // If no settings exist, return defaults
+    if (!emailSettings) {
+      emailSettings = {
+        provider: 'sendgrid',
+        fromEmail: '',
+        fromName: '',
+      };
+    }
+
+    res.json({
+      success: true,
+      data: emailSettings,
+    });
+  }),
+);
+
+/**
+ * PUT /api/settings/email
+ * Update email provider settings
+ */
+router.put(
+  '/email',
+  requirePermission(PERMISSIONS.EDIT_SETTINGS),
+  asyncHandler(async (req, res) => {
+    const shopDb = getShopDatabase(req.user.shopId);
+    const {
+      provider,
+      fromEmail,
+      fromName,
+      mailchimpServerPrefix,
+      mailchimpListId,
+      mailchimpFromEmail,
+      mailchimpFromName,
+    } = req.body;
+
+    if (provider && !['sendgrid', 'mailchimp'].includes(provider)) {
+      throw createError.badRequest('Provider must be sendgrid or mailchimp');
+    }
+
+    // Never persist the raw API key in the settings document — providers are
+    // configured via env vars (SENDGRID_API_KEY etc.); the UI fields are kept
+    // for reference only.
+    const settingsData = {
+      type: 'email',
+      provider: provider || 'sendgrid',
+      fromEmail: fromEmail?.trim() || fromEmail || '',
+      fromName: fromName?.trim() || fromName || '',
+      mailchimpServerPrefix: mailchimpServerPrefix?.trim() || '',
+      mailchimpListId: mailchimpListId?.trim() || '',
+      mailchimpFromEmail: mailchimpFromEmail?.trim() || '',
+      mailchimpFromName: mailchimpFromName?.trim() || '',
+      updatedAt: new Date(),
+      updatedBy: req.user._id,
+    };
+
+    await shopDb
+      .collection('settings')
+      .updateOne({ type: 'email' }, { $set: settingsData }, { upsert: true });
+
+    // Audit: email settings updated
+    auditLog.log(req, AUDIT_ACTIONS.SETTINGS_UPDATED, 'settings', 'email',
+      `Updated email settings for ${req.user.shopId}`,
+      { after: { provider: settingsData.provider } }
+    );
+
+    // Invalidate settings cache
+    cacheService.invalidateShopCache(req.user.shopId, 'settings');
+
+    res.json({
+      success: true,
+      message: 'Email settings updated successfully',
     });
   }),
 );

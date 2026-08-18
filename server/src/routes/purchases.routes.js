@@ -296,6 +296,7 @@ router.get(
       pipeline.push({
         $match: {
           $or: [
+            { purchaseNo: { $regex: search, $options: 'i' } },
             { invoiceNo: { $regex: search, $options: 'i' } },
             { 'supplier.name': { $regex: search, $options: 'i' } },
             { 'supplier.company': { $regex: search, $options: 'i' } },
@@ -471,11 +472,12 @@ router.post(
       invoiceNo ||
       `PO-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-    // Check if invoice number already exists
+    // Check if invoice number already exists (purchases are stored under
+    // purchaseNo — check both fields to also catch legacy records)
     if (invoiceNo) {
       const existingPurchase = await shopDb
         .collection('purchases')
-        .findOne({ invoiceNo });
+        .findOne({ $or: [{ invoiceNo }, { purchaseNo: invoiceNo }] });
 
       if (existingPurchase) {
         throw createError.conflict('Invoice number already exists');
@@ -530,6 +532,10 @@ router.put(
     const stockCommand = require('../services/stock-command.service');
     const { receivedItems, notes } = req.body;
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Purchase order not found');
+    }
+
     // Get purchase order
     const purchase = await shopDb
       .collection('purchases')
@@ -575,8 +581,20 @@ router.put(
       // Process each received item
       for (const item of itemsToReceive) {
         const productId = toObjectId(item.productId || item.productId);
-        const receivedQty = item.receivedQty || item.qty;
+        const receivedQty = parseInt(item.receivedQty || item.qty, 10);
         const unitCost = item.unitCost || item.rate;
+
+        // Reject negative/zero quantities — a negative receivedQty would
+        // silently drain stock instead of adding it
+        if (!productId || !ObjectId.isValid(productId)) {
+          logger.warn(`Invalid productId during purchase receive: ${item.productId}`);
+          continue;
+        }
+        if (!Number.isFinite(receivedQty) || receivedQty <= 0) {
+          throw createError.badRequest(
+            `Invalid received quantity for product ${item.productId}: must be a positive number`,
+          );
+        }
 
         // Get product details
         const product = await shopDb
@@ -648,26 +666,44 @@ router.put(
 
       // Record stock movement using event-sourced system
       try {
-        await stockCommand.recordMovement({
-          shopId: req.user.shopId,
-          productId: productId,
-          movementType: 'PURCHASE',
-          quantity: parseInt(receivedQty),
-          userId: toObjectId(req.user._id),
-          referenceType: 'PURCHASE',
-          referenceId: toObjectId(req.params.id),
-          batchNo: item.batchNo || null,
-          expiryDate: item.expiryDate || null,
-          costPrice: parseFloat(unitCost),
-          note: `Purchase ${purchase.purchaseNo || purchase.invoiceNo} received`,
-        });
+        // Dedupe guard: if a previous receive attempt already applied this
+        // movement (e.g. partial failure followed by a retry), skip it so
+        // stock is never double-added.
+        const alreadyApplied = await shopDb
+          .collection('stock_ledger')
+          .findOne({
+            movementType: 'PURCHASE',
+            referenceId: toObjectId(req.params.id),
+            productId: productId,
+          });
 
-        logger.info('Stock movement recorded for purchase', {
-          shopId: req.user.shopId,
-          purchaseId: req.params.id,
-          productId: productId.toString(),
-          quantity: receivedQty,
-        });
+        if (alreadyApplied) {
+          logger.warn('Stock movement already recorded for purchase item, skipping', {
+            purchaseId: req.params.id,
+            productId: productId.toString(),
+          });
+        } else {
+          await stockCommand.recordMovement({
+            shopId: req.user.shopId,
+            productId: productId,
+            movementType: 'PURCHASE',
+            quantity: receivedQty,
+            userId: toObjectId(req.user._id),
+            referenceType: 'PURCHASE',
+            referenceId: toObjectId(req.params.id),
+            batchNo: item.batchNo || null,
+            expiryDate: item.expiryDate || null,
+            costPrice: parseFloat(unitCost),
+            note: `Purchase ${purchase.purchaseNo || purchase.invoiceNo} received`,
+          });
+
+          logger.info('Stock movement recorded for purchase', {
+            shopId: req.user.shopId,
+            purchaseId: req.params.id,
+            productId: productId.toString(),
+            quantity: receivedQty,
+          });
+        }
       } catch (stockError) {
         logger.error('Failed to record stock movement', {
           error: stockError.message,
@@ -744,6 +780,10 @@ router.put(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
     const { reason } = req.body;
+
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Purchase order not found');
+    }
 
     // Get purchase order
     const purchase = await shopDb

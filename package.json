@@ -5,7 +5,10 @@
   "private": true,
   "scripts": {
     "start": "cd server && npm start",
-    "install-all": "cd server && npm install && cd ../client && npm install"
+    "install-all": "cd server && npm install && cd ../client && npm install",
+    "lint": "cd server && npm run lint && cd ../client && npm run lint",
+    "test": "cd server && npm test",
+    "format": "cd server && npm run format && cd ../client && npm run format"
   },
   "engines": {
     "node": ">=18.0.0",

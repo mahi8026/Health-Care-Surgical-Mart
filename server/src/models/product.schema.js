@@ -25,8 +25,8 @@ const productSchema = {
           description: 'Product name - required',
         },
         category: {
-          enum: ['Medical', 'Lab', 'Surgical'],
-          description: 'Product category - must be Medical, Lab, or Surgical',
+          bsonType: 'string',
+          description: 'Product category (free-form, e.g. Medical, Lab, Surgical, Equipment, etc.)',
         },
         brand: {
           bsonType: 'string',

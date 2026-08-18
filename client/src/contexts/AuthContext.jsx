@@ -79,9 +79,14 @@ export const AuthProvider = ({ children }) => {
           });
 
           if (response.success && response.data?.user) {
-            // Update user state (cookie is automatically updated by backend)
+            // Update user state AND the rotated JWT (the backend issues a new
+            // token on every firebase-login — keeping the old one in
+            // localStorage would make the stored session stale/invalid)
             setMongoUser(response.data.user);
             localStorage.setItem("user", JSON.stringify(response.data.user));
+            if (response.data.token) {
+              localStorage.setItem("token", response.data.token);
+            }
             
             if (import.meta.env.DEV) {
               console.log('[AUTH] Token refreshed successfully');

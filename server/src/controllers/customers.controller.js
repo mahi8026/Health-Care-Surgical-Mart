@@ -76,7 +76,7 @@ class CustomersController extends BaseController {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
       const {
-        name, phone, email, address, type = 'Retail',
+        name, phone, email, address, type = 'Walk-in',
         creditEnabled = false, creditLimit = 0,
       } = req.body;
 
@@ -179,10 +179,10 @@ class CustomersController extends BaseController {
         return this.sendError(res, 'Customer not found', 404);
       }
 
-      // Check if customer has any sales
+      // Check if customer has any sales (sales store customerId as ObjectId)
       const salesCount = await shopDb
         .collection('sales')
-        .countDocuments({ customerId: req.params.id });
+        .countDocuments({ customerId: new ObjectId(req.params.id) });
 
       if (salesCount > 0) {
         return this.sendError(
@@ -232,7 +232,7 @@ class CustomersController extends BaseController {
       phone: phone.trim(),
       email: email?.trim() || null,
       address: address?.trim() || null,
-      type: type || 'Retail',
+      type: type || 'Walk-in',
       creditEnabled: creditEnabled === true || creditEnabled === 'true',
       creditLimit: parseFloat(creditLimit) || 0,
       currentDue: 0,
@@ -251,7 +251,7 @@ class CustomersController extends BaseController {
       phone: phone.trim(),
       email: email?.trim() || null,
       address: address?.trim() || null,
-      type: type || 'Retail',
+      type: type || 'Walk-in',
       updatedAt: new Date(),
       updatedBy: user.id || user._id,
     };

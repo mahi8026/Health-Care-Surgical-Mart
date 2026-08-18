@@ -90,6 +90,12 @@ class StockCommandService {
       throw new Error('Missing required parameters: shopId, productId, movementType, quantity');
     }
 
+    // Reject NaN/Infinity — NaN passes `quantity <= 0` checks and would
+    // silently corrupt the snapshot balance (NaN spreads through every $inc).
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity)) {
+      throw new Error('Quantity must be a finite number');
+    }
+
     // For SET type, allow quantity of 0 (setting stock to zero is valid)
     // For ADD/SUBTRACT, quantity must be positive
     if (movementType === 'ADJUSTMENT_SET') {
@@ -134,8 +140,25 @@ class StockCommandService {
           updatedAt: new Date()
         };
 
-        await shopDb.collection('stock_snapshots').insertOne(snapshot, { session });
-        logger.info(`Created missing stock snapshot for product ${productId}`);
+        try {
+          await shopDb.collection('stock_snapshots').insertOne(snapshot, { session });
+          logger.info(`Created missing stock snapshot for product ${productId}`);
+        } catch (snapshotError) {
+          // Concurrent creation (unique index on productId): re-read the
+          // winner's snapshot and continue with it
+          if (snapshotError.code === 11000) {
+            snapshot = await shopDb.collection('stock_snapshots').findOne(
+              { productId: productObjId },
+              { session },
+            );
+            if (!snapshot) {
+              throw snapshotError;
+            }
+            logger.info(`Reused concurrently-created stock snapshot for product ${productId}`);
+          } else {
+            throw snapshotError;
+          }
+        }
       }
 
       // 2. Calculate new balance

@@ -354,11 +354,10 @@ const validateProductData = (product, rowIndex) => {
 // Bulk import products
 router.post(
   '/bulk-import',
-  (req, res, next) => {
-    next();
-  },
-  requirePermission(PERMISSIONS.CREATE_PRODUCT),
+  // Order matters: authenticate FIRST (requirePermission needs req.user,
+  // and multer must not consume the body before auth rejects the request)
   authenticate,
+  requirePermission(PERMISSIONS.CREATE_PRODUCT),
   importUpload.single('file'),
   async (req, res) => {
     let filePath = null;

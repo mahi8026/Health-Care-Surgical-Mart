@@ -12,6 +12,7 @@ const {
 } = require('../middleware/auth-multi-tenant');
 const { requirePermission } = require('../utils/rbac');
 const { PERMISSIONS } = require('../utils/rbac');
+const { createError } = require('../config/error-handling');
 const customersController = require('../controllers/customers.controller');
 
 // Apply authentication to all routes
@@ -305,12 +306,50 @@ router.post(
       const results = [];
 
       for (const customer of customers) {
-        const agg = await shopDb.collection('sales').aggregate([
-          { $match: { customerId: customer._id } },
-          { $group: { _id: null, totalDue: { $sum: '$dueAmount' } } },
-        ]).toArray();
+        // currentDue is derived: outstanding balance on the customer's credit
+        // sales, minus payments recorded against the customer. Sales track
+        // totalOutstanding (what's still owed on that sale) — fall back to
+        // dueAmount + previousDue for legacy records. Only customer_payments
+        // reduce the due here; /sales/:id/pay-due already lowers
+        // totalOutstanding on the sale itself, so subtracting the payments
+        // collection would double-count.
+        const [salesAgg, paymentsAgg] = await Promise.all([
+          shopDb.collection('sales').aggregate([
+            { $match: { customerId: customer._id } },
+            {
+              $group: {
+                _id: null,
+                totalDue: {
+                  $sum: {
+                    $max: [
+                      { $ifNull: ['$totalOutstanding', 0] },
+                      {
+                        $add: [
+                          { $ifNull: ['$dueAmount', 0] },
+                          { $ifNull: ['$previousDue', 0] },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ]).toArray(),
+          shopDb.collection('customer_payments').aggregate([
+            { $match: { customerId: customer._id } },
+            {
+              $group: {
+                _id: null,
+                totalPaid: { $sum: { $ifNull: ['$amount', 0] } },
+              },
+            },
+          ]).toArray(),
+        ]);
 
-        const calculatedDue = agg[0]?.totalDue || 0;
+        const calculatedDue = Math.max(
+          0,
+          (salesAgg[0]?.totalDue || 0) - (paymentsAgg[0]?.totalPaid || 0),
+        );
         const previousDue = customer.currentDue || 0;
 
         if (Math.abs(calculatedDue - previousDue) > 0.01) {
@@ -513,8 +552,20 @@ router.get(
       const defaultStart = new Date(now);
       defaultStart.setDate(defaultStart.getDate() - 30);
 
-      const startDate = req.query.startDate ? new Date(req.query.startDate) : defaultStart;
-      const endDate = req.query.endDate ? new Date(req.query.endDate) : now;
+      const parsedStart = req.query.startDate
+        ? new Date(req.query.startDate)
+        : defaultStart;
+      const parsedEnd = req.query.endDate ? new Date(req.query.endDate) : now;
+      if (
+        Number.isNaN(parsedStart.getTime()) ||
+        Number.isNaN(parsedEnd.getTime())
+      ) {
+        throw createError.badRequest(
+          'Invalid startDate/endDate: must be valid dates',
+        );
+      }
+      const startDate = parsedStart;
+      const endDate = parsedEnd;
       // Include the full end day
       endDate.setHours(23, 59, 59, 999);
 

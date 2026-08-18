@@ -12,9 +12,20 @@ const {
 const { requirePermission } = require('../utils/rbac');
 const { PERMISSIONS } = require('../utils/rbac');
 const { getShopDatabase } = require('../config/database');
-const { asyncHandler } = require('../config/error-handling');
+const { asyncHandler, createError } = require('../config/error-handling');
 const { cacheResponse, queryHash } = require('../middleware/cache.middleware');
 const { TTL } = require('../services/cache.service');
+
+// Parse an optional date query param; invalid values → 400 instead of a 500
+// from a BSON conversion error mid-pipeline.
+function parseDateParam(value, name) {
+  if (!value) {return null;}
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw createError.badRequest(`Invalid ${name}: must be a valid date`);
+  }
+  return date;
+}
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -227,12 +238,12 @@ router.get(
 
     // Set default date range if not provided
     const today = new Date();
-    const defaultStartDate = startDate
-      ? new Date(startDate)
-      : new Date(today.getFullYear(), today.getMonth(), 1); // Start of current month
-    const defaultEndDate = endDate
-      ? new Date(endDate)
-      : new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of current month
+    const defaultStartDate =
+      parseDateParam(startDate, 'startDate') ||
+      new Date(today.getFullYear(), today.getMonth(), 1); // Start of current month
+    const defaultEndDate =
+      parseDateParam(endDate, 'endDate') ||
+      new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of current month
 
     // Sales Revenue — includes ALL sales (accrual basis): a credit or partial
     // sale is still revenue for the period even if not yet collected.
@@ -490,7 +501,7 @@ router.get(
     const shopDb = getShopDatabase(req.user.shopId);
     const { date } = req.query;
 
-    const targetDate = date ? new Date(date) : new Date();
+    const targetDate = parseDateParam(date, 'date') || new Date();
     const startOfDay = new Date(
       targetDate.getFullYear(),
       targetDate.getMonth(),
@@ -733,12 +744,12 @@ router.get(
     const limit = Math.min(parseInt(queryLimit) || 20, 100);
 
     const today = new Date();
-    const defaultStartDate = startDate
-      ? new Date(startDate)
-      : new Date(today.getFullYear(), today.getMonth(), 1);
-    const defaultEndDate = endDate
-      ? new Date(endDate)
-      : new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const defaultStartDate =
+      parseDateParam(startDate, 'startDate') ||
+      new Date(today.getFullYear(), today.getMonth(), 1);
+    const defaultEndDate =
+      parseDateParam(endDate, 'endDate') ||
+      new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const productsCollectionName = 'products';
 
@@ -769,7 +780,9 @@ router.get(
             category: { $first: '$product.category' },
             totalQuantitySold: { $sum: '$items.qty' },
             totalRevenue: { $sum: '$items.total' },
-            averageSellingPrice: { $avg: '$items.price' },
+            averageSellingPrice: {
+              $avg: { $ifNull: ['$items.rate', '$items.price'] },
+            },
             purchasePrice: { $first: '$product.purchasePrice' },
             totalCost: {
               $sum: {
@@ -915,12 +928,12 @@ router.get(
     const { startDate, endDate } = req.query;
 
     const today = new Date();
-    const defaultStartDate = startDate
-      ? new Date(startDate)
-      : new Date(today.getFullYear(), today.getMonth(), 1);
-    const defaultEndDate = endDate
-      ? new Date(endDate)
-      : new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const defaultStartDate =
+      parseDateParam(startDate, 'startDate') ||
+      new Date(today.getFullYear(), today.getMonth(), 1);
+    const defaultEndDate =
+      parseDateParam(endDate, 'endDate') ||
+      new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     // Return analysis by reason
     const returnsByReason = await shopDb
@@ -1076,12 +1089,12 @@ router.get(
     const { startDate, endDate } = req.query;
 
     const today = new Date();
-    const defaultStartDate = startDate
-      ? new Date(startDate)
-      : new Date(today.getFullYear(), today.getMonth(), 1);
-    const defaultEndDate = endDate
-      ? new Date(endDate)
-      : new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const defaultStartDate =
+      parseDateParam(startDate, 'startDate') ||
+      new Date(today.getFullYear(), today.getMonth(), 1);
+    const defaultEndDate =
+      parseDateParam(endDate, 'endDate') ||
+      new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     // Cash inflows (sales) — actual cash collected, regardless of payment
     // status: cashPaid + bankPaid are the real money that moved. A partial

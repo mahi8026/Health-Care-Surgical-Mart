@@ -31,6 +31,9 @@ const PERMISSIONS = {
   VIEW_SALES: 'view_sales',
   MANAGE_SALES: 'manage_sales', // Admin-level sales management (edit, delete, send invoice)
 
+  // Notifications
+  SEND_BULK_SMS: 'send_bulk_sms',
+
   // Returns
   CREATE_RETURN: 'create_return',
   EDIT_RETURN: 'edit_return',
@@ -88,7 +91,7 @@ const PERMISSIONS = {
   MANAGE_PRODUCTS: 'manage_products',
 
   // Sales (additional)
-  MANAGE_SALES: 'manage_sales',
+  MANAGE_SALES: 'manage_sales', // (duplicate key kept for backward compat)
 
   // Reports (additional)
   VIEW_REPORTS: 'view_reports',
@@ -175,6 +178,7 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.MANAGE_PRODUCTS,
     PERMISSIONS.MANAGE_SALES,
     PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.SEND_BULK_SMS,
   ],
 
 };

@@ -807,9 +807,6 @@ router.put(
   })
 );
 
-module.exports = router;
-
-
 /**
  * POST /api/stock/adjust
  * Manual stock adjustment (add, subtract, or set exact quantity)
@@ -822,19 +819,24 @@ router.post(
     const { productId, adjustmentType, quantity, reason, notes } = req.body;
 
     // Validation
-    if (!productId || !adjustmentType || quantity === undefined) {
+    if (!productId || !ObjectId.isValid(productId) || !adjustmentType || quantity === undefined) {
       throw createError.badRequest('Missing required fields: productId, adjustmentType, quantity');
+    }
+
+    const parsedQuantity = parseFloat(quantity);
+    if (!Number.isFinite(parsedQuantity)) {
+      throw createError.badRequest('Quantity must be a valid number');
     }
 
     if (!['ADD', 'SUBTRACT', 'SET'].includes(adjustmentType)) {
       throw createError.badRequest('Invalid adjustmentType. Must be: ADD, SUBTRACT, or SET');
     }
 
-    if (adjustmentType !== 'SET' && quantity <= 0) {
+    if (adjustmentType !== 'SET' && parsedQuantity <= 0) {
       throw createError.badRequest('Quantity must be positive for ADD/SUBTRACT');
     }
 
-    if (adjustmentType === 'SET' && quantity < 0) {
+    if (adjustmentType === 'SET' && parsedQuantity < 0) {
       throw createError.badRequest('Quantity cannot be negative for SET');
     }
 
@@ -850,7 +852,7 @@ router.post(
       shopId: req.user.shopId,
       productId: new ObjectId(productId),
       movementType,
-      quantity: parseFloat(quantity),
+      quantity: parsedQuantity,
       userId: req.user._id,
       referenceType: 'ADJUSTMENT',
       note: `${reason || 'Manual adjustment'}: ${notes || ''}`,
@@ -900,15 +902,19 @@ router.post(
 
     for (const item of items) {
       try {
-        if (!item.productId || item.quantity === undefined) {
+        if (!item.productId || !ObjectId.isValid(item.productId) || item.quantity === undefined) {
           throw new Error('Missing productId or quantity');
+        }
+        const parsedQty = parseFloat(item.quantity);
+        if (!Number.isFinite(parsedQty) || parsedQty < 0) {
+          throw new Error('Quantity must be a valid non-negative number');
         }
 
         const result = await stockCommand.recordMovement({
           shopId: req.user.shopId,
           productId: new ObjectId(item.productId),
           movementType: 'OPENING_STOCK',
-          quantity: parseFloat(item.quantity),
+          quantity: parsedQty,
           userId: req.user._id,
           referenceType: 'OPENING_STOCK',
           costPrice: item.costPrice ? parseFloat(item.costPrice) : null,
@@ -1001,7 +1007,17 @@ router.post(
         createdAt: new Date(),
       };
 
-      await shopDb.collection('stock_snapshots').insertOne(snapshot);
+      // The productId unique index makes this safe against concurrent runs —
+      // a duplicate-key race is treated as "already exists" instead of an error
+      try {
+        await shopDb.collection('stock_snapshots').insertOne(snapshot);
+      } catch (insertError) {
+        if (insertError.code === 11000) {
+          skipped++;
+          continue;
+        }
+        throw insertError;
+      }
       created++;
 
       results.push({
@@ -1032,3 +1048,5 @@ router.post(
     });
   })
 );
+
+module.exports = router;

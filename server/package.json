@@ -17,9 +17,9 @@
     "format": "prettier --write \"src/**/*.{js,json,md}\"",
     "seed": "node src/utils/database-initializer.js",
     "seed:test": "node src/scripts/seed-test-data.js",
-    "migrate": "node database/migrations/migrate.js",
+    "migrate": "node scripts/migrate-users.js && node scripts/migrate-old-schema-to-new.js && node scripts/migrate-missing-snapshots.js",
     "security:audit": "npm audit",
-    "logs": "tail -f ../logs/app.log"
+    "logs": "node -e \"const fs=require('fs'),path=require('path');const d=path.join(__dirname,'logs');const files=fs.existsSync(d)?fs.readdirSync(d).filter(x=>x.startsWith('app-')&&x.endsWith('.log')):[];const latest=files.sort().pop();if(!latest){console.log('No app log files found in '+d);process.exit(0)}const p=path.join(d,latest);const s=fs.statSync(p).size;const start=Math.max(0,s-16384);const tail=fs.readFileSync(p,'utf8').slice(start).split('\\n').slice(-200).join('\\n');console.log('--- '+latest+' (last 200 lines) ---');console.log(tail)\""
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",

@@ -433,13 +433,13 @@ async function getRecurringTemplates(shopId, filters = {}) {
       { $match: matchQuery },
       {
         $lookup: {
-          from: 'expenseCategories',
+          from: 'expense_categories',
           localField: 'categoryId',
           foreignField: '_id',
           as: 'category',
         },
       },
-      { $unwind: '$category' },
+      { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: 'users',
@@ -448,7 +448,7 @@ async function getRecurringTemplates(shopId, filters = {}) {
           as: 'createdByUser',
         },
       },
-      { $unwind: '$createdByUser' },
+      { $unwind: { path: '$createdByUser', preserveNullAndEmptyArrays: true } },
       { $sort: { 'recurringConfig.nextDueDate': 1 } },
     ])
     .toArray();

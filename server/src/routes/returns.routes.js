@@ -409,6 +409,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Return record not found');
+    }
+
     const returnRecord = await shopDb
       .collection('returns')
       .findOne({ _id: new ObjectId(req.params.id) });
@@ -434,6 +438,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const shopDb = getShopDatabase(req.user.shopId);
 
+    if (!ObjectId.isValid(req.params.saleId)) {
+      throw createError.notFound('Original sale not found');
+    }
+
     const sale = await shopDb
       .collection('sales')
       .findOne({ _id: new ObjectId(req.params.saleId) });
@@ -453,6 +461,7 @@ router.get(
     existingReturns.forEach((returnRecord) => {
       if (returnRecord.status !== 'cancelled') {
         returnRecord.items.forEach((item) => {
+          if (!item.productId) {return;}
           const key = item.productId.toString();
           returnedQuantities[key] =
             (returnedQuantities[key] || 0) + item.returnQuantity;
@@ -463,12 +472,14 @@ router.get(
     // Add returnable quantities to sale items
     const saleWithReturnInfo = {
       ...sale,
-      items: sale.items.map((item) => ({
-        ...item,
-        returnedQuantity: returnedQuantities[item.productId.toString()] || 0,
-        returnableQuantity:
-          item.qty - (returnedQuantities[item.productId.toString()] || 0),
-      })),
+      items: sale.items
+        .filter((item) => item.productId)
+        .map((item) => ({
+          ...item,
+          returnedQuantity: returnedQuantities[item.productId.toString()] || 0,
+          returnableQuantity:
+            item.qty - (returnedQuantities[item.productId.toString()] || 0),
+        })),
       existingReturns,
     };
 
@@ -505,6 +516,10 @@ router.post(
       throw createError.badRequest(
         'Original sale ID and return items are required',
       );
+    }
+
+    if (!ObjectId.isValid(originalSaleId)) {
+      throw createError.badRequest('Invalid original sale ID');
     }
 
     // Idempotency: a retry with the same key returns the already-created
@@ -547,13 +562,15 @@ router.post(
         returnReason: itemReason,
       } = returnItem;
 
-      if (!productId || !returnQuantity || returnQuantity <= 0) {
+      if (!productId || !ObjectId.isValid(productId) || !returnQuantity || returnQuantity <= 0) {
         throw createError.badRequest('Invalid return item data');
       }
 
-      // Find the original sale item
+      // Find the original sale item (custom items have no productId — skip)
       const originalItem = originalSale.items.find(
-        (item) => item.productId.toString() === productId.toString(),
+        (item) =>
+          item.productId &&
+          item.productId.toString() === productId.toString(),
       );
 
       if (!originalItem) {
@@ -598,7 +615,14 @@ router.post(
         throw createError.badRequest(`Product ${productId} not found`);
       }
 
-      const itemReturnAmount = (originalItem.sellingPrice || originalItem.saleRate || originalItem.price || 0) * returnQuantity;
+      // Sale items store the selling price in `rate` (schema-required field)
+      const unitPrice =
+        originalItem.rate ||
+        originalItem.sellingPrice ||
+        originalItem.saleRate ||
+        originalItem.price ||
+        0;
+      const itemReturnAmount = unitPrice * returnQuantity;
       totalReturnAmount += itemReturnAmount;
 
       returnItems.push({
@@ -607,7 +631,7 @@ router.post(
         sku: originalItem.sku,
         originalQuantity: originalItem.qty,
         returnQuantity: parseInt(returnQuantity),
-        price: originalItem.sellingPrice || originalItem.saleRate || originalItem.price || 0,
+        price: unitPrice,
         costPrice: originalItem.costPrice || product.purchasePrice || 0,
         total: itemReturnAmount,
         returnReason: itemReason || returnReason,
@@ -625,16 +649,29 @@ router.post(
     const originalSubtotal = originalSale.subtotal || originalSale.grandTotal;
     const returnRatio = totalReturnAmount / originalSubtotal;
 
-    const refundDiscount = (originalSale.discount || 0) * returnRatio;
+    const refundDiscount = (originalSale.discountAmount || originalSale.discount || 0) * returnRatio;
     const refundVAT = (originalSale.vatAmount || 0) * returnRatio;
     const totalRefundAmount = totalReturnAmount - refundDiscount + refundVAT;
+
+    // How much of the original sale's outstanding due this return settles
+    // (persisted on the return so a later cancel can restore it exactly)
+    const originalPaymentMethod = originalSale.paymentMethod?.toLowerCase();
+    const originalDue = originalSale.dueAmount || 0;
+    const saleCustomerId = originalSale.customerId || customer?.id;
+    const isCreditSettled =
+      (originalPaymentMethod === 'credit' || originalDue > 0) &&
+      saleCustomerId &&
+      ObjectId.isValid(saleCustomerId);
+    const dueReduction = isCreditSettled
+      ? Math.min(totalRefundAmount, originalDue)
+      : 0;
 
     // Create return record
     const returnData = {
       returnNumber,
       originalSaleId: originalSaleId,
       originalInvoiceNumber:
-        originalInvoiceNumber || originalSale.invoiceNumber,
+        originalInvoiceNumber || originalSale.invoiceNo || originalSale.invoiceNumber,
       customer: customer || originalSale.customer,
       items: returnItems,
       returnReason,
@@ -644,6 +681,7 @@ router.post(
       discount: refundDiscount,
       vatAmount: refundVAT,
       totalRefund: totalRefundAmount,
+      dueReduction,
       status: 'completed', // 'pending', 'completed', 'cancelled'
       returnDate: new Date(),
       notes: notes || '',
@@ -703,6 +741,7 @@ router.post(
         // Create a return batch
         await shopDb.collection('stock_batches').insertOne({
           productId: item.productId,
+          shopId: req.user.shopId, // Required — other batch writes set shopId
           batchNo: item.batchNumber || `RET-${returnNumber}`,
           lotNo: null,
           quantity: item.returnQuantity,
@@ -751,14 +790,7 @@ router.post(
       // Credit/partial sales: refunding item value must reduce the customer's
       // outstanding due too, otherwise money is lost twice (refund handed out,
       // but due never lowered). Reduce up to the refund amount, never negative.
-      const originalPaymentMethod = originalSale.paymentMethod?.toLowerCase();
-      const originalDue = originalSale.dueAmount || 0;
-      const saleCustomerId = originalSale.customerId || customer?.id;
-      if (
-        (originalPaymentMethod === 'credit' || originalDue > 0) &&
-        saleCustomerId &&
-        ObjectId.isValid(saleCustomerId)
-      ) {
+      if (isCreditSettled) {
         await shopDb.collection('customers').updateOne(
           { _id: new ObjectId(saleCustomerId) },
           [
@@ -772,6 +804,20 @@ router.post(
             },
           ],
         );
+
+        // Keep the sale's own due books in sync — customer.currentDue is derived
+        // from sale.dueAmount/totalOutstanding (see /customers/recalculate-due),
+        // so the sale must be reduced by the same amount or recalculation would
+        // undo this refund adjustment.
+        if (dueReduction > 0) {
+          await shopDb.collection('sales').updateOne(
+            { _id: new ObjectId(originalSaleId) },
+            {
+              $inc: { dueAmount: -dueReduction, totalOutstanding: -dueReduction },
+              $set: { updatedAt: new Date() },
+            },
+          );
+        }
       }
 
       res.status(201).json({
@@ -806,6 +852,10 @@ router.put(
       throw createError.badRequest('Invalid status');
     }
 
+    if (!ObjectId.isValid(req.params.id)) {
+      throw createError.notFound('Return record not found');
+    }
+
     const returnRecord = await shopDb
       .collection('returns')
       .findOne({ _id: new ObjectId(req.params.id) });
@@ -834,6 +884,44 @@ router.put(
             reason: notes || 'Return cancelled'
           }
         });
+      }
+
+      // Remove the return batch created when the return was processed
+      await shopDb.collection('stock_batches').deleteMany({
+        referenceId: returnRecord._id,
+        source: 'RETURN',
+      });
+
+      // Reverse the customer due reduction and the sale due reduction exactly
+      // as they were applied on return creation (dueReduction persisted there)
+      const reduction = returnRecord.dueReduction || 0;
+      if (reduction > 0) {
+        const originalSale = await shopDb
+          .collection('sales')
+          .findOne({ _id: new ObjectId(returnRecord.originalSaleId) });
+        const custId = originalSale?.customerId;
+        if (custId && ObjectId.isValid(custId)) {
+          await shopDb.collection('customers').updateOne(
+            { _id: new ObjectId(custId) },
+            { $inc: { currentDue: reduction }, $set: { updatedAt: new Date() } },
+          );
+        }
+        if (originalSale) {
+          await shopDb.collection('sales').updateOne(
+            { _id: originalSale._id },
+            {
+              $inc: { dueAmount: reduction, totalOutstanding: reduction },
+              $pull: { returns: { returnId: returnRecord._id } },
+              $set: { updatedAt: new Date() },
+            },
+          );
+        }
+      } else if (returnRecord.originalSaleId && ObjectId.isValid(returnRecord.originalSaleId)) {
+        // No due was reduced — still detach the return reference from the sale
+        await shopDb.collection('sales').updateOne(
+          { _id: new ObjectId(returnRecord.originalSaleId) },
+          { $pull: { returns: { returnId: returnRecord._id } }, $set: { updatedAt: new Date() } },
+        );
       }
     }
 

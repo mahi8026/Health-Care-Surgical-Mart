@@ -28,6 +28,20 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
 
+    services:
+      mongodb:
+        # Same pin as ci.yml — mongo:8.0.5+ crash on ubuntu-latest Linux
+        # kernels >= 6.19 (TCMalloc/rseq incompatibility)
+        image: mongo:8.0.4
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

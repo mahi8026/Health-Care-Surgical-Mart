@@ -299,7 +299,12 @@ const xssProtection = (req, res, next) => {
     if (typeof str !== 'string') {return str;}
 
     for (const pattern of xssPatterns) {
+      // Global-flag regexes keep state in lastIndex — reset it before every
+      // test, otherwise alternate calls start matching mid-string and
+      // malicious payloads slip through unsanitized.
+      pattern.lastIndex = 0;
       if (pattern.test(str)) {
+        pattern.lastIndex = 0;
         logSecurityEvent('xss_attempt', {
           ip: req.ip,
           url: req.url,

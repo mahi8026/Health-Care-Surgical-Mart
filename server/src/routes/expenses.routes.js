@@ -375,9 +375,19 @@ router.get(
 
     // Date range filter
     if (startDate || endDate) {
+      const parsedStart = startDate ? new Date(startDate) : null;
+      const parsedEnd = endDate ? new Date(endDate) : null;
+      if (
+        (parsedStart && Number.isNaN(parsedStart.getTime())) ||
+        (parsedEnd && Number.isNaN(parsedEnd.getTime()))
+      ) {
+        throw createError.badRequest(
+          'Invalid startDate/endDate: must be valid dates',
+        );
+      }
       matchQuery.expenseDate = {};
-      if (startDate) {matchQuery.expenseDate.$gte = new Date(startDate);}
-      if (endDate) {matchQuery.expenseDate.$lte = new Date(endDate);}
+      if (parsedStart) {matchQuery.expenseDate.$gte = parsedStart;}
+      if (parsedEnd) {matchQuery.expenseDate.$lte = parsedEnd;}
     }
 
     // Category filter - support multiple categories
@@ -707,7 +717,7 @@ router.get(
             as: 'createdByUser',
           },
         },
-        { $unwind: '$createdByUser' },
+        { $unwind: { path: '$createdByUser', preserveNullAndEmptyArrays: true } },
       ])
       .toArray();
 
