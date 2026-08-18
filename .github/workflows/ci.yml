@@ -86,7 +86,14 @@ jobs:
         working-directory: server
         run: |
           npm run test:ci 2>&1 | tee jest-ci.log
-          exit ${PIPESTATUS[0]}
+          status=${PIPESTATUS[0]}
+          if [ $status -ne 0 ]; then
+            sed 's/\x1b\[[0-9;]*m//g' jest-ci.log \
+              | grep -E "FAIL|✕|●|Expected|Received|at Object|Test Suites:|Tests:|Cannot find|Error:" \
+              | grep -v "console.warn\|console.error" \
+              | head -30 | while IFS= read -r line; do echo "::error::$line"; done
+          fi
+          exit $status
 
       - name: Upload jest log (diagnostics)
         if: always()
