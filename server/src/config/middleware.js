@@ -6,8 +6,6 @@
 const { authenticate } = require('../middleware/auth-multi-tenant');
 const {
   createRateLimiters,
-  createValidators,
-  handleValidationErrors,
   xssProtection,
 } = require('./security');
 const {
@@ -29,20 +27,15 @@ const setupMiddleware = (app) => {
   app.use(xssProtection);
 
   // Rate limiters
-  const { apiLimiter, authLimiter, passwordResetLimiter } =
+  const { authLimiter, passwordResetLimiter } =
     createRateLimiters();
 
   // Apply rate limiters to specific routes
   app.use(['/api/auth/login', '/api/auth/firebase-login'], authLimiter);
   app.use('/api/auth/request-password-reset', passwordResetLimiter);
-  // Global API limiter — skip auth paths so login attempts are not
-  // double-counted (authLimiter already covers them)
-  app.use('/api', (req, res, next) => {
-    if (req.path.startsWith('/auth/')) {
-      return next();
-    }
-    return apiLimiter(req, res, next);
-  });
+  // NOTE: the global /api rate limiter is applied in server.js so requests
+  // are not counted TWICE (server.js global limiter + this one). server.js's
+  // limiter skips development and /auth/* paths (authLimiter covers those).
 
   // Request ID middleware for tracking
   app.use((req, res, next) => {
@@ -70,16 +63,7 @@ const setupMiddleware = (app) => {
   });
 };
 
-/**
- * Get validation middleware for different entities
- */
-const getValidators = () => {
-  return createValidators();
-};
-
 module.exports = {
   setupMiddleware,
-  getValidators,
-  handleValidationErrors,
   authenticate,
 };

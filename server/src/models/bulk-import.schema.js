@@ -11,7 +11,7 @@ const bulkImportSchema = {
       required: ['shopId', 'fileName', 'fileSize', 'fileType', 'status', 'uploadedBy'],
       properties: {
         _id: { bsonType: 'objectId' },
-        shopId: { bsonType: 'objectId', description: 'Reference to shop - required' },
+        shopId: { bsonType: ['string', 'objectId'], description: 'Reference to shop - required (string in single-tenant mode)' },
         fileName: { bsonType: 'string', description: 'Original file name - required' },
         fileSize: { bsonType: 'number', description: 'File size in bytes - required' },
         fileType: {

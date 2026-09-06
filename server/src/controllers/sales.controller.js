@@ -8,6 +8,13 @@ const { logger } = require('../config/logging');
 const EmailService = require('../services/email/email.service');
 const { cacheService } = require('../services/cache.service');
 const { client: getMongoClient } = require('../config/database');
+const { escapeRegex } = require('../utils/validator');
+
+/**
+ * Round a money value to 2 decimal places (paisa/cent). Prevents floating
+ * point drift from accumulating across repeated due/credit updates.
+ */
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 class SalesController {
   /**
@@ -66,15 +73,25 @@ class SalesController {
           });
         }
 
+        // For credit sales the amount that goes on credit is whatever the
+        // customer does NOT pay upfront (cash/bank), not the full grandTotal.
+        const creditPaid = round2(
+          (parseFloat(cashPaid) || 0) + (parseFloat(bankPaid) || 0),
+        );
+        const creditAmount = Math.max(
+          0,
+          round2(parseFloat(grandTotal) - creditPaid),
+        );
+
         const currentDue = creditCustomer.currentDue || 0;
         const creditLimit = creditCustomer.creditLimit || 0;
-        const newDue = currentDue + parseFloat(grandTotal);
+        const newDue = round2(currentDue + creditAmount);
 
         if (newDue > creditLimit) {
-          const available = Math.max(0, creditLimit - currentDue);
+          const available = Math.max(0, round2(creditLimit - currentDue));
           return res.status(400).json({
             success: false,
-            message: `Credit limit exceeded. Available credit: ?${available.toFixed(2)} (Limit: ?${creditLimit.toFixed(2)}, Current due: ?${currentDue.toFixed(2)})`,
+            message: `Credit limit exceeded. Available credit: ৳${available.toFixed(2)} (Limit: ৳${creditLimit.toFixed(2)}, Current due: ৳${currentDue.toFixed(2)})`,
           });
         }
       }
@@ -189,6 +206,14 @@ class SalesController {
             // Validate every item's stock BEFORE inserting the sale to avoid an
             // orphan sale (sale committed, stock never deducted).
             const fallbackPlan = await this._allocateStockForSale(enrichedItems, req.user.shopId);
+            // Enforce the credit limit BEFORE the sale insert: this update is
+            // conditional on the customer's credit limit, so a rejection here
+            // means nothing was written at all.
+            if (customer?.id) {
+              await this._updateCustomerAfterSale(
+                req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
+              );
+            }
             const result = await req.shopDb.collection('sales').insertOne(sale);
             insertedId = result.insertedId;
             for (const { item, batchAllocations } of fallbackPlan) {
@@ -196,11 +221,6 @@ class SalesController {
                 continue;
               }
               await this._recordStockMovement(item, batchAllocations, null, insertedId, req.user._id, req.user.shopId);
-            }
-            if (customer?.id) {
-              await this._updateCustomerAfterSale(
-                req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
-              );
             }
           } else {
             throw txError;
@@ -214,6 +234,12 @@ class SalesController {
         // Validate stock BEFORE inserting the sale (avoid orphan sale on
         // insufficient stock).
         const legacyPlan = await this._allocateStockForSale(enrichedItems, req.user.shopId);
+        // Enforce the credit limit BEFORE the sale insert (see comment above).
+        if (customer?.id) {
+          await this._updateCustomerAfterSale(
+            req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
+          );
+        }
         const result = await req.shopDb.collection('sales').insertOne(sale);
         insertedId = result.insertedId;
         for (const { item, batchAllocations } of legacyPlan) {
@@ -221,11 +247,6 @@ class SalesController {
             continue;
           }
           await this._recordStockMovement(item, batchAllocations, null, insertedId, req.user._id, req.user.shopId);
-        }
-        if (customer?.id) {
-          await this._updateCustomerAfterSale(
-            req.shopDb, customer.id, parseFloat(grandTotal), req.body.paymentMethod, null, sale.dueAmount,
-          );
         }
       }
 
@@ -241,7 +262,7 @@ class SalesController {
         const auditLog = require('../services/audit-log.service');
         const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
         auditLog.log(req, AUDIT_ACTIONS.SALE_CREATED, 'sale', insertedId.toString(),
-          `Created sale ${sale.invoiceNo} � total ?${sale.grandTotal}`,
+          `Created sale ${sale.invoiceNo} � total ৳${sale.grandTotal}`,
           { after: { invoiceNo: sale.invoiceNo, grandTotal: sale.grandTotal, itemCount: enrichedItems.length } }
         );
       } catch (_) { /* never block the response */ }
@@ -273,6 +294,14 @@ class SalesController {
 
       // Insufficient stock → 400 (not 500)
       if (error.message?.startsWith('Insufficient stock')) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+
+      // Credit limit exceeded (atomic guard) → 400 (not 500)
+      if (
+        error.code === 'CREDIT_LIMIT_EXCEEDED' ||
+        error.statusCode === 400
+      ) {
         return res.status(400).json({ success: false, message: error.message });
       }
 
@@ -395,14 +424,23 @@ class SalesController {
           throw new Error('Custom items must have a customName');
         }
 
+        const customQty = this._parseItemQty(item);
+        if (!isFinite(customQty) || customQty <= 0) {
+          throw new Error(`Invalid quantity for custom item "${item.customName}"`);
+        }
+        const customRate = parseFloat(item.sellingPrice);
+        if (!isFinite(customRate) || customRate < 0) {
+          throw new Error(`Invalid selling price for custom item "${item.customName}"`);
+        }
+
         enrichedItems.push({
           productId: null,
           customName: item.customName,
           name: item.customName,
-          rate: parseFloat(item.sellingPrice),
+          rate: customRate,
           costPrice: 0,
-          qty: parseFloat(item.quantity),
-          total: parseFloat(item.sellingPrice) * parseFloat(item.quantity),
+          qty: customQty,
+          total: customRate * customQty,
         });
         continue;
       }
@@ -437,9 +475,13 @@ class SalesController {
         productId: product._id,
       });
 
-      if (!stock || stock.currentQty < item.quantity) {
+      const qty = this._parseItemQty(item);
+      if (!isFinite(qty) || qty <= 0) {
+        throw new Error(`Invalid quantity for "${product.name}"`);
+      }
+      if (!stock || stock.currentQty < qty) {
         logger.warn(
-          `Warning: Insufficient stock for ${product.name}. Available: ${stock?.currentQty || 0}, Requested: ${item.quantity}`,
+          `Warning: Insufficient stock for ${product.name}. Available: ${stock?.currentQty || 0}, Requested: ${qty}`,
         );
       }
 
@@ -452,19 +494,31 @@ class SalesController {
         );
       }
 
+      const rate = parseFloat(item.sellingPrice || product.sellingPrice);
+      if (!isFinite(rate) || rate < 0) {
+        throw new Error(`Invalid selling price for "${product.name}"`);
+      }
       enrichedItems.push({
         productId: product._id,
         name: product.name,
-        rate: parseFloat(item.sellingPrice || product.sellingPrice),
+        rate,
         costPrice: parseFloat(product.purchasePrice || 0),
-        qty: parseFloat(item.quantity),
-        total:
-          parseFloat(item.sellingPrice || product.sellingPrice) *
-          parseFloat(item.quantity),
+        qty,
+        total: rate * qty,
       });
     }
 
     return enrichedItems;
+  }
+
+  /**
+   * Resolve quantity from either `qty` (schema field) or `quantity`
+   * (legacy POS client field). Returns NaN when absent/invalid so callers
+   * can reject the sale with a clear error instead of persisting a NaN.
+   */
+  _parseItemQty(item) {
+    const raw = item.qty !== undefined ? item.qty : item.quantity;
+    return parseFloat(raw);
   }
 
   /**
@@ -489,18 +543,20 @@ class SalesController {
     vatAmount, vatPercent, grandTotal, cashPaid, bankPaid,
     paymentMethod, _dueAmount, previousDue = 0, notes, user,
   }) {
-    const paid = (parseFloat(cashPaid) || 0) + (parseFloat(bankPaid) || 0);
-    const due = paymentMethod === 'credit'
-      ? parseFloat(grandTotal)
-      : Math.max(0, parseFloat(grandTotal) - paid);
+    const paid = round2((parseFloat(cashPaid) || 0) + (parseFloat(bankPaid) || 0));
+    const grand = round2(parseFloat(grandTotal));
+    // Due is the unpaid portion for EVERY payment method — including credit.
+    // A "credit" sale with upfront cash/bank only puts the remainder on
+    // credit (previously the cash portion was silently dropped).
+    const due = Math.max(0, round2(grand - paid));
 
-    const parsedSubtotal = parseFloat(subtotal) || 0;
-    const discountAmount = parseFloat(discount) || 0;
+    const parsedSubtotal = round2(parseFloat(subtotal) || 0);
+    const discountAmount = round2(parseFloat(discount) || 0);
     const discountPercent = parsedSubtotal > 0
       ? Math.round((discountAmount / parsedSubtotal) * 100 * 100) / 100
       : 0;
 
-    const totalOutstanding = (parseFloat(previousDue) || 0) + due;
+    const totalOutstanding = round2((parseFloat(previousDue) || 0) + due);
 
     return {
       invoiceNo,
@@ -515,12 +571,12 @@ class SalesController {
       discountPercent: discountPercent,
       vatAmount: parseFloat(vatAmount) || 0,
       vatPercent: parseFloat(vatPercent) || 0,
-      grandTotal: parseFloat(grandTotal),
-      cashPaid: paymentMethod === 'credit' ? 0 : (parseFloat(cashPaid) || 0),
-      bankPaid: paymentMethod === 'credit' ? 0 : (parseFloat(bankPaid) || 0),
-      returnAmount: paymentMethod === 'credit' ? 0 : Math.max(0, paid - parseFloat(grandTotal)),
+      grandTotal: grand,
+      cashPaid: round2(parseFloat(cashPaid) || 0),
+      bankPaid: round2(parseFloat(bankPaid) || 0),
+      returnAmount: Math.max(0, round2(paid - grand)),
       dueAmount: due,
-      previousDue: parseFloat(previousDue) || 0,
+      previousDue: round2(parseFloat(previousDue) || 0),
       totalOutstanding,
       paymentMethod: paymentMethod || 'cash',
       paymentStatus: due > 0 ? (paymentMethod === 'credit' ? 'Credit' : 'Partial') : 'Paid',
@@ -534,28 +590,71 @@ class SalesController {
 
   /**
    * Update customer totals after a sale
+   *
+   * For credit sales the currentDue increment is conditional: the update only
+   * matches when `currentDue + saleTotal <= creditLimit`. This closes the
+   * check-then-act race where two concurrent credit sales both pass the
+   * pre-validation and jointly exceed the customer's credit limit.
+   *
+   * Throws a 400-class error when a credit sale would exceed the limit, so a
+   * transactional caller aborts the whole sale (session path), and a
+   * non-transactional caller can reject BEFORE inserting anything (the
+   * fallback call sites invoke this method prior to the sale insert).
    */
   async _updateCustomerAfterSale(shopDb, customerId, saleTotal, paymentMethod, session = null, dueAmount = 0) {
-    try {
-      const update = {
-        // totalPurchases is a count of sale records, not a second money total
-        $inc: { totalPurchased: saleTotal, totalPurchases: 1 },
-        $set: { lastPurchaseDate: new Date(), updatedAt: new Date() },
-      };
-      // Add to currentDue for credit sales OR partial payments
-      if (paymentMethod === 'credit') {
-        update.$inc.currentDue = saleTotal;
-      } else if (dueAmount > 0) {
-        update.$inc.currentDue = dueAmount;
+    const saleTotalRounded = round2(saleTotal);
+    const dueAmountRounded = round2(dueAmount);
+    // The amount that goes on the customer's due balance is the sale's
+    // outstanding portion (sale.dueAmount) for EVERY payment method:
+    //   - pure credit                       → full total
+    //   - mixed cash+credit                 → only the unpaid remainder
+    //   - fully-prepaid credit / cash sale  → 0 (no credit extended)
+    const creditChange = Math.max(0, dueAmountRounded);
+
+    const update = {
+      // totalPurchases is a count of sale records, not a second money total
+      $inc: { totalPurchased: saleTotalRounded, totalPurchases: 1 },
+      $set: { lastPurchaseDate: new Date(), updatedAt: new Date() },
+    };
+    if (creditChange > 0) {
+      update.$inc.currentDue = creditChange;
+    }
+
+    // Atomic credit-limit guard: evaluated against the document as it is at
+    // update time, so concurrent sales cannot slip past the limit together.
+    // Uses creditChange (the credit portion), not the full sale total, so a
+    // mixed cash+credit sale only checks the credit it actually extends.
+    const filter =
+      paymentMethod === 'credit' && creditChange > 0
+        ? {
+            _id: new ObjectId(customerId),
+            $expr: {
+              $lte: [
+                { $add: [{ $ifNull: ['$currentDue', 0] }, creditChange] },
+                { $ifNull: ['$creditLimit', 0] },
+              ],
+            },
+          }
+        : { _id: new ObjectId(customerId) };
+
+    const options = session ? { session } : {};
+    const result = await shopDb
+      .collection('customers')
+      .updateOne(filter, update, options);
+
+    if (result.matchedCount === 0) {
+      if (paymentMethod === 'credit' && creditChange > 0) {
+        const err = new Error(
+          'Credit limit exceeded — the sale was not recorded',
+        );
+        err.statusCode = 400;
+        err.code = 'CREDIT_LIMIT_EXCEEDED';
+        throw err;
       }
-      const options = session ? { session } : {};
-      await shopDb.collection('customers').updateOne(
-        { _id: new ObjectId(customerId) },
-        update,
-        options,
+      logger.warn(
+        'Customer not found while updating totals after sale:',
+        String(customerId),
       );
-    } catch (err) {
-      logger.warn('Failed to update customer totals after sale:', err.message);
     }
   }
 
@@ -673,9 +772,24 @@ class SalesController {
     const filter = {};
 
     if (startDate || endDate) {
+      // Validate BEFORE building the date range — an Invalid Date in a
+      // Mongo query makes the BSON serializer throw and turns this endpoint
+      // into a 500. Surface it as a 400 instead.
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+      if (
+        (start && isNaN(start.getTime())) ||
+        (end && isNaN(end.getTime()))
+      ) {
+        const err = new Error(
+          'Invalid date format for startDate/endDate (expected YYYY-MM-DD or ISO)',
+        );
+        err.statusCode = 400;
+        throw err;
+      }
       filter.saleDate = {};
-      if (startDate) {filter.saleDate.$gte = new Date(startDate);}
-      if (endDate) {filter.saleDate.$lte = new Date(endDate);}
+      if (start) {filter.saleDate.$gte = start;}
+      if (end) {filter.saleDate.$lte = end;}
     }
 
     if (customerId) {
@@ -688,9 +802,10 @@ class SalesController {
 
     // Search by invoice number or customer name
     if (search && search.trim()) {
+      const term = escapeRegex(search.trim());
       filter.$or = [
-        { invoiceNo: { $regex: search.trim(), $options: 'i' } },
-        { customerName: { $regex: search.trim(), $options: 'i' } },
+        { invoiceNo: { $regex: term, $options: 'i' } },
+        { customerName: { $regex: term, $options: 'i' } },
       ];
     }
 

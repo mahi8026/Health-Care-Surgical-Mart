@@ -819,6 +819,73 @@ router.post(
         });
       }
 
+      // Keep the SALE ledger in sync: allocate this payment across the
+      // customer's outstanding sales (oldest first) so each sale's
+      // dueAmount/totalOutstanding decrease too. Without this, the customer
+      // ledger and the per-sale dues diverge (the sale-level pay-due endpoint
+      // has the mirror obligation — see sales.routes.js /:id/pay-due).
+      try {
+        let remaining = payAmount;
+        const outstandingSales = await shopDb
+          .collection('sales')
+          .find({
+            customerId,
+            $or: [
+              { dueAmount: { $gt: 0 } },
+              { previousDue: { $gt: 0 } },
+            ],
+          })
+          .sort({ saleDate: 1, _id: 1 })
+          .toArray();
+
+        const paidField = paymentMethod === 'cash' ? 'cashPaid' : 'bankPaid';
+
+        for (const outstandingSale of outstandingSales) {
+          if (remaining <= 0) {break;}
+
+          const saleDueAmount = outstandingSale.dueAmount || 0;
+          const salePreviousDue = outstandingSale.previousDue || 0;
+          const saleTotalDue = saleDueAmount + salePreviousDue;
+          if (saleTotalDue <= 0) {continue;}
+
+          // Apply to this sale: current sale due first, then previous due
+          // (mirrors the allocation order used by /api/sales/:id/pay-due).
+          const applied = Math.min(remaining, saleTotalDue);
+          remaining -= applied;
+          const duePayment = Math.min(applied, saleDueAmount);
+          const previousDuePayment = applied - duePayment;
+          const newSaleDue = saleDueAmount - duePayment;
+          const newSalePreviousDue = salePreviousDue - previousDuePayment;
+          const newTotalOutstanding = newSaleDue + newSalePreviousDue;
+          const newSalePaymentStatus =
+            newTotalOutstanding <= 0 ? 'Paid' : 'Partial';
+
+          await shopDb.collection('sales').updateOne(
+            { _id: outstandingSale._id },
+            {
+              $inc: {
+                dueAmount: -duePayment,
+                previousDue: -previousDuePayment,
+                totalOutstanding: -applied,
+                [paidField]: applied,
+              },
+              $set: {
+                paymentStatus: newSalePaymentStatus,
+                updatedAt: new Date(),
+              },
+            },
+          );
+        }
+      } catch (allocErr) {
+        // The customer due was already reduced; if sale allocation fails the
+        // recalculate-due endpoint can rebuild customer.currentDue, and the
+        // audit log below records the payment. Surface the error in logs.
+        logger.error('Failed to allocate customer payment across sales:', {
+          error: allocErr.message,
+          customerId: req.params.id,
+        });
+      }
+
       // Create payment record (only after the due was atomically claimed)
       const paymentRecord = {
         customerId,

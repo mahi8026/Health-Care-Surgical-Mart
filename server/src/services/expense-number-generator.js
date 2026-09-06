@@ -17,48 +17,54 @@ async function generateExpenseNumber(shopDb) {
 
     const counters = shopDb.collection('expense_counters');
 
-    // Atomically claim the next sequence number. upsert + $inc is atomic, so
-    // two concurrent expense creations receive strictly increasing values.
-    let claimed;
+    let sequenceNumber;
     try {
-      claimed = await counters.findOneAndUpdate(
+      // Bootstrap BEFORE claiming: when the counter does not exist yet, raise
+      // it to the highest existing expense number with an atomic, idempotent
+      // `$max` upsert. Concurrent first-callers can never claim a colliding
+      // number, and the old "$set regresses the counter" race is gone.
+      const existing = await counters.findOne({ _id: yearPrefix });
+      if (!existing) {
+        const maxExisting = await maxExistingExpenseSequence(shopDb, yearPrefix);
+        await counters.updateOne(
+          { _id: yearPrefix },
+          { $max: { value: maxExisting } },
+          { upsert: true },
+        );
+      }
+
+      // Atomically claim the next sequence number. upsert + $inc is atomic, so
+      // two concurrent expense creations receive strictly increasing values.
+      const claimed = await counters.findOneAndUpdate(
         { _id: yearPrefix },
         { $inc: { value: 1 }, $set: { updatedAt: new Date() } },
         { upsert: true, returnDocument: 'after' },
       );
+      sequenceNumber = claimed ? claimed.value : 1;
+
+      // Final collision guard: if the minted number already exists (manual
+      // counter reset, imported data), bump the counter and re-claim.
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = `${yearPrefix}${sequenceNumber.toString().padStart(3, '0')}`;
+        // eslint-disable-next-line no-await-in-loop
+        const collision = await shopDb
+          .collection('expenses')
+          .countDocuments({ expenseNumber: candidate });
+        if (!collision) {
+          break;
+        }
+        logger.warn(`Expense number collision on ${candidate}, re-claiming`);
+        // eslint-disable-next-line no-await-in-loop
+        const reclaimed = await counters.findOneAndUpdate(
+          { _id: yearPrefix },
+          { $inc: { value: 1 }, $set: { updatedAt: new Date() } },
+          { returnDocument: 'after' },
+        );
+        sequenceNumber = reclaimed ? reclaimed.value : sequenceNumber + 1;
+      }
     } catch (counterError) {
       logger.warn('Expense counter unavailable, using read-based sequence:', counterError.message);
       return await readBasedExpenseNumber(shopDb, yearPrefix);
-    }
-
-    let sequenceNumber = claimed ? claimed.value : 1;
-
-    // Bootstrap: the very first claim (value === 1) may belong to a year that
-    // already has expenses from the old read-based generator. Reconcile so
-    // numbering continues instead of colliding.
-    if (sequenceNumber === 1) {
-      const lastExpense = await shopDb
-        .collection('expenses')
-        .find({ expenseNumber: { $regex: `^${yearPrefix}` } })
-        .sort({ createdAt: -1, _id: -1 })
-        .limit(1)
-        .toArray();
-
-      let maxExisting = 0;
-      if (lastExpense.length > 0) {
-        const match = lastExpense[0].expenseNumber.match(/EXP-\d{4}-(\d+)$/);
-        if (match && match[1]) {
-          maxExisting = parseInt(match[1], 10);
-        }
-      }
-
-      if (maxExisting >= sequenceNumber) {
-        await counters.updateOne(
-          { _id: yearPrefix },
-          { $set: { value: maxExisting, updatedAt: new Date() } },
-        );
-        sequenceNumber = maxExisting + 1;
-      }
     }
 
     // Format with leading zeros (minimum 3 digits)
@@ -74,10 +80,10 @@ async function generateExpenseNumber(shopDb) {
 }
 
 /**
- * Read-based sequence: highest existing expense number for the year + 1.
- * Used when the atomic counter collection is unavailable.
+ * Highest existing expense sequence for a year prefix (0 when none).
+ * Shared by the counter bootstrap and read-based fallback.
  */
-async function readBasedExpenseNumber(shopDb, yearPrefix) {
+async function maxExistingExpenseSequence(shopDb, yearPrefix) {
   const lastExpense = await shopDb
     .collection('expenses')
     .find({ expenseNumber: { $regex: `^${yearPrefix}` } })
@@ -85,15 +91,22 @@ async function readBasedExpenseNumber(shopDb, yearPrefix) {
     .limit(1)
     .toArray();
 
-  let sequenceNumber = 1;
   if (lastExpense.length > 0 && lastExpense[0].expenseNumber) {
     const match = lastExpense[0].expenseNumber.match(/EXP-\d{4}-(\d+)$/);
     if (match && match[1]) {
-      sequenceNumber = parseInt(match[1], 10) + 1;
+      return parseInt(match[1], 10);
     }
   }
+  return 0;
+}
 
-  return `${yearPrefix}${sequenceNumber.toString().padStart(3, '0')}`;
+/**
+ * Read-based sequence: highest existing expense number for the year + 1.
+ * Used when the atomic counter collection is unavailable.
+ */
+async function readBasedExpenseNumber(shopDb, yearPrefix) {
+  const maxExisting = await maxExistingExpenseSequence(shopDb, yearPrefix);
+  return `${yearPrefix}${(maxExisting + 1).toString().padStart(3, '0')}`;
 }
 
 /**

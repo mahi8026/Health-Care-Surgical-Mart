@@ -87,7 +87,9 @@ setupSentryRequestHandler(app);
 // Advanced security headers (must be early in middleware chain)
 const { advancedSecurityHeaders, sanitizeRequest } = require('./middleware/security-headers');
 app.use(advancedSecurityHeaders);
-app.use(sanitizeRequest);
+// NOTE: sanitizeRequest is applied again AFTER the body parsers (below) so it
+// can actually inspect req.body — registering it here alone was a no-op for
+// JSON bodies because express.json() hadn't run yet.
 
 // Security middleware
 app.use(
@@ -108,18 +110,39 @@ app.use(
           'https://cdnjs.cloudflare.com',
           'https://unpkg.com',
         ],
-        imgSrc: ["'self'", 'data:', 'https:'],
+        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
         mediaSrc: ["'self'", 'blob:', 'mediastream:'],
         fontSrc: [
           "'self'",
+          'data:',
           'https://cdnjs.cloudflare.com',
           'https://fonts.gstatic.com',
         ],
+        // connect-src must include Firebase Auth endpoints — the browser SDK
+        // calls identitytoolkit/securetoken.googleapis.com. Without these,
+        // production Firebase login is silently blocked by the CSP.
         connectSrc: [
           "'self'",
-          'https://cdnjs.cloudflare.com',
-          'https://unpkg.com',
+          'https://identitytoolkit.googleapis.com',
+          'https://securetoken.googleapis.com',
+          'https://*.googleapis.com',
+          'https://*.firebaseio.com',
+          'https://*.firebaseapp.com',
+          'wss://*.firebaseio.com',
+          // Vite HMR websocket / dev server in development only
+          ...(process.env.NODE_ENV !== 'production'
+            ? ['ws://localhost:*', 'ws://127.0.0.1:*', 'http://localhost:*']
+            : []),
         ],
+        frameSrc: ["'self'", 'https://*.firebaseapp.com'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        // upgrade-insecure-requests is correct on HTTPS hosts (Render) but
+        // breaks plain-HTTP local dev if the Express server serves the app.
+        upgradeInsecureRequests:
+          process.env.NODE_ENV === 'production' ? [] : null,
       },
     },
   }),
@@ -145,9 +168,14 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (_req) => {
+  skip: (req) => {
     // Skip rate limiting for development
-    return process.env.NODE_ENV === 'development';
+    if (process.env.NODE_ENV === 'development') {
+      return true;
+    }
+    // Skip auth routes — they are covered by the stricter authLimiter /
+    // passwordResetLimiter (avoids double counting the same request).
+    return req.path.startsWith('/auth/');
   },
 });
 
@@ -225,6 +253,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Cookie parser middleware (for httpOnly JWT cookies)
 app.use(cookieParser());
 
+// NoSQL-injection sanitization for parsed request bodies. Must run AFTER
+// express.json()/urlencoded() so req.body is populated (previously registered
+// before the body parsers, making the body check a no-op).
+app.use(sanitizeRequest);
+
 // Static file serving with caching (only in production with built client)
 if (process.env.NODE_ENV === 'production') {
   const clientPath = path.join(__dirname, '../../client/dist');
@@ -285,12 +318,20 @@ if (process.env.NODE_ENV === 'production') {
   const fs = require('fs');
 
   if (fs.existsSync(clientIndexPath)) {
-    app.get('*', (req, res) => {
+    app.get('*', (req, res, next) => {
+      // Unknown /api* requests must reach the JSON 404 handler (registered
+      // after this catch-all) instead of getting the SPA HTML with 200.
+      if (req.path.startsWith('/api/')) {
+        return next();
+      }
       res.sendFile(clientIndexPath);
     });
   } else {
     // API-only mode - return 404 for non-API routes
-    app.get('*', (req, res) => {
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        return next();
+      }
       res.status(404).json({
         success: false,
         message: 'API endpoint not found',
@@ -304,7 +345,10 @@ if (process.env.NODE_ENV === 'production') {
   const fs = require('fs');
 
   if (fs.existsSync(clientIndexPath)) {
-    app.get('*', (req, res) => {
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        return next();
+      }
       res.sendFile(clientIndexPath);
     });
   }

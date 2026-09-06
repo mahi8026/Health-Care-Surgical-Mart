@@ -26,7 +26,7 @@ const userSchema = {
           description: 'Bcrypt hashed password - required',
         },
         role: {
-          enum: ['SHOP_ADMIN'],
+          enum: ['SHOP_ADMIN', 'SUPER_ADMIN'],
           description: 'User role - required',
         },
         phone: {
@@ -34,8 +34,12 @@ const userSchema = {
           description: 'User phone number',
         },
         shopId: {
-          bsonType: 'string',
-          description: 'Shop identifier - required for all users',
+          bsonType: ['string', 'null'],
+          description: 'Shop identifier (null for platform super admins)',
+        },
+        isSuper: {
+          bsonType: 'bool',
+          description: 'Platform super-admin flag (system_users only)',
         },
         permissions: {
           bsonType: 'array',

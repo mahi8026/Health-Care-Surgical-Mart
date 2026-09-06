@@ -9,6 +9,7 @@ const { logger } = require('../config/logging');
 const auditLog = require('../services/audit-log.service');
 const { AUDIT_ACTIONS } = require('../models/audit-log.schema');
 const { cacheService } = require('../services/cache.service');
+const { escapeRegex } = require('../utils/validator');
 
 class ProductsController extends BaseController {
   /**
@@ -85,6 +86,23 @@ class ProductsController extends BaseController {
         'unit',
         'minStockLevel',
       ]);
+
+      // Reject non-numeric money/stock values before they reach the DB.
+      // parseFloat('abc') → NaN would otherwise fail $jsonSchema validation.
+      const parsedPurchasePrice = parseFloat(purchasePrice);
+      const parsedSellingPrice = parseFloat(sellingPrice);
+      const parsedMinStock = parseInt(minStockLevel, 10);
+      if (
+        !isFinite(parsedPurchasePrice) ||
+        !isFinite(parsedSellingPrice) ||
+        isNaN(parsedMinStock)
+      ) {
+        return this.sendError(
+          res,
+          'Invalid numeric value for purchasePrice, sellingPrice, or minStockLevel',
+          400,
+        );
+      }
 
       // Check if SKU already exists
       const existingProduct = await req.shopDb
@@ -199,6 +217,18 @@ class ProductsController extends BaseController {
 
       if (!existingProduct) {
         return this.sendError(res, 'Product not found', 404);
+      }
+
+      // Reject non-numeric money/stock values on update (NaN would fail the
+      // $jsonSchema validator or corrupt the document)
+      if (purchasePrice !== undefined && !isFinite(parseFloat(purchasePrice))) {
+        return this.sendError(res, 'Invalid numeric value for purchasePrice', 400);
+      }
+      if (sellingPrice !== undefined && !isFinite(parseFloat(sellingPrice))) {
+        return this.sendError(res, 'Invalid numeric value for sellingPrice', 400);
+      }
+      if (minStockLevel !== undefined && isNaN(parseInt(minStockLevel, 10))) {
+        return this.sendError(res, 'Invalid numeric value for minStockLevel', 400);
       }
 
       // Check if SKU is being changed and if new SKU already exists
@@ -412,10 +442,10 @@ class ProductsController extends BaseController {
     if (category) {matchStage.category = category;}
     if (search) {
       matchStage.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } },
-        { barcode: { $regex: search, $options: 'i' } },
-        { brand: { $regex: search, $options: 'i' } },
+        { name: { $regex: escapeRegex(search), $options: 'i' } },
+        { sku: { $regex: escapeRegex(search), $options: 'i' } },
+        { barcode: { $regex: escapeRegex(search), $options: 'i' } },
+        { brand: { $regex: escapeRegex(search), $options: 'i' } },
       ];
     }
 

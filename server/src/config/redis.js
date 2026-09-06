@@ -56,12 +56,20 @@ async function initializeRedis() {
     });
 
     // Connect with timeout
-    await Promise.race([
-      client.connect(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
-      )
-    ]);
+    let connectTimer;
+    try {
+      await Promise.race([
+        client.connect(),
+        new Promise((_, reject) => {
+          connectTimer = setTimeout(
+            () => reject(new Error('Redis connection timeout')),
+            5000
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(connectTimer);
+    }
 
     logger.info('Redis: Connected successfully');
     redisClient = client;

@@ -147,20 +147,28 @@ function calculateHealthScore(metrics) {
   else if (metrics.pingTime > 200) {score -= 10;}
   else if (metrics.pingTime > 100) {score -= 5;}
 
-  // Deduct points for connection pool issues
-  const connectionUtilization = metrics.connectionStatus.current /
-    (metrics.connectionStatus.current + metrics.connectionStatus.available);
+  // Connection pool utilization — guard against a missing/zero "available"
+  // field so utilization can't become Infinity/NaN (which would always read
+  // as "critical").
+  const cur = Number(metrics.connectionStatus.current) || 0;
+  const avail = Number(metrics.connectionStatus.available) || 0;
+  const connectionUtilization =
+    cur + avail > 0 ? cur / (cur + avail) : 0;
 
   if (connectionUtilization > 0.9) {score -= 20;}
   else if (connectionUtilization > 0.7) {score -= 10;}
 
   // Deduct points for high memory usage
-  if (metrics.memory.resident > 2000) {score -= 15;} // > 2GB
-  else if (metrics.memory.resident > 1000) {score -= 5;} // > 1GB
+  const residentMB = Number(metrics.memory.resident) || 0;
+  if (residentMB > 2000) {score -= 15;} // > 2GB
+  else if (residentMB > 1000) {score -= 5;} // > 1GB
 
-  // Deduct points for large database size without indexes
-  const indexRatio = metrics.dbStats.indexSize / metrics.dbStats.dataSize;
-  if (indexRatio < 0.05 && metrics.dbStats.dataSize > 1000000) {score -= 10;}
+  // Deduct points for large database size without indexes (empty DB has
+  // dataSize 0 → ratio is undefined; treat as healthy)
+  const dataSize = Number(metrics.dbStats.dataSize) || 0;
+  const indexSize = Number(metrics.dbStats.indexSize) || 0;
+  const indexRatio = dataSize > 0 ? indexSize / dataSize : 0;
+  if (indexRatio < 0.05 && dataSize > 1000000) {score -= 10;}
 
   return Math.max(0, Math.min(100, score));
 }
@@ -175,23 +183,27 @@ function generateHealthWarnings(metrics) {
     warnings.push('High database latency detected (>500ms)');
   }
 
-  const connectionUtilization = metrics.connectionStatus.current /
-    (metrics.connectionStatus.current + metrics.connectionStatus.available);
+  const cur = Number(metrics.connectionStatus.current) || 0;
+  const avail = Number(metrics.connectionStatus.available) || 0;
+  const connectionUtilization =
+    cur + avail > 0 ? cur / (cur + avail) : 0;
 
   if (connectionUtilization > 0.9) {
     warnings.push('Connection pool nearly exhausted (>90% utilization)');
   }
 
-  if (metrics.memory.resident > 2000) {
+  if ((Number(metrics.memory.resident) || 0) > 2000) {
     warnings.push('High memory usage (>2GB)');
   }
 
-  const indexRatio = metrics.dbStats.indexSize / metrics.dbStats.dataSize;
-  if (indexRatio < 0.05 && metrics.dbStats.dataSize > 1000000) {
+  const dataSize = Number(metrics.dbStats.dataSize) || 0;
+  const indexSize = Number(metrics.dbStats.indexSize) || 0;
+  const indexRatio = dataSize > 0 ? indexSize / dataSize : 0;
+  if (indexRatio < 0.05 && dataSize > 1000000) {
     warnings.push('Low index-to-data ratio - consider adding indexes');
   }
 
-  if (metrics.dbStats.dataSize > 1000000000) { // 1GB
+  if (dataSize > 1000000000) { // 1GB
     warnings.push('Large database size - consider archiving old data');
   }
 

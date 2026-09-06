@@ -42,6 +42,21 @@ const { initializeShopDatabase } = require('./database-initializer');
 const MONGO_URI = process.env.MONGODB_URI;
 const DB_NAME   = process.env.DB_NAME || 'Health_Care_Shop_DB';
 
+/**
+ * Resolve the shop database name the SAME way config/database.js does so the
+ * admin user is written into the exact database the server reads:
+ *   1. SHOP_DB_NAME env pin (production)
+ *   2. shop_<id> (dev/test), guarding against callers that already pass a
+ *      prefixed name (e.g. "shop_6a020466789ca874348b2557")
+ */
+function resolveShopDbName(shopId) {
+  if (process.env.SHOP_DB_NAME) {
+    return process.env.SHOP_DB_NAME;
+  }
+  const clean = String(shopId).replace(/^shop_/, '');
+  return `shop_${clean}`;
+}
+
 async function run() {
   console.log('🚀 Bootstrap script starting…');
   console.log(`   MongoDB URI : ${MONGO_URI?.split('@')[1] ?? MONGO_URI}`);
@@ -61,7 +76,7 @@ async function run() {
   if (existing) {
     console.log(`ℹ️  Shop already exists for ${CONFIG.ownerEmail} (shopId: ${existing.shopId})`);
     // Still ensure the user exists — might have been missed by a failed first run
-    const shopDbName = `shop_${existing.shopId}`;
+    const shopDbName = resolveShopDbName(existing.shopId);
     const shopDbRaw  = mongoClient.db(shopDbName);
     const existingUser = await shopDbRaw.collection('users').findOne({ email: CONFIG.adminEmail });
     if (existingUser) {
@@ -147,7 +162,7 @@ async function run() {
 
   // ── 5. Initialise the shop DB (collections + indexes) ─────────────────
   // We need to provide a db-like proxy that the initializer expects
-  const shopDbName = `shop_${shopId}`;
+  const shopDbName = resolveShopDbName(shopId);
   const shopDbRaw  = mongoClient.db(shopDbName);
 
   // Proxy wrapping to add getCollectionName helper used by some parts

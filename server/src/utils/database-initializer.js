@@ -182,14 +182,23 @@ async function initializeSystemDatabase(systemDb) {
     if (systemUserExists.length === 0) {
       await systemDb.createCollection('system_users', userSchema);
       results.collections.push('✅ Created collection: system_users');
-
-      const systemUsersCollection = systemDb.collection('system_users');
-      await systemUsersCollection.createIndex(
-        { email: 1 },
-        { unique: true, name: 'email_unique' },
-      );
-      results.indexes.push('✅ Created index email_unique on system_users');
+    } else {
+      // Keep the validator in sync (e.g. shopId now allows null for
+      // super admins, isSuper flag added) — otherwise existing deployments
+      // keep the old $jsonSchema and reject new super-admin documents.
+      await systemDb.command({
+        collMod: 'system_users',
+        validator: userSchema.validator,
+      });
+      results.collections.push('✅ Updated validation for: system_users');
     }
+
+    const systemUsersCollection = systemDb.collection('system_users');
+    await systemUsersCollection.createIndex(
+      { email: 1 },
+      { unique: true, name: 'email_unique' },
+    );
+    results.indexes.push('✅ Created index email_unique on system_users');
 
     return results;
   } catch (error) {

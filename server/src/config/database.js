@@ -173,7 +173,14 @@ function getShopDatabase(shopId) {
 
   const effectiveShopId = process.env.SHOP_ID || shopId;
   if (effectiveShopId && typeof effectiveShopId === 'string') {
-    return client.db(`shop_${effectiveShopId}`);
+    // Guard against double-prefixing: callers may pass either the bare shop id
+    // (e.g. "6a020466789ca874348b2557") or an already-prefixed database name
+    // (e.g. "shop_6a020466789ca874348b2557", which is what SHOP_ID/bootstrap
+    // scripts end up storing). Normalize so both resolve to the same DB.
+    const normalized = effectiveShopId.startsWith('shop_')
+      ? effectiveShopId
+      : `shop_${effectiveShopId}`;
+    return client.db(normalized);
   }
 
   logger.warn(

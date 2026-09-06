@@ -7,20 +7,9 @@ const crypto = require('crypto');
 const { securityLogger } = require('../config/logging');
 
 /**
- * Generate Content Security Policy nonce for inline scripts
- */
-function generateNonce() {
-  return crypto.randomBytes(16).toString('base64');
-}
-
-/**
  * Advanced security headers middleware
  */
 function advancedSecurityHeaders(req, res, next) {
-  // Generate nonce for CSP
-  const nonce = generateNonce();
-  req.nonce = nonce;
-
   // Strict Transport Security (HSTS)
   // Force HTTPS for 1 year, include subdomains
   res.setHeader(
@@ -28,22 +17,11 @@ function advancedSecurityHeaders(req, res, next) {
     'max-age=31536000; includeSubDomains; preload'
   );
 
-  // Content Security Policy (CSP)
-  // Prevent XSS, clickjacking, and other code injection attacks
-  const cspDirectives = [
-    "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com https://unpkg.com`,
-    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
-    "img-src 'self' data: https: blob:",
-    "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com",
-    "connect-src 'self' https://firebaseapp.com https://*.firebaseio.com https://*.googleapis.com",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    'upgrade-insecure-requests'
-  ];
-
-  res.setHeader('Content-Security-Policy', cspDirectives.join('; '));
+  // NOTE: Content-Security-Policy is set by helmet in server.js. Defining it
+  // here too caused two CSP headers to stomp on each other (the middleware
+  // registered later always won), so the "active" policy was whichever file
+  // ran last AND the nonce in this file was never used by the Vite SPA.
+  // helmet is now the single source of truth for the CSP.
 
   // X-Content-Type-Options
   // Prevent MIME type sniffing
@@ -369,5 +347,4 @@ module.exports = {
   preventSessionFixation,
   bruteForceProtection,
   validateApiKey,
-  generateNonce
 };

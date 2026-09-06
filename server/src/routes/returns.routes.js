@@ -554,6 +554,10 @@ router.post(
     // Validate return items and quantities
     const returnItems = [];
     let totalReturnAmount = 0;
+    // Track quantities already claimed for each product WITHIN this request —
+    // a payload that lists the same product twice must not be validated (and
+    // restored) against the same available quantity twice.
+    const inRequestQty = new Map();
 
     for (const returnItem of items) {
       const {
@@ -565,6 +569,16 @@ router.post(
       if (!productId || !ObjectId.isValid(productId) || !returnQuantity || returnQuantity <= 0) {
         throw createError.badRequest('Invalid return item data');
       }
+
+      // Sum every matching sale line — the same product can appear on
+      // multiple lines of one sale.
+      const soldQty = originalSale.items
+        .filter(
+          (item) =>
+            item.productId &&
+            item.productId.toString() === productId.toString(),
+        )
+        .reduce((sum, item) => sum + (item.qty || 0), 0);
 
       // Find the original sale item (custom items have no productId — skip)
       const originalItem = originalSale.items.find(
@@ -599,12 +613,20 @@ router.post(
         }
       });
 
-      const availableForReturn = originalItem.qty - totalReturnedQty;
+      // Quantities for this product already accepted earlier in THIS request
+      const requestedSoFar = inRequestQty.get(productId.toString()) || 0;
+
+      const availableForReturn =
+        soldQty - totalReturnedQty - requestedSoFar;
       if (returnQuantity > availableForReturn) {
         throw createError.badRequest(
-          `Cannot return ${returnQuantity} units of ${originalItem.name}. Only ${availableForReturn} units available for return.`,
+          `Cannot return ${returnQuantity} units of ${originalItem.name}. Only ${Math.max(0, availableForReturn)} units available for return.`,
         );
       }
+      inRequestQty.set(
+        productId.toString(),
+        requestedSoFar + returnQuantity,
+      );
 
       // Get current product details for stock restoration
       const product = await shopDb
@@ -647,7 +669,10 @@ router.post(
 
     // Calculate refund amounts based on original sale proportions
     const originalSubtotal = originalSale.subtotal || originalSale.grandTotal;
-    const returnRatio = totalReturnAmount / originalSubtotal;
+    // Guard against a zero subtotal (fully-discounted/legacy sale) — an
+    // unchecked division would poison downstream money math with Infinity/NaN.
+    const returnRatio =
+      originalSubtotal > 0 ? totalReturnAmount / originalSubtotal : 0;
 
     const refundDiscount = (originalSale.discountAmount || originalSale.discount || 0) * returnRatio;
     const refundVAT = (originalSale.vatAmount || 0) * returnRatio;
@@ -725,7 +750,7 @@ router.post(
           productId: item.productId,
           movementType: 'RETURN_IN',
           quantity: item.returnQuantity,
-          userId: req.user._id || req.user._id,
+          userId: req.user.id || req.user._id,
           referenceType: 'RETURN',
           referenceId: result.insertedId,
           batchNo: item.batchNumber || `RET-${returnNumber}`,
@@ -790,19 +815,39 @@ router.post(
       // Credit/partial sales: refunding item value must reduce the customer's
       // outstanding due too, otherwise money is lost twice (refund handed out,
       // but due never lowered). Reduce up to the refund amount, never negative.
+      let customerDueReduced = 0;
       if (isCreditSettled) {
-        await shopDb.collection('customers').updateOne(
+        const customerUpdate = await shopDb.collection('customers').findOneAndUpdate(
           { _id: new ObjectId(saleCustomerId) },
           [
             {
               $set: {
-                currentDue: {
+                // Compute the new due first, then the amount ACTUALLY removed
+                // (clamped at zero when part of the debt was already settled).
+                // The audit field lets a later cancellation restore exactly
+                // what was taken instead of inventing due money.
+                __newDue: {
                   $max: [0, { $subtract: [{ $ifNull: ['$currentDue', 0] }, totalRefundAmount] }],
                 },
+                customerDueReducedLastReturn: {
+                  $subtract: [{ $ifNull: ['$currentDue', 0] }, '$__newDue'],
+                },
+                currentDue: '$__newDue',
                 updatedAt: new Date(),
               },
             },
+            { $unset: '__newDue' },
           ],
+          { returnDocument: 'after' },
+        );
+        customerDueReduced =
+          customerUpdate?.customerDueReducedLastReturn || 0;
+
+        // Persist the actual reduction on the return record for exact reversal
+        // on cancellation.
+        await shopDb.collection('returns').updateOne(
+          { _id: result.insertedId },
+          { $set: { customerDueReduced } },
         );
 
         // Keep the sale's own due books in sync — customer.currentDue is derived
@@ -875,7 +920,7 @@ router.put(
           productId: item.productId,
           movementType: 'RETURN_OUT',
           quantity: item.returnQuantity,
-          userId: req.user._id || req.user._id,
+          userId: req.user.id || req.user._id,
           referenceType: 'RETURN_CANCEL',
           referenceId: returnRecord._id,
           note: `Cancelled return ${returnRecord.returnNumber}`,
@@ -892,28 +937,42 @@ router.put(
         source: 'RETURN',
       });
 
-      // Reverse the customer due reduction and the sale due reduction exactly
-      // as they were applied on return creation (dueReduction persisted there)
-      const reduction = returnRecord.dueReduction || 0;
-      if (reduction > 0) {
+      // Reverse the due adjustments exactly as they were applied on return
+      // creation. Two separate amounts are involved:
+      //   • customerDueReduced — what was ACTUALLY removed from the customer
+      //     (clamped at zero when part of the debt was already settled), so a
+      //     refund that exceeded the live due cannot inflate the due back.
+      //   • dueReduction — what was removed from the sale's own due books.
+      // Legacy records only carry `dueReduction`, which is used for both.
+      const customerReduction =
+        returnRecord.customerDueReduced != null
+          ? returnRecord.customerDueReduced
+          : returnRecord.dueReduction || 0;
+      const saleReduction = returnRecord.dueReduction || 0;
+      if (saleReduction > 0 || customerReduction > 0) {
         const originalSale = await shopDb
           .collection('sales')
           .findOne({ _id: new ObjectId(returnRecord.originalSaleId) });
         const custId = originalSale?.customerId;
-        if (custId && ObjectId.isValid(custId)) {
+        if (custId && ObjectId.isValid(custId) && customerReduction > 0) {
           await shopDb.collection('customers').updateOne(
             { _id: new ObjectId(custId) },
-            { $inc: { currentDue: reduction }, $set: { updatedAt: new Date() } },
+            { $inc: { currentDue: customerReduction }, $set: { updatedAt: new Date() } },
           );
         }
-        if (originalSale) {
+        if (originalSale && saleReduction > 0) {
           await shopDb.collection('sales').updateOne(
             { _id: originalSale._id },
             {
-              $inc: { dueAmount: reduction, totalOutstanding: reduction },
+              $inc: { dueAmount: saleReduction, totalOutstanding: saleReduction },
               $pull: { returns: { returnId: returnRecord._id } },
               $set: { updatedAt: new Date() },
             },
+          );
+        } else if (originalSale) {
+          await shopDb.collection('sales').updateOne(
+            { _id: originalSale._id },
+            { $pull: { returns: { returnId: returnRecord._id } }, $set: { updatedAt: new Date() } },
           );
         }
       } else if (returnRecord.originalSaleId && ObjectId.isValid(returnRecord.originalSaleId)) {
@@ -935,7 +994,7 @@ router.put(
           productId: item.productId,
           movementType: 'RETURN_IN',
           quantity: item.returnQuantity,
-          userId: req.user._id || req.user._id,
+          userId: req.user.id || req.user._id,
           referenceType: 'RETURN',
           referenceId: returnRecord._id,
           note: `Approved return ${returnRecord.returnNumber}`,

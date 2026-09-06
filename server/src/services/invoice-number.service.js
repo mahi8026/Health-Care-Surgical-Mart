@@ -36,51 +36,61 @@ class InvoiceNumberService {
 
       const counters = shopDb.collection('invoice_counters');
 
-      // Atomically claim the next sequence number. upsert + $inc is atomic, so
-      // two concurrent calls receive strictly increasing values.
-      let claimed;
+      let sequenceNumber;
       try {
-        claimed = await counters.findOneAndUpdate(
+        // Bootstrap BEFORE claiming: when the counter does not exist yet
+        // (month rollover or first run after the read-based generator era),
+        // reconcile it with the highest existing invoice using an atomic,
+        // idempotent `$max` upsert. Two concurrent first-callers both raise
+        // the counter to maxExisting and then claim strictly increasing
+        // values — the old "$set regresses the counter" race is gone.
+        const existing = await counters.findOne({ _id: counterId });
+        if (!existing) {
+          const maxExisting = await this._maxExistingInvoiceSequence(
+            shopDb,
+            yearMonth,
+          );
+          await counters.updateOne(
+            { _id: counterId },
+            { $max: { value: maxExisting } },
+            { upsert: true },
+          );
+        }
+
+        // Atomically claim the next sequence number. upsert + $inc is atomic,
+        // so two concurrent POS checkouts receive strictly increasing values.
+        const claimed = await counters.findOneAndUpdate(
           { _id: counterId },
           { $inc: { value: 1 }, $set: { updatedAt: new Date() } },
           { upsert: true, returnDocument: 'after' },
         );
+        sequenceNumber = claimed ? claimed.value : 1;
+
+        // Final collision guard: if the minted number already exists (manual
+        // counter reset, imported data), bump the counter and re-claim.
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const candidate = this.buildInvoiceNo(yearMonth, sequenceNumber);
+          // eslint-disable-next-line no-await-in-loop
+          const collision = await shopDb
+            .collection('sales')
+            .countDocuments({ invoiceNo: candidate });
+          if (!collision) {
+            break;
+          }
+          logger.warn(`Invoice number collision on ${candidate}, re-claiming`);
+          // eslint-disable-next-line no-await-in-loop
+          const reclaimed = await counters.findOneAndUpdate(
+            { _id: counterId },
+            { $inc: { value: 1 }, $set: { updatedAt: new Date() } },
+            { returnDocument: 'after' },
+          );
+          sequenceNumber = reclaimed ? reclaimed.value : sequenceNumber + 1;
+        }
       } catch (counterError) {
         // Counter collection unavailable (e.g. mocked or restricted DB) —
         // fall back to the read-based sequence below.
         logger.warn('Invoice counter unavailable, using read-based sequence:', counterError.message);
         return await this._readBasedInvoiceNo(shopDb, yearMonth);
-      }
-
-      let sequenceNumber = claimed ? claimed.value : 1;
-
-      // Bootstrap: the very first claim (value === 1) may belong to a month
-      // that already has invoices from the old read-based generator. Reconcile
-      // the counter with the highest existing invoice so numbering continues
-      // instead of colliding.
-      if (sequenceNumber === 1) {
-        const lastSale = await shopDb
-          .collection('sales')
-          .find({ invoiceNo: { $regex: `^INV-${yearMonth}-` } })
-          .sort({ createdAt: -1, _id: -1 })
-          .limit(1)
-          .toArray();
-
-        let maxExisting = 0;
-        if (lastSale.length > 0) {
-          const match = lastSale[0].invoiceNo.match(/INV-\d{6}-(\d{5})$/);
-          if (match && match[1]) {
-            maxExisting = parseInt(match[1], 10);
-          }
-        }
-
-        if (maxExisting >= sequenceNumber) {
-          await counters.updateOne(
-            { _id: counterId },
-            { $set: { value: maxExisting, updatedAt: new Date() } },
-          );
-          sequenceNumber = maxExisting + 1;
-        }
       }
 
       const invoiceNo = this.buildInvoiceNo(yearMonth, sequenceNumber);
@@ -124,6 +134,27 @@ class InvoiceNumberService {
   }
 
   /**
+   * Highest existing invoice sequence for a year-month (0 when none).
+   * Shared by the counter bootstrap and read-based fallback.
+   */
+  async _maxExistingInvoiceSequence(shopDb, yearMonth) {
+    const lastSale = await shopDb
+      .collection('sales')
+      .find({ invoiceNo: { $regex: `^INV-${yearMonth}-` } })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(1)
+      .toArray();
+
+    if (lastSale.length > 0) {
+      const match = lastSale[0].invoiceNo.match(/INV-\d{6}-(\d{5})$/);
+      if (match && match[1]) {
+        return parseInt(match[1], 10);
+      }
+    }
+    return 0;
+  }
+
+  /**
    * Get next invoice number preview (read-only — never claims a number, so
    * the POS "next invoice" display cannot burn sequence values).
    *
@@ -145,22 +176,8 @@ class InvoiceNumberService {
       }
 
       // Otherwise fall back to the highest existing invoice this month.
-      const lastSale = await shopDb
-        .collection('sales')
-        .find({ invoiceNo: { $regex: `^INV-${yearMonth}-` } })
-        .sort({ createdAt: -1, _id: -1 })
-        .limit(1)
-        .toArray();
-
-      let sequenceNumber = 1;
-      if (lastSale.length > 0) {
-        const match = lastSale[0].invoiceNo.match(/INV-\d{6}-(\d{5})$/);
-        if (match && match[1]) {
-          sequenceNumber = parseInt(match[1], 10) + 1;
-        }
-      }
-
-      return this.buildInvoiceNo(yearMonth, sequenceNumber);
+      const maxExisting = await this._maxExistingInvoiceSequence(shopDb, yearMonth);
+      return this.buildInvoiceNo(yearMonth, maxExisting + 1);
     } catch (error) {
       logger.error('Failed to preview invoice number:', error);
       return `INV-${Date.now()}`;
@@ -179,15 +196,24 @@ class InvoiceNumberService {
 
       const now = new Date();
       const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const counterId = `INV-${yearMonth}`;
 
       const count = await shopDb.collection('sales').countDocuments({
         invoiceNo: { $regex: `^INV-${yearMonth}-` },
       });
 
+      // nextSequence must respect gaps (skipped numbers, fallback timestamps),
+      // so derive it from the counter / highest existing invoice, not count.
+      const counter = await shopDb.collection('invoice_counters').findOne({ _id: counterId });
+      const maxExisting =
+        counter && counter.value > 0
+          ? counter.value
+          : await this._maxExistingInvoiceSequence(shopDb, yearMonth);
+
       return {
         yearMonth,
         totalInvoices: count,
-        nextSequence: count + 1,
+        nextSequence: maxExisting + 1,
       };
     } catch (error) {
       logger.error('Failed to get monthly stats:', error);

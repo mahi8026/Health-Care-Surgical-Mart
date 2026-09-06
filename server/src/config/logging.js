@@ -96,12 +96,22 @@ const logger = winston.createLogger({
   ],
 });
 
-// Add console transport for development
+// Add console transport — colorized in development, plain JSON in production
+// so host log collectors (Render dashboard, Docker, etc.) actually see logs.
+// Without this, production logs only went to ephemeral files and were
+// effectively invisible.
 if (process.env.NODE_ENV !== 'production') {
   logger.add(
     new winston.transports.Console({
       format: consoleFormat,
       level: 'debug',
+    }),
+  );
+} else {
+  logger.add(
+    new winston.transports.Console({
+      format: logFormat,
+      level: process.env.LOG_LEVEL || 'info',
     }),
   );
 }
@@ -154,7 +164,7 @@ const requestLogger = (req, res, next) => {
     url: req.url,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    userId: req.user?.id,
+    userId: req.user?._id?.toString() ?? req.user?.id,
     shopId: req.user?.shopId,
   });
 
@@ -169,7 +179,7 @@ const requestLogger = (req, res, next) => {
       statusCode: res.statusCode,
       duration: `${duration}ms`,
       ip: req.ip,
-      userId: req.user?.id,
+      userId: req.user?._id?.toString() ?? req.user?.id,
       shopId: req.user?.shopId,
     });
 
@@ -179,7 +189,7 @@ const requestLogger = (req, res, next) => {
         method: req.method,
         url: req.url,
         duration: `${duration}ms`,
-        userId: req.user?.id,
+        userId: req.user?._id?.toString() ?? req.user?.id,
       });
     }
   });

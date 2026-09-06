@@ -4,7 +4,6 @@
  */
 
 const rateLimit = require('express-rate-limit');
-const { body, validationResult } = require('express-validator');
 const { logSecurityEvent, securityLogger } = require('./logging');
 
 /**
@@ -57,7 +56,7 @@ const setupSecurity = (app) => {
   // IP whitelist/blacklist middleware (only in production)
   if (process.env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
-      const clientIP = req.ip || req.connection.remoteAddress;
+      const clientIP = req.ip || req.socket?.remoteAddress;
       const blacklistedIPs =
         process.env.BLACKLISTED_IPS?.split(',').filter((ip) => ip.trim()) || [];
       const whitelistedIPs =
@@ -102,31 +101,9 @@ const setupSecurity = (app) => {
  * Enhanced rate limiting configurations
  */
 const createRateLimiters = () => {
-  // General API rate limiter
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    message: {
-      success: false,
-      message: 'Too many requests from this IP, please try again later.',
-      retryAfter: 900, // 15 minutes in seconds
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (req, res) => {
-      logSecurityEvent('rate_limit_exceeded', {
-        ip: req.ip,
-        url: req.url,
-        userAgent: req.get('User-Agent'),
-      });
-
-      res.status(429).json({
-        success: false,
-        message: 'Too many requests from this IP, please try again later.',
-        retryAfter: 900,
-      });
-    },
-  });
+  // NOTE: the general /api rate limiter is defined inline in server.js — the
+  // single source of truth — so requests aren't counted by two independent
+  // express-rate-limit instances.
 
   // Strict rate limiter for authentication endpoints
   const authLimiter = rateLimit({
@@ -175,113 +152,9 @@ const createRateLimiters = () => {
   });
 
   return {
-    apiLimiter,
     authLimiter,
     passwordResetLimiter,
   };
-};
-
-/**
- * Input validation and sanitization
- */
-const createValidators = () => {
-  // Login validation
-  const validateLogin = [
-    body('email')
-      .isEmail()
-      .normalizeEmail()
-      .withMessage('Valid email is required'),
-    body('password')
-      .isLength({ min: 6, max: 128 })
-      .withMessage('Password must be between 6 and 128 characters'),
-    body('shopId')
-      .optional()
-      .isAlphanumeric()
-      .isLength({ min: 3, max: 50 })
-      .withMessage('Shop ID must be alphanumeric and between 3-50 characters'),
-  ];
-
-  // Product validation
-  const validateProduct = [
-    body('name')
-      .trim()
-      .isLength({ min: 1, max: 200 })
-      .withMessage(
-        'Product name is required and must be less than 200 characters',
-      ),
-    body('sku')
-      .trim()
-      .isAlphanumeric('en-US', { ignore: '-_' })
-      .isLength({ min: 3, max: 50 })
-      .withMessage('SKU must be alphanumeric and between 3-50 characters'),
-    body('purchasePrice')
-      .isFloat({ min: 0 })
-      .withMessage('Purchase price must be a positive number'),
-    body('sellingPrice')
-      .isFloat({ min: 0 })
-      .withMessage('Selling price must be a positive number'),
-    body('category')
-      .isIn(['Medical', 'Lab', 'Surgical'])
-      .withMessage('Category must be Medical, Lab, or Surgical'),
-    body('unit')
-      .isIn(['pcs', 'box', 'pack', 'bottle', 'strip', 'vial'])
-      .withMessage('Invalid unit type'),
-    body('minStockLevel')
-      .isInt({ min: 0 })
-      .withMessage('Minimum stock level must be a non-negative integer'),
-  ];
-
-  // Sale validation
-  const validateSale = [
-    body('items')
-      .isArray({ min: 1 })
-      .withMessage('Sale must have at least one item'),
-    body('items.*.productId').isMongoId().withMessage('Invalid product ID'),
-    body('items.*.qty')
-      .isInt({ min: 1 })
-      .withMessage('Quantity must be a positive integer'),
-    body('grandTotal')
-      .isFloat({ min: 0 })
-      .withMessage('Grand total must be a positive number'),
-    body('cashPaid')
-      .optional()
-      .isFloat({ min: 0 })
-      .withMessage('Cash paid must be a non-negative number'),
-    body('bankPaid')
-      .optional()
-      .isFloat({ min: 0 })
-      .withMessage('Bank paid must be a non-negative number'),
-  ];
-
-  return {
-    validateLogin,
-    validateProduct,
-    validateSale,
-  };
-};
-
-/**
- * Validation error handler
- */
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-
-  if (!errors.isEmpty()) {
-    logSecurityEvent('validation_failed', {
-      ip: req.ip,
-      url: req.url,
-      errors: errors.array(),
-      body: req.body,
-    });
-
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: errors.array(),
-    });
-  }
-
-  next();
 };
 
 /**
@@ -340,7 +213,5 @@ const xssProtection = (req, res, next) => {
 module.exports = {
   setupSecurity,
   createRateLimiters,
-  createValidators,
-  handleValidationErrors,
   xssProtection,
 };

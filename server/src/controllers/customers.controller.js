@@ -7,7 +7,7 @@ const BaseController = require('./base.controller');
 const { ObjectId } = require('mongodb');
 const { logger } = require('../config/logging');
 const { getShopDatabase } = require('../config/database');
-const { validatePhone, validateEmail } = require('../utils/validator');
+const { validatePhone, validateEmail, escapeRegex } = require('../utils/validator');
 const { createError } = require('../utils/errors');
 
 class CustomersController extends BaseController {
@@ -17,9 +17,11 @@ class CustomersController extends BaseController {
   async getCustomers(req, res) {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
-      const { page = 1, limit = 50, search = '' } = req.query;
+      const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+      const { search = '' } = req.query;
 
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const skip = (page - 1) * limit;
       const searchQuery = this._buildSearchQuery(search);
 
       const customers = await shopDb
@@ -78,11 +80,12 @@ class CustomersController extends BaseController {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
       const {
-        name, phone, email, address, type = 'Walk-in',
+        name, phone: rawPhone, email, address, type = 'Walk-in',
         creditEnabled = false, creditLimit = 0,
       } = req.body;
 
       this.validateRequired(req.body, ['name', 'phone']);
+      const phone = this._normalizePhone(rawPhone);
       this._validateContact({ phone, email });
 
       const existingCustomer = await shopDb
@@ -108,7 +111,12 @@ class CustomersController extends BaseController {
       );
     } catch (error) {
       logger.error('Create customer error:', error);
-      this.sendError(res, error.message || 'Failed to create customer', 400, error);
+      this.sendError(
+        res,
+        error.message || 'Failed to create customer',
+        error.statusCode || 500,
+        error,
+      );
     }
   }
 
@@ -119,11 +127,12 @@ class CustomersController extends BaseController {
     try {
       const shopDb = getShopDatabase(req.user.shopId);
       const {
-        name, phone, email, address, type,
+        name, phone: rawPhone, email, address, type,
         creditEnabled, creditLimit,
       } = req.body;
 
       this.validateRequired(req.body, ['name', 'phone']);
+      const phone = this._normalizePhone(rawPhone);
       this._validateContact({ phone, email });
 
       if (!ObjectId.isValid(req.params.id)) {
@@ -211,6 +220,19 @@ class CustomersController extends BaseController {
   // ==================== Private Helper Methods ====================
 
   /**
+   * Normalize a phone number to the DB format ('0'+10 digits) matching the
+   * customers $jsonSchema pattern. Mirrors validatePhone()'s normalization so
+   * the stored value never trips schema validation (e.g. '+8801...' fails
+   * the '^[0-9]{10,15}$' pattern).
+   */
+  _normalizePhone(phone) {
+    return String(phone)
+      .trim()
+      .replace(/^\+?880/, '0')
+      .replace(/[\s-]/g, '');
+  }
+
+  /**
    * Validate phone (required) and email (optional) format. The shared
    * validators throw ValidationError (422); remap to 400 for the API.
    */
@@ -233,9 +255,9 @@ class CustomersController extends BaseController {
 
     return {
       $or: [
-        { name: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
+        { name: { $regex: escapeRegex(search), $options: 'i' } },
+        { phone: { $regex: escapeRegex(search), $options: 'i' } },
+        { email: { $regex: escapeRegex(search), $options: 'i' } },
       ],
     };
   }

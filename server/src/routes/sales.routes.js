@@ -532,6 +532,62 @@ router.post(
       const newDueAmountFinal = updatedSale.dueAmount || 0;
       const newPreviousDueFinal = updatedSale.previousDue || 0;
 
+      // Keep the CUSTOMER ledger in sync: this payment must also reduce the
+      // customer's outstanding due, otherwise customer.currentDue and the
+      // sale ledger diverge (the customer-level payment endpoint has the
+      // mirror obligation — see customers.routes.js /:id/payment).
+      const { ObjectId: ObjectIdClass } = require('mongodb');
+      const customerIdForSync =
+        sale.customerId && ObjectIdClass.isValid(sale.customerId)
+          ? new ObjectIdClass(sale.customerId)
+          : null;
+      if (customerIdForSync) {
+        try {
+          // Atomic, clamped reduction: recomputes from the doc at update time
+          // (safe under concurrency) and never drops the due below zero when
+          // part of this debt was already settled through the customer-level
+          // payment endpoint.
+          const pipeline = [
+            {
+              $set: {
+                currentDue: {
+                  $max: [
+                    0,
+                    {
+                      $subtract: [
+                        { $ifNull: ['$currentDue', 0] },
+                        parsedAmount,
+                      ],
+                    },
+                  ],
+                },
+                updatedAt: new Date(),
+              },
+            },
+          ];
+          const updatedCustomer = await req.shopDb
+            .collection('customers')
+            .findOneAndUpdate({ _id: customerIdForSync }, pipeline, {
+              returnDocument: 'after',
+            });
+          if (updatedCustomer) {
+            logger.info('Customer due synced with sale payment', {
+              saleId: req.params.id,
+              customerId: customerIdForSync.toString(),
+              customerDueAfter: updatedCustomer.currentDue,
+            });
+          }
+        } catch (custErr) {
+          // The sale payment is already committed; log loudly but do not fail
+          // the request. The recalculate-due endpoint can repair the customer.
+          logger.error('Failed to sync customer due after sale payment:', {
+            error: custErr.message,
+            saleId: req.params.id,
+            customerId: customerIdForSync,
+          });
+        }
+      }
+
       // Recalculate payment status from the freshly-written values
       const totalPaidFinal =
         (updatedSale.cashPaid || 0) + (updatedSale.bankPaid || 0);

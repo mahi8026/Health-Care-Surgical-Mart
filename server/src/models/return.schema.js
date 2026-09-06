@@ -50,7 +50,7 @@ const returnSchema = {
               description: 'Customer phone number',
             },
             type: {
-              enum: ['Retail', 'Wholesale'],
+              enum: ['Retail', 'Wholesale', 'Walk-in', 'Hospital/Clinic', 'Diagnostic'],
               description: 'Customer type',
             },
           },

@@ -62,7 +62,7 @@ const shopSchema = {
           description: 'Shop status - required',
         },
         subscriptionPlan: {
-          enum: ['Trial', 'Basic', 'Premium', 'Enterprise'],
+          enum: ['Trial', 'Basic', 'Premium', 'Enterprise', 'Professional', 'professional'],
           description: 'Subscription plan',
         },
         subscriptionExpiry: {

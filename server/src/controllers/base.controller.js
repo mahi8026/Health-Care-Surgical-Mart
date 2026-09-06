@@ -76,11 +76,13 @@ class BaseController {
    * Build pagination object
    */
   buildPagination(page, limit, total) {
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
     return {
-      page: parseInt(page),
-      limit: parseInt(limit),
+      page: safePage,
+      limit: safeLimit,
       total,
-      pages: Math.ceil(total / parseInt(limit)),
+      pages: Math.ceil(total / safeLimit),
     };
   }
 }

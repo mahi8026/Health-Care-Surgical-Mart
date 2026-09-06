@@ -15,7 +15,7 @@ const setupErrorHandling = (app) => {
     logger.warn(`API endpoint not found: ${req.method} ${req.originalUrl}`, {
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-      userId: req.user?.id,
+      userId: req.user?._id?.toString() ?? req.user?.id,
     });
 
     res.status(404).json({
@@ -36,16 +36,19 @@ const setupErrorHandling = (app) => {
       method: req.method,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-      userId: req.user?.id,
+      userId: req.user?._id?.toString() ?? req.user?.id,
       shopId: req.user?.shopId,
     });
 
     // Handle specific error types
-    if (error.name === 'ValidationError') {
+    if (error.name === 'ValidationError' && error.errors) {
+      const details = Array.isArray(error.errors)
+        ? error.errors.map((err) => err.message)
+        : Object.values(error.errors).map((err) => err.message);
       return res.status(400).json({
         success: false,
         message: 'Validation error',
-        errors: Object.values(error.errors).map((err) => err.message),
+        errors: details,
       });
     }
 

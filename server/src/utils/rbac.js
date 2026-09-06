@@ -5,6 +5,7 @@
 
 const ROLES = {
   SHOP_ADMIN: 'SHOP_ADMIN',
+  SUPER_ADMIN: 'SUPER_ADMIN',
 };
 
 const PERMISSIONS = {
@@ -181,6 +182,8 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.SEND_BULK_SMS,
   ],
 
+  // Platform-level role: has every permission
+  [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
 };
 
 /**

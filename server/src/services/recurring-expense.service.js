@@ -13,9 +13,12 @@ const { logger } = require('../config/logging');
  * @param {Date} currentDate - Current due date
  * @param {string} frequency - Frequency type (daily, weekly, monthly, yearly)
  * @param {number} interval - Interval multiplier
+ * @param {number|null} anchorDay - Day-of-month anchor for monthly/yearly
+ *   recurrences (prevents drift like Jan 31 → Feb 28 → Mar 28). When null the
+ *   day of `currentDate` is used.
  * @returns {Date} Next due date
  */
-function calculateNextDueDate(currentDate, frequency, interval = 1) {
+function calculateNextDueDate(currentDate, frequency, interval = 1, anchorDay = null) {
   const nextDate = new Date(currentDate);
 
   switch (frequency) {
@@ -26,11 +29,28 @@ function calculateNextDueDate(currentDate, frequency, interval = 1) {
       nextDate.setDate(nextDate.getDate() + interval * 7);
       break;
     case 'monthly':
-      nextDate.setMonth(nextDate.getMonth() + interval);
-      break;
-    case 'yearly':
-      nextDate.setFullYear(nextDate.getFullYear() + interval);
-      break;
+    case 'yearly': {
+      // Anchor the day-of-month so short months never cause drift: a monthly
+      // expense due on the 31st lands on Feb 28/29, then Mar 31 again.
+      const monthsToAdd = frequency === 'monthly' ? interval : interval * 12;
+      const day = anchorDay || currentDate.getDate();
+      const target = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + monthsToAdd,
+        1,
+        currentDate.getHours(),
+        currentDate.getMinutes(),
+        currentDate.getSeconds(),
+        currentDate.getMilliseconds(),
+      );
+      const daysInTargetMonth = new Date(
+        target.getFullYear(),
+        target.getMonth() + 1,
+        0,
+      ).getDate();
+      target.setDate(Math.min(day, daysInTargetMonth));
+      return target;
+    }
     default:
       throw new Error(`Invalid frequency: ${frequency}`);
   }
@@ -134,32 +154,54 @@ async function processShopRecurringExpenses(shopId, processDate = new Date()) {
           continue;
         }
 
+        const dueDate = new Date(recurringConfig.nextDueDate);
+
+        // ATOMIC CLAIM: advance nextDueDate BEFORE creating the expense,
+        // guarded on the exact due date we read. If another worker (cron run,
+        // manual trigger, second instance) already processed this cycle, the
+        // guard fails and we skip — the same due date can never be billed
+        // twice, and a crash after the claim merely skips to the next cycle
+        // instead of duplicating the expense.
+        const anchorDay =
+          recurringConfig.billingDay || dueDate.getDate();
+        const nextDueDate = calculateNextDueDate(
+          dueDate,
+          recurringConfig.frequency,
+          recurringConfig.interval,
+          anchorDay,
+        );
+
+        const claim = await shopDb.collection('expenses').findOneAndUpdate(
+          {
+            _id: template._id,
+            isRecurring: true,
+            'recurringConfig.nextDueDate': dueDate,
+          },
+          {
+            $set: {
+              'recurringConfig.nextDueDate': nextDueDate,
+              'recurringConfig.billingDay': anchorDay,
+              updatedAt: new Date(),
+            },
+          },
+          { returnDocument: 'after' },
+        );
+
+        if (!claim) {
+          logger.info(
+            `Recurring expense ${template._id} already claimed by another worker, skipping`,
+          );
+          continue;
+        }
+
         // Create new expense from template
         const newExpense = await createExpenseFromTemplate(
           template,
           shopDb,
-          new Date(recurringConfig.nextDueDate),
+          dueDate,
         );
 
         results.createdExpenses.push(newExpense);
-
-        // Calculate next due date
-        const nextDueDate = calculateNextDueDate(
-          new Date(recurringConfig.nextDueDate),
-          recurringConfig.frequency,
-          recurringConfig.interval,
-        );
-
-        // Update the template's next due date
-        await shopDb.collection('expenses').updateOne(
-          { _id: template._id },
-          {
-            $set: {
-              'recurringConfig.nextDueDate': nextDueDate,
-              updatedAt: new Date(),
-            },
-          },
-        );
 
         results.updatedTemplates.push({
           templateId: template._id,
@@ -198,14 +240,18 @@ async function processShopRecurringExpenses(shopId, processDate = new Date()) {
 }
 
 /**
- * Process recurring expenses for all shops
+ * Process recurring expenses for the single app database.
+ *
+ * The app is single-tenant: `getShopDatabase()` always resolves to the one
+ * pinned database (SHOP_DB_NAME / SHOP_ID), regardless of the shopId passed.
+ * Iterating every `shop_*` database on the cluster (the old behaviour) would
+ * therefore process the SAME database once per database name — creating
+ * duplicate expenses. We process the single configured database exactly once.
+ *
  * @param {Date} processDate - Date to process (defaults to today)
  * @returns {Object} Overall processing results
  */
 async function processAllRecurringExpenses(processDate = new Date()) {
-  const { MongoClient } = require('mongodb');
-  const client = new MongoClient(process.env.MONGODB_URI);
-
   const overallResults = {
     processDate,
     totalShopsProcessed: 0,
@@ -215,50 +261,24 @@ async function processAllRecurringExpenses(processDate = new Date()) {
   };
 
   try {
-    await client.connect();
-    const adminDb = client.db('admin');
-
-    // Get list of all shop databases
-    const databases = await adminDb.admin().listDatabases();
-    const shopDatabases = databases.databases.filter(
-      (db) => db.name.startsWith('shop_') && db.name !== 'shop_template',
+    // Single-tenant: the pinned app database is the only one this app serves.
+    const shopResults = await processShopRecurringExpenses(
+      process.env.SHOP_DB_NAME || process.env.SHOP_ID || 'default',
+      processDate,
     );
-
-    logger.info(
-      `Processing recurring expenses for ${shopDatabases.length} shops`,
-    );
-
-    for (const dbInfo of shopDatabases) {
-      const shopId = dbInfo.name.replace('shop_', '');
-
-      try {
-        const shopResults = await processShopRecurringExpenses(
-          shopId,
-          processDate,
-        );
-        overallResults.shopResults.push(shopResults);
-        overallResults.totalExpensesCreated +=
-          shopResults.createdExpenses.length;
-        overallResults.totalShopsProcessed++;
-      } catch (error) {
-        logger.error(`Error processing shop ${shopId}:`, error);
-        overallResults.errors.push({
-          shopId,
-          error: error.message,
-        });
-      }
-    }
+    overallResults.shopResults.push(shopResults);
+    overallResults.totalExpensesCreated = shopResults.createdExpenses.length;
+    overallResults.totalShopsProcessed = 1;
+    overallResults.errors.push(...shopResults.errors);
   } catch (error) {
     logger.error('Error in processAllRecurringExpenses:', error);
     overallResults.errors.push({
       error: error.message,
     });
-  } finally {
-    await client.close();
   }
 
   logger.info(
-    `Recurring expense processing completed. Created ${overallResults.totalExpensesCreated} expenses across ${overallResults.totalShopsProcessed} shops`,
+    `Recurring expense processing completed. Created ${overallResults.totalExpensesCreated} expenses across ${overallResults.totalShopsProcessed} shop database(s)`,
   );
 
   return overallResults;

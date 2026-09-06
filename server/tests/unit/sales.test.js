@@ -80,6 +80,8 @@ describe("Sales Creation with Stock Deduction", () => {
       },
       customers: {
         findOne: jest.fn(),
+        // _updateCustomerAfterSale calls updateOne and reads result.matchedCount
+        updateOne: jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
       },
       // Event-sourced stock system collections
       stock_snapshots: {

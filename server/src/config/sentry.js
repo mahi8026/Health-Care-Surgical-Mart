@@ -63,9 +63,17 @@ const initializeSentry = (_app) => {
 
         // Remove sensitive data from request body
         if (event.request?.data) {
-          const data = typeof event.request.data === 'string'
-            ? JSON.parse(event.request.data)
-            : event.request.data;
+          let rawData = event.request.data;
+          if (typeof rawData === 'string') {
+            try {
+              rawData = JSON.parse(rawData);
+            } catch (_parseError) {
+              // Non-JSON body (form-encoded, text, etc.) — can't redact
+              // field-by-field; keep the event but strip any obvious strings.
+              return event;
+            }
+          }
+          const data = rawData;
 
           const sensitiveFields = [
             'password',

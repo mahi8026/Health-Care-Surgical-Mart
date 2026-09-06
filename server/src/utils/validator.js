@@ -79,8 +79,16 @@ const validateNonNegativeNumber = (value, fieldName = 'Value') => {
  * Validate integer
  */
 const validateInteger = (value, fieldName = 'Value') => {
-  const num = parseInt(value);
-  if (isNaN(num) || !Number.isInteger(num)) {
+  // Reject "12abc" / "12.5" / whitespace-wrapped garbage that parseInt would
+  // silently coerce. Accepts an optional leading sign and plain digits only.
+  if (
+    (typeof value === 'string' && !/^[+-]?\d+$/.test(value.trim())) ||
+    (typeof value !== 'string' && typeof value !== 'number')
+  ) {
+    throw new ValidationError(`${fieldName} must be an integer`);
+  }
+  const num = Number(value);
+  if (!Number.isInteger(num)) {
     throw new ValidationError(`${fieldName} must be an integer`);
   }
   return num;
@@ -185,6 +193,14 @@ const sanitizeObject = (obj) => {
   return sanitized;
 };
 
+/**
+ * Escape a string for safe use in a RegExp / MongoDB $regex so user-supplied
+ * search terms can't cause ReDoS or alter the match (e.g. "a+" would otherwise
+ * match more than the literal text "a+").
+ */
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 module.exports = {
   validateRequired,
   validateEmail,
@@ -199,4 +215,5 @@ module.exports = {
   validateArray,
   sanitizeString,
   sanitizeObject,
+  escapeRegex,
 };

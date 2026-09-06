@@ -118,7 +118,6 @@ module.exports = [
       '*.min.js',
       'uploads/**',
       'logs/**',
-      'src/utils/api.js', // Client-side code, not used in server
     ],
   },
 ];
